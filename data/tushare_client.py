@@ -116,6 +116,62 @@ class TushareClient:
             end_date=end_date,
         )
 
+    def daily_basic(
+        self,
+        *,
+        ts_code: str | None = None,
+        trade_date: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        fields: str | None = None,
+    ) -> pd.DataFrame:
+        return self._call_with_retry(
+            self._pro.daily_basic,
+            ts_code=ts_code,
+            trade_date=trade_date,
+            start_date=start_date,
+            end_date=end_date,
+            fields=fields,
+        )
+
+    def fina_indicator(
+        self,
+        *,
+        ts_code: str,
+        ann_date: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        period: str | None = None,
+        fields: str | None = None,
+    ) -> pd.DataFrame:
+        return self._call_with_retry(
+            self._pro.fina_indicator,
+            ts_code=ts_code,
+            ann_date=ann_date,
+            start_date=start_date,
+            end_date=end_date,
+            period=period,
+            fields=fields,
+        )
+
+    def trade_cal(
+        self,
+        *,
+        exchange: str = "SSE",
+        start_date: str | None = None,
+        end_date: str | None = None,
+        is_open: str | None = None,
+        fields: str | None = None,
+    ) -> pd.DataFrame:
+        return self._call_with_retry(
+            self._pro.trade_cal,
+            exchange=exchange,
+            start_date=start_date,
+            end_date=end_date,
+            is_open=is_open,
+            fields=fields,
+        )
+
     def pro_bar(
         self,
         *,
