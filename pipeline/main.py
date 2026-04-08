@@ -9,7 +9,7 @@ import pandas as pd
 from backtest import attach_benchmark, calc_benchmark_returns, calc_performance, calc_relative_performance, run_backtest
 from data import get_a_share_daily_prices, get_a_share_index_daily
 from factors import return_20d_factor, turnover_mean_20d_factor, volatility_20d_factor
-from reports import format_latest_selection, format_strategy_report
+from reports import format_latest_selection, format_strategy_report, render_strategy_report_text
 from signals import combine_factor_scores, rank_signal, top_n_selection
 
 
@@ -147,6 +147,7 @@ def run_minimal_pipeline(
             },
         },
     )
+    report_text = render_strategy_report_text(report)
 
     return {
         "factor_data": factor_panel,
@@ -159,4 +160,5 @@ def run_minimal_pipeline(
         "performance": performance,
         "latest_selection": latest_selection,
         "report": report,
+        "report_text": report_text,
     }
