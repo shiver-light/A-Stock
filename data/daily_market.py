@@ -25,6 +25,16 @@ DEFAULT_FIELDS = [
     "vol",
     "amount",
 ]
+MINIMAL_DAILY_FIELDS = [
+    "trade_date",
+    "ts_code",
+    "open",
+    "high",
+    "low",
+    "close",
+    "vol",
+    "amount",
+]
 
 
 @dataclass(frozen=True)
@@ -249,3 +259,37 @@ class AShareDailyMarketService:
         if missing:
             raise ValueError(f"Requested fields are unavailable: {missing}")
         return data.loc[:, list(fields)].copy()
+
+
+def get_a_share_daily_prices(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+    cache_dir: str | Path = "data/cache/tushare",
+) -> pd.DataFrame:
+    """Fetch unified A-share daily market data with a minimal research schema.
+
+    Tushare source:
+    - API: daily
+    - Doc: https://tushare.pro/document/2?doc_id=27
+    - Permission: 120 points and above
+    - Limit: 6000 rows per call, about 500 calls/min for base users
+
+    Notes
+    -----
+    - This function returns unadjusted daily bars.
+    - Output is sorted by trade_date, ts_code.
+    - Data is trade_date close data and does not change T close / T+1 execution assumptions.
+    """
+
+    service = AShareDailyMarketService(cache_dir=cache_dir)
+    request = DailyMarketRequest(
+        ts_code=ts_code,
+        start_date=start_date,
+        end_date=end_date,
+        fields=tuple(MINIMAL_DAILY_FIELDS),
+        refresh=refresh,
+    )
+    return service.get_daily(request)
