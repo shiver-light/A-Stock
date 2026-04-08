@@ -152,3 +152,30 @@ def run_backtest(
     returns = pd.DataFrame(records)
     holdings = pd.DataFrame(holdings_rows)
     return returns, holdings
+
+
+def calc_benchmark_returns(
+    benchmark_data: pd.DataFrame,
+    *,
+    date_col: str = "trade_date",
+) -> pd.DataFrame:
+    _validate_columns(benchmark_data, [date_col, "open", "close", "pre_close"])
+    data = benchmark_data.loc[:, [date_col, "open", "close", "pre_close"]].copy()
+    data[date_col] = data[date_col].astype(str)
+    data = data.sort_values(date_col).drop_duplicates(subset=[date_col], keep="last").reset_index(drop=True)
+    data["benchmark_return"] = data["close"] / data["pre_close"] - 1.0
+    return data.loc[:, [date_col, "benchmark_return"]]
+
+
+def attach_benchmark(
+    strategy_returns: pd.DataFrame,
+    benchmark_returns: pd.DataFrame,
+    *,
+    date_col: str = "trade_date",
+) -> pd.DataFrame:
+    _validate_columns(strategy_returns, [date_col, "strategy_return"])
+    _validate_columns(benchmark_returns, [date_col, "benchmark_return"])
+    merged = strategy_returns.merge(benchmark_returns, on=date_col, how="left")
+    merged["benchmark_return"] = merged["benchmark_return"].fillna(0.0)
+    merged["excess_return"] = merged["strategy_return"] - merged["benchmark_return"]
+    return merged.sort_values(date_col).reset_index(drop=True)

@@ -134,6 +134,24 @@ class TushareClient:
             fields=fields,
         )
 
+    def index_daily(
+        self,
+        *,
+        ts_code: str | None = None,
+        trade_date: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        fields: str | None = None,
+    ) -> pd.DataFrame:
+        return self._call_with_retry(
+            self._pro.index_daily,
+            ts_code=ts_code,
+            trade_date=trade_date,
+            start_date=start_date,
+            end_date=end_date,
+            fields=fields,
+        )
+
     def fina_indicator(
         self,
         *,

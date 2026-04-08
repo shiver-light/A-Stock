@@ -45,3 +45,35 @@ def calc_performance(
         "max_drawdown": max_drawdown,
         "sharpe": sharpe,
     }
+
+
+def calc_relative_performance(
+    returns_with_benchmark: pd.DataFrame,
+    *,
+    date_col: str = "trade_date",
+    benchmark_col: str = "benchmark_return",
+    excess_col: str = "excess_return",
+) -> dict[str, float]:
+    if returns_with_benchmark.empty:
+        return {
+            "benchmark_cumulative_return": 0.0,
+            "excess_cumulative_return": 0.0,
+            "excess_annual_return": 0.0,
+        }
+
+    data = returns_with_benchmark.loc[:, [date_col, benchmark_col, excess_col]].copy()
+    data = data.sort_values(date_col).reset_index(drop=True)
+
+    benchmark_equity = (1.0 + data[benchmark_col].fillna(0.0)).cumprod()
+    excess_equity = (1.0 + data[excess_col].fillna(0.0)).cumprod()
+
+    benchmark_cumulative_return = float(benchmark_equity.iloc[-1] - 1.0)
+    excess_cumulative_return = float(excess_equity.iloc[-1] - 1.0)
+    num_days = len(data)
+    excess_annual_return = float(excess_equity.iloc[-1] ** (252 / num_days) - 1.0) if num_days > 0 else 0.0
+
+    return {
+        "benchmark_cumulative_return": benchmark_cumulative_return,
+        "excess_cumulative_return": excess_cumulative_return,
+        "excess_annual_return": excess_annual_return,
+    }

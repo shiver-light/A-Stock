@@ -6,8 +6,8 @@ from functools import reduce
 
 import pandas as pd
 
-from backtest import calc_performance, run_backtest
-from data import get_a_share_daily_prices
+from backtest import attach_benchmark, calc_benchmark_returns, calc_performance, calc_relative_performance, run_backtest
+from data import get_a_share_daily_prices, get_a_share_index_daily
 from factors import return_20d_factor, turnover_mean_20d_factor, volatility_20d_factor
 from reports import format_latest_selection, format_strategy_report
 from signals import combine_factor_scores, rank_signal, top_n_selection
@@ -102,6 +102,7 @@ def run_minimal_pipeline(
     start_date: str,
     end_date: str,
     top_n: int = 20,
+    benchmark_code: str = "000300.SH",
 ) -> dict[str, object]:
     factor_panel = build_factor_panel(ts_codes=ts_codes, start_date=start_date, end_date=end_date)
     scored = combine_factor_scores(
@@ -117,7 +118,16 @@ def run_minimal_pipeline(
         signals=selected.loc[:, ["trade_date", "ts_code", "selected"]],
         market_data=market_panel,
     )
+    benchmark_data = get_a_share_index_daily(
+        ts_code=benchmark_code,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    benchmark_returns = calc_benchmark_returns(benchmark_data)
+    returns_with_benchmark = attach_benchmark(strategy_returns, benchmark_returns)
+
     performance = calc_performance(strategy_returns)
+    performance.update(calc_relative_performance(returns_with_benchmark))
 
     latest_date = None
     if not selected.empty:
@@ -128,6 +138,7 @@ def run_minimal_pipeline(
         performance,
         config={
             "universe": ts_codes,
+            "benchmark_code": benchmark_code,
             "selection_logic": "等权综合因子打分后按日排序取Top N",
             "factor_config": {
                 "return_20d": 1.0,
@@ -142,6 +153,8 @@ def run_minimal_pipeline(
         "scored_signals": scored,
         "selected_signals": selected,
         "strategy_returns": strategy_returns,
+        "benchmark_returns": benchmark_returns,
+        "returns_with_benchmark": returns_with_benchmark,
         "holdings": holdings,
         "performance": performance,
         "latest_selection": latest_selection,

@@ -49,9 +49,16 @@ def format_strategy_report(
             "max_drawdown": performance.get("max_drawdown", 0.0),
             "sharpe": performance.get("sharpe", 0.0),
         },
+        "benchmark": {
+            "benchmark_code": config.get("benchmark_code"),
+            "benchmark_cumulative_return": performance.get("benchmark_cumulative_return", 0.0),
+            "excess_cumulative_return": performance.get("excess_cumulative_return", 0.0),
+            "excess_annual_return": performance.get("excess_annual_return", 0.0),
+        },
         "risk": [
             "基于历史数据，不保证未来收益。",
             "可能存在回撤和风格失效风险。",
             "当前MVP未建模停牌、涨跌停和滑点约束。",
+            "当前benchmark使用指数日线收益作为对照，不代表可完全复制的指数投资结果。",
         ],
     }
