@@ -6,12 +6,19 @@ from functools import reduce
 
 import pandas as pd
 
-from backtest import attach_benchmark, calc_benchmark_returns, calc_performance, calc_relative_performance, run_backtest
+from backtest import (
+    attach_benchmark,
+    calc_benchmark_returns,
+    calc_performance,
+    calc_relative_performance,
+    get_rebalance_schedule,
+    run_backtest,
+)
 from data import get_a_share_daily_prices, get_a_share_index_daily
 from factors import return_20d_factor, turnover_mean_20d_factor, volatility_20d_factor
 from reports import format_latest_selection, format_strategy_report, render_strategy_report_text
 from signals import combine_factor_scores, rank_signal, top_n_selection
-from universe import get_universe
+from universe import get_universe, get_universe_history
 
 
 def _factor_to_wide(
@@ -106,10 +113,19 @@ def run_minimal_pipeline(
     benchmark_code: str = "000300.SH",
     universe_name: str | None = None,
 ) -> dict[str, object]:
+    benchmark_data = get_a_share_index_daily(
+        ts_code=benchmark_code,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    trade_dates = benchmark_data["trade_date"].astype(str).drop_duplicates().sort_values().tolist()
+    rebalance_schedule = get_rebalance_schedule(trade_dates)
+
     resolved_ts_codes = _resolve_ts_codes(
         ts_codes=ts_codes,
         universe_name=universe_name,
         as_of_date=end_date,
+        signal_dates=rebalance_schedule["signal_date"].tolist() if not rebalance_schedule.empty else None,
     )
     factor_panel = build_factor_panel(ts_codes=resolved_ts_codes, start_date=start_date, end_date=end_date)
     scored = combine_factor_scores(
@@ -118,17 +134,14 @@ def run_minimal_pipeline(
         directions={"return_20d": 1, "volatility_20d": -1, "turnover_mean_20d": 1},
     )
     ranked = rank_signal(scored, score_col="score")
+    if universe_name and not ts_codes:
+        ranked = _filter_ranked_by_universe_history(ranked, universe_name, rebalance_schedule["signal_date"].tolist())
     selected = top_n_selection(ranked, top_n=top_n)
 
     market_panel = _build_market_panel(ts_codes=resolved_ts_codes, start_date=start_date, end_date=end_date)
     strategy_returns, holdings = run_backtest(
         signals=selected.loc[:, ["trade_date", "ts_code", "selected"]],
         market_data=market_panel,
-    )
-    benchmark_data = get_a_share_index_daily(
-        ts_code=benchmark_code,
-        start_date=start_date,
-        end_date=end_date,
     )
     benchmark_returns = calc_benchmark_returns(benchmark_data)
     returns_with_benchmark = attach_benchmark(strategy_returns, benchmark_returns)
@@ -177,10 +190,27 @@ def _resolve_ts_codes(
     ts_codes: list[str] | None,
     universe_name: str | None,
     as_of_date: str,
+    signal_dates: list[str] | None = None,
 ) -> list[str]:
     if ts_codes:
         return sorted(set(ts_codes))
     if not universe_name:
         raise ValueError("Either ts_codes or universe_name must be provided.")
-    universe = get_universe(universe_name, as_of_date)
+    if signal_dates:
+        universe = get_universe_history(universe_name, signal_dates)
+    else:
+        universe = get_universe(universe_name, as_of_date)
     return universe["ts_code"].drop_duplicates().sort_values().tolist()
+
+
+def _filter_ranked_by_universe_history(
+    ranked: pd.DataFrame,
+    universe_name: str,
+    signal_dates: list[str],
+) -> pd.DataFrame:
+    if not signal_dates:
+        return ranked
+    universe_history = get_universe_history(universe_name, signal_dates)
+    allowed = universe_history.loc[:, ["as_of_date", "ts_code"]].rename(columns={"as_of_date": "trade_date"})
+    filtered = ranked.merge(allowed, on=["trade_date", "ts_code"], how="inner")
+    return filtered.sort_values(["trade_date", "rank", "ts_code"]).reset_index(drop=True)

@@ -2,6 +2,10 @@
 
 统一定义某个 `as_of_date` 可选哪些股票。
 
+也支持按一组历史日期批量获取：
+
+- `get_universe_history(universe_name, as_of_dates, ...)`
+
 ## 支持的 universe
 
 - `all_a`

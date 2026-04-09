@@ -78,6 +78,35 @@ def get_universe(
     return result.loc[:, ["as_of_date", "ts_code", "universe_name", "in_universe"]].reset_index(drop=True)
 
 
+def get_universe_history(
+    universe_name: str,
+    as_of_dates: list[str],
+    *,
+    ts_codes: list[str] | None = None,
+    include_weights: bool = False,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    unique_dates = sorted(set(as_of_dates))
+    frames: list[pd.DataFrame] = []
+    for as_of_date in unique_dates:
+        frame = get_universe(
+            universe_name,
+            as_of_date,
+            ts_codes=ts_codes,
+            include_weights=include_weights,
+            refresh=refresh,
+        )
+        frames.append(frame)
+    if not frames:
+        return pd.DataFrame(columns=["as_of_date", "ts_code", "universe_name", "in_universe"])
+    return (
+        pd.concat(frames, ignore_index=True)
+        .sort_values(["as_of_date", "ts_code"])
+        .drop_duplicates(subset=["as_of_date", "ts_code", "universe_name"], keep="last")
+        .reset_index(drop=True)
+    )
+
+
 def _filter_active_a_share(stock_basic: pd.DataFrame, as_of_date: str) -> pd.DataFrame:
     data = stock_basic.copy()
     data["list_date"] = data["list_date"].fillna("").astype(str)

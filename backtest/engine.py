@@ -47,6 +47,11 @@ def _execution_schedule(trade_dates: list[str]) -> pd.DataFrame:
     return pd.DataFrame(schedule_rows)
 
 
+def get_rebalance_schedule(trade_dates: list[str]) -> pd.DataFrame:
+    """Return the monthly execution schedule under the current backtest assumptions."""
+    return _execution_schedule(trade_dates)
+
+
 def generate_weights(
     signals: pd.DataFrame,
     market_data: pd.DataFrame,
