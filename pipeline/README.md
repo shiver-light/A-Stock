@@ -30,3 +30,39 @@
 - `performance`
 - `latest_selection`
 - `report`
+- `report_text`
+
+## 命令行执行
+
+按 universe 运行：
+
+```bash
+export TUSHARE_TOKEN=your_token
+python3 -m pipeline \
+  --universe-name hs300 \
+  --start-date 20250101 \
+  --end-date 20250331 \
+  --top-n 5 \
+  --benchmark-code 000300.SH
+```
+
+按自定义股票列表运行：
+
+```bash
+export TUSHARE_TOKEN=your_token
+python3 -m pipeline \
+  --ts-codes 000001.SZ 000002.SZ 600000.SH \
+  --start-date 20250101 \
+  --end-date 20250331 \
+  --top-n 3
+```
+
+如果需要结构化输出：
+
+```bash
+python3 -m pipeline \
+  --universe-name hs300 \
+  --start-date 20250101 \
+  --end-date 20250331 \
+  --output json
+```
