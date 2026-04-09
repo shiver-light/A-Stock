@@ -11,6 +11,7 @@ from data import get_a_share_daily_prices, get_a_share_index_daily
 from factors import return_20d_factor, turnover_mean_20d_factor, volatility_20d_factor
 from reports import format_latest_selection, format_strategy_report, render_strategy_report_text
 from signals import combine_factor_scores, rank_signal, top_n_selection
+from universe import get_universe
 
 
 def _factor_to_wide(
@@ -98,13 +99,19 @@ def _build_market_panel(
 
 def run_minimal_pipeline(
     *,
-    ts_codes: list[str],
+    ts_codes: list[str] | None = None,
     start_date: str,
     end_date: str,
     top_n: int = 20,
     benchmark_code: str = "000300.SH",
+    universe_name: str | None = None,
 ) -> dict[str, object]:
-    factor_panel = build_factor_panel(ts_codes=ts_codes, start_date=start_date, end_date=end_date)
+    resolved_ts_codes = _resolve_ts_codes(
+        ts_codes=ts_codes,
+        universe_name=universe_name,
+        as_of_date=end_date,
+    )
+    factor_panel = build_factor_panel(ts_codes=resolved_ts_codes, start_date=start_date, end_date=end_date)
     scored = combine_factor_scores(
         factor_panel,
         factor_cols=["return_20d", "volatility_20d", "turnover_mean_20d"],
@@ -113,7 +120,7 @@ def run_minimal_pipeline(
     ranked = rank_signal(scored, score_col="score")
     selected = top_n_selection(ranked, top_n=top_n)
 
-    market_panel = _build_market_panel(ts_codes=ts_codes, start_date=start_date, end_date=end_date)
+    market_panel = _build_market_panel(ts_codes=resolved_ts_codes, start_date=start_date, end_date=end_date)
     strategy_returns, holdings = run_backtest(
         signals=selected.loc[:, ["trade_date", "ts_code", "selected"]],
         market_data=market_panel,
@@ -137,7 +144,8 @@ def run_minimal_pipeline(
         latest_selection,
         performance,
         config={
-            "universe": ts_codes,
+            "universe": resolved_ts_codes,
+            "universe_name": universe_name or "custom",
             "benchmark_code": benchmark_code,
             "selection_logic": "等权综合因子打分后按日排序取Top N",
             "factor_config": {
@@ -162,3 +170,17 @@ def run_minimal_pipeline(
         "report": report,
         "report_text": report_text,
     }
+
+
+def _resolve_ts_codes(
+    *,
+    ts_codes: list[str] | None,
+    universe_name: str | None,
+    as_of_date: str,
+) -> list[str]:
+    if ts_codes:
+        return sorted(set(ts_codes))
+    if not universe_name:
+        raise ValueError("Either ts_codes or universe_name must be provided.")
+    universe = get_universe(universe_name, as_of_date)
+    return universe["ts_code"].drop_duplicates().sort_values().tolist()

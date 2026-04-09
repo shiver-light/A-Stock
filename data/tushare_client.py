@@ -152,6 +152,44 @@ class TushareClient:
             fields=fields,
         )
 
+    def stock_basic(
+        self,
+        *,
+        ts_code: str | None = None,
+        name: str | None = None,
+        market: str | None = None,
+        list_status: str | None = None,
+        exchange: str | None = None,
+        is_hs: str | None = None,
+        fields: str | None = None,
+    ) -> pd.DataFrame:
+        return self._call_with_retry(
+            self._pro.stock_basic,
+            ts_code=ts_code,
+            name=name,
+            market=market,
+            list_status=list_status,
+            exchange=exchange,
+            is_hs=is_hs,
+            fields=fields,
+        )
+
+    def index_weight(
+        self,
+        *,
+        index_code: str,
+        trade_date: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> pd.DataFrame:
+        return self._call_with_retry(
+            self._pro.index_weight,
+            index_code=index_code,
+            trade_date=trade_date,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
     def fina_indicator(
         self,
         *,
