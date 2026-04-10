@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 import pandas as pd
+import yaml
 
 
 def _load_tushare_sdk():
@@ -51,12 +52,33 @@ class TushareClient:
 
     @staticmethod
     def _resolve_token(explicit_token: str | None) -> str:
-        token = explicit_token or os.getenv("TUSHARE_TOKEN") or os.getenv("TS_TOKEN")
+        token = (
+            explicit_token
+            or os.getenv("TUSHARE_TOKEN")
+            or os.getenv("TS_TOKEN")
+            or TushareClient._load_token_from_settings()
+        )
         if not token:
             raise ValueError(
-                "Missing Tushare token. Set TUSHARE_TOKEN or TS_TOKEN in the environment."
+                "Missing Tushare token. Set TUSHARE_TOKEN or TS_TOKEN in the environment, "
+                "or add tushare_token to config/settings.yaml."
             )
         return token
+
+    @staticmethod
+    def _load_token_from_settings() -> str | None:
+        settings_path = Path(__file__).resolve().parents[1] / "config" / "settings.yaml"
+        if not settings_path.exists():
+            return None
+
+        with settings_path.open("r", encoding="utf-8") as handle:
+            payload = yaml.safe_load(handle) or {}
+
+        token = payload.get("tushare_token")
+        if token is None:
+            return None
+        token = str(token).strip()
+        return token or None
 
     def _throttle(self) -> None:
         now = time.monotonic()
