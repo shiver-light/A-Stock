@@ -12,7 +12,11 @@ from pathlib import Path
 from typing import Any, Callable
 
 import pandas as pd
-import yaml
+
+try:
+    import yaml
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    yaml = None
 
 
 def _load_tushare_sdk():
@@ -71,14 +75,32 @@ class TushareClient:
         if not settings_path.exists():
             return None
 
-        with settings_path.open("r", encoding="utf-8") as handle:
-            payload = yaml.safe_load(handle) or {}
+        payload = TushareClient._read_settings_payload(settings_path)
+        if not isinstance(payload, dict):
+            return None
 
         token = payload.get("tushare_token")
         if token is None:
             return None
         token = str(token).strip()
         return token or None
+
+    @staticmethod
+    def _read_settings_payload(settings_path: Path) -> dict[str, object] | None:
+        if yaml is not None:
+            with settings_path.open("r", encoding="utf-8") as handle:
+                return yaml.safe_load(handle) or {}
+
+        # Fallback parser for the current minimal settings file format.
+        payload: dict[str, object] = {}
+        with settings_path.open("r", encoding="utf-8") as handle:
+            for raw_line in handle:
+                line = raw_line.strip()
+                if not line or line.startswith("#") or ":" not in line:
+                    continue
+                key, value = line.split(":", 1)
+                payload[key.strip()] = value.strip().strip("'").strip('"')
+        return payload
 
     def _throttle(self) -> None:
         now = time.monotonic()
