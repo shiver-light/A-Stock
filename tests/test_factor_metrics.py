@@ -12,6 +12,7 @@ from analysis.factor_metrics import (
     calc_quantile_returns,
     calc_rank_ic,
 )
+from analysis.factor_report import build_factor_diagnostics_report, render_factor_report_text
 
 
 class FactorMetricsTestCase(unittest.TestCase):
@@ -183,6 +184,97 @@ class FactorMetricsTestCase(unittest.TestCase):
         self.assertEqual(result.loc[0, "total_count"], 3)
         self.assertEqual(result.loc[0, "non_null_count"], 1)
         self.assertAlmostEqual(result.loc[0, "coverage"], 1.0 / 3.0)
+
+    def test_build_factor_diagnostics_report_basic_summary(self) -> None:
+        ic_data = pd.DataFrame(
+            {
+                "trade_date": ["20240102", "20240103"],
+                "horizon": [5, 5],
+                "ic": [0.1, 0.3],
+                "n_obs": [100, 100],
+                "method": ["pearson", "pearson"],
+            }
+        )
+        rank_ic_data = pd.DataFrame(
+            {
+                "trade_date": ["20240102", "20240103"],
+                "horizon": [5, 5],
+                "ic": [0.2, 0.4],
+                "n_obs": [100, 100],
+                "method": ["spearman", "spearman"],
+            }
+        )
+        coverage_data = pd.DataFrame(
+            {
+                "trade_date": ["20240102", "20240103"],
+                "coverage": [0.8, 0.6],
+                "non_null_count": [80, 60],
+                "total_count": [100, 100],
+            }
+        )
+        quantile_returns = pd.DataFrame(
+            {
+                "trade_date": ["20240102", "20240102", "20240103", "20240103"],
+                "quantile": [1, 5, 1, 5],
+                "horizon": [5, 5, 5, 5],
+                "forward_return": [0.01, 0.05, 0.02, 0.06],
+                "n_obs": [20, 20, 20, 20],
+            }
+        )
+
+        report = build_factor_diagnostics_report(
+            factor_name="return_20d",
+            horizon=5,
+            ic_data=ic_data,
+            rank_ic_data=rank_ic_data,
+            coverage_data=coverage_data,
+            quantile_returns=quantile_returns,
+        )
+
+        self.assertEqual(report["factor_name"], "return_20d")
+        self.assertEqual(report["horizon"], 5)
+        self.assertAlmostEqual(report["ic_mean"], 0.2)
+        self.assertAlmostEqual(report["rank_ic_mean"], 0.3)
+        self.assertAlmostEqual(report["coverage"], 0.7)
+        self.assertEqual(len(report["quantile_return_summary"]), 2)
+
+    def test_build_factor_diagnostics_report_handles_empty_metrics(self) -> None:
+        report = build_factor_diagnostics_report(
+            factor_name="return_20d",
+            horizon=5,
+            ic_data=pd.DataFrame(columns=["trade_date", "horizon", "ic", "n_obs", "method"]),
+            rank_ic_data=pd.DataFrame(columns=["trade_date", "horizon", "ic", "n_obs", "method"]),
+            coverage_data=pd.DataFrame(columns=["trade_date", "coverage", "non_null_count", "total_count"]),
+            quantile_returns=pd.DataFrame(columns=["trade_date", "quantile", "horizon", "forward_return", "n_obs"]),
+        )
+
+        self.assertIsNone(report["ic_mean"])
+        self.assertIsNone(report["icir"])
+        self.assertEqual(report["quantile_return_summary"], [])
+
+    def test_render_factor_report_text_contains_key_fields(self) -> None:
+        report = {
+            "factor_name": "return_20d",
+            "horizon": 5,
+            "ic_mean": 0.1,
+            "ic_std": 0.05,
+            "icir": 2.0,
+            "rank_ic_mean": 0.12,
+            "coverage": 0.8,
+            "observation_summary": {"ic_dates": 10, "rank_ic_dates": 10, "coverage_dates": 12},
+            "quantile_return_summary": [
+                {"quantile": 1, "mean_return": -0.01, "mean_count": 30.0, "date_count": 10},
+                {"quantile": 5, "mean_return": 0.02, "mean_count": 30.0, "date_count": 10},
+            ],
+            "risk": ["基于历史样本统计，不保证未来有效。"],
+        }
+
+        text = render_factor_report_text(report)
+
+        self.assertIn("factor name: return_20d", text)
+        self.assertIn("horizon: 5d", text)
+        self.assertIn("ic mean: 0.100000", text)
+        self.assertIn("q5: mean_return=0.020000", text)
 
 
 if __name__ == "__main__":
