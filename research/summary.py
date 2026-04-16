@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
+
+from research.storage import read_json
 
 
 def build_research_summary(results: list[dict[str, object]]) -> pd.DataFrame:
@@ -35,3 +39,35 @@ def sort_research_summary(summary: pd.DataFrame, by: str = "sharpe", ascending: 
     if by not in summary.columns:
         raise ValueError(f"Unknown sort column: {by}")
     return summary.sort_values(by=by, ascending=ascending).reset_index(drop=True)
+
+
+def rebuild_summary_from_disk(run_dir: str | Path) -> pd.DataFrame:
+    run_path = Path(run_dir)
+    experiments_dir = run_path / "experiments"
+    if not experiments_dir.exists():
+        return pd.DataFrame()
+
+    results: list[dict[str, object]] = []
+    for experiment_dir in sorted(experiments_dir.iterdir()):
+        if not experiment_dir.is_dir():
+            continue
+        status_path = experiment_dir / "status.json"
+        config_path = experiment_dir / "config.json"
+        metrics_path = experiment_dir / "metrics.json"
+        if not status_path.exists() or not config_path.exists() or not metrics_path.exists():
+            continue
+
+        status = read_json(status_path)
+        if status.get("status") != "completed":
+            continue
+        config = read_json(config_path)
+        metrics = read_json(metrics_path)
+        results.append(
+            {
+                "name": experiment_dir.name,
+                "config": config,
+                "performance": metrics,
+            }
+        )
+
+    return build_research_summary(results)
