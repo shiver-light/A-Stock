@@ -6,6 +6,15 @@ from functools import reduce
 
 import pandas as pd
 
+from analysis import (
+    build_factor_diagnostics_report,
+    calc_factor_coverage,
+    calc_forward_returns,
+    calc_ic,
+    calc_quantile_returns,
+    calc_rank_ic,
+    render_factor_report_text,
+)
 from backtest import (
     attach_benchmark,
     calc_benchmark_returns,
@@ -113,6 +122,8 @@ def run_minimal_pipeline(
     benchmark_code: str = "000300.SH",
     universe_name: str | None = None,
     factor_config: dict[str, float] | None = None,
+    enable_factor_diagnostics: bool = False,
+    analysis_horizons: tuple[int, ...] = (5, 10, 20),
 ) -> dict[str, object]:
     benchmark_data = get_a_share_index_daily(
         ts_code=benchmark_code,
@@ -178,7 +189,7 @@ def run_minimal_pipeline(
     )
     report_text = render_strategy_report_text(report)
 
-    return {
+    result = {
         "factor_data": factor_panel,
         "scored_signals": scored,
         "selected_signals": selected,
@@ -191,6 +202,17 @@ def run_minimal_pipeline(
         "report": report,
         "report_text": report_text,
     }
+    if enable_factor_diagnostics:
+        factor_diagnostics, factor_report_text = _build_factor_diagnostics_outputs(
+            factor_panel=factor_panel,
+            market_panel=market_panel,
+            factor_names=list(factor_config.keys()),
+            analysis_horizons=analysis_horizons,
+        )
+        result["factor_diagnostics"] = factor_diagnostics
+        result["factor_report_text"] = factor_report_text
+
+    return result
 
 
 def _resolve_ts_codes(
@@ -222,3 +244,68 @@ def _filter_ranked_by_universe_history(
     allowed = universe_history.loc[:, ["as_of_date", "ts_code"]].rename(columns={"as_of_date": "trade_date"})
     filtered = ranked.merge(allowed, on=["trade_date", "ts_code"], how="inner")
     return filtered.sort_values(["trade_date", "rank", "ts_code"]).reset_index(drop=True)
+
+
+def _build_factor_diagnostics_outputs(
+    *,
+    factor_panel: pd.DataFrame,
+    market_panel: pd.DataFrame,
+    factor_names: list[str],
+    analysis_horizons: tuple[int, ...],
+) -> tuple[dict[str, list[dict[str, object]]], dict[str, str]]:
+    unique_horizons = tuple(sorted({int(horizon) for horizon in analysis_horizons if int(horizon) > 0}))
+    if not unique_horizons:
+        raise ValueError("analysis_horizons must contain at least one positive integer.")
+
+    if market_panel.empty:
+        forward_returns = calc_forward_returns(
+            pd.DataFrame(columns=["trade_date", "ts_code", "close"]),
+            list(unique_horizons),
+        )
+    else:
+        forward_returns = calc_forward_returns(
+            market_panel.loc[:, ["trade_date", "ts_code", "close"]].copy(),
+            list(unique_horizons),
+        )
+
+    diagnostics: dict[str, list[dict[str, object]]] = {}
+    report_text: dict[str, str] = {}
+    for factor_name in factor_names:
+        if factor_name not in factor_panel.columns:
+            diagnostics[factor_name] = []
+            report_text[factor_name] = ""
+            continue
+
+        factor_data = (
+            factor_panel.loc[:, ["trade_date", "ts_code", factor_name]]
+            .rename(columns={factor_name: "factor_value"})
+            .sort_values(["trade_date", "ts_code"])
+            .reset_index(drop=True)
+        )
+        if factor_data.empty or factor_data["factor_value"].dropna().empty:
+            diagnostics[factor_name] = []
+            report_text[factor_name] = ""
+            continue
+
+        coverage_data = calc_factor_coverage(factor_data)
+        ic_data = calc_ic(factor_data, forward_returns)
+        rank_ic_data = calc_rank_ic(factor_data, forward_returns)
+        quantile_returns = calc_quantile_returns(factor_data, forward_returns)
+
+        factor_reports = [
+            build_factor_diagnostics_report(
+                factor_name=factor_name,
+                horizon=horizon,
+                ic_data=ic_data,
+                rank_ic_data=rank_ic_data,
+                coverage_data=coverage_data,
+                quantile_returns=quantile_returns,
+            )
+            for horizon in unique_horizons
+        ]
+        diagnostics[factor_name] = factor_reports
+        report_text[factor_name] = "\n\n".join(
+            render_factor_report_text(report) for report in factor_reports
+        )
+
+    return diagnostics, report_text
