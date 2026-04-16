@@ -1,0 +1,28 @@
+global:
+  start_date: "20250101"
+  end_date: "20250331"
+  benchmark_code: "000300.SH"
+  top_n: 20
+
+experiments:
+  - name: "hs300_baseline"
+    universe_name: "hs300"
+    factor_config:
+      return_20d: 1.0
+      volatility_20d: -1.0
+      turnover_mean_20d: 1.0
+
+  - name: "hs300_low_vol_bias"
+    universe_name: "hs300"
+    factor_config:
+      return_20d: 0.5
+      volatility_20d: -1.5
+      turnover_mean_20d: 0.5
+
+  - name: "zz500_balanced_top30"
+    universe_name: "zz500"
+    top_n: 30
+    factor_config:
+      return_20d: 1.0
+      volatility_20d: -1.0
+      turnover_mean_20d: 0.5

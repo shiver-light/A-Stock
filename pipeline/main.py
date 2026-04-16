@@ -39,32 +39,34 @@ def build_factor_panel(
     ts_codes: list[str],
     start_date: str,
     end_date: str,
+    factor_config: dict[str, float] | None = None,
 ) -> pd.DataFrame:
+    factor_config = factor_config or {
+        "return_20d": 1.0,
+        "volatility_20d": -1.0,
+        "turnover_mean_20d": 1.0,
+    }
+    factor_function_map = {
+        "return_20d": return_20d_factor,
+        "volatility_20d": volatility_20d_factor,
+        "turnover_mean_20d": turnover_mean_20d_factor,
+    }
+
     factor_frames: list[pd.DataFrame] = []
     for ts_code in ts_codes:
-        frames = [
-            _factor_to_wide(
-                return_20d_factor,
-                factor_name="return_20d",
-                ts_code=ts_code,
-                start_date=start_date,
-                end_date=end_date,
-            ),
-            _factor_to_wide(
-                volatility_20d_factor,
-                factor_name="volatility_20d",
-                ts_code=ts_code,
-                start_date=start_date,
-                end_date=end_date,
-            ),
-            _factor_to_wide(
-                turnover_mean_20d_factor,
-                factor_name="turnover_mean_20d",
-                ts_code=ts_code,
-                start_date=start_date,
-                end_date=end_date,
-            ),
-        ]
+        frames = []
+        for factor_name in factor_config:
+            if factor_name not in factor_function_map:
+                raise ValueError(f"Unsupported factor in factor_config: {factor_name}")
+            frames.append(
+                _factor_to_wide(
+                    factor_function_map[factor_name],
+                    factor_name=factor_name,
+                    ts_code=ts_code,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+            )
         merged = reduce(
             lambda left, right: left.merge(right, on=["trade_date", "ts_code"], how="inner"),
             frames,
@@ -72,9 +74,7 @@ def build_factor_panel(
         factor_frames.append(merged)
 
     if not factor_frames:
-        return pd.DataFrame(
-            columns=["trade_date", "ts_code", "return_20d", "volatility_20d", "turnover_mean_20d"]
-        )
+        return pd.DataFrame(columns=["trade_date", "ts_code", *factor_config.keys()])
     return (
         pd.concat(factor_frames, ignore_index=True)
         .sort_values(["trade_date", "ts_code"])
@@ -112,6 +112,7 @@ def run_minimal_pipeline(
     top_n: int = 20,
     benchmark_code: str = "000300.SH",
     universe_name: str | None = None,
+    factor_config: dict[str, float] | None = None,
 ) -> dict[str, object]:
     benchmark_data = get_a_share_index_daily(
         ts_code=benchmark_code,
@@ -121,17 +122,28 @@ def run_minimal_pipeline(
     trade_dates = benchmark_data["trade_date"].astype(str).drop_duplicates().sort_values().tolist()
     rebalance_schedule = get_rebalance_schedule(trade_dates)
 
+    factor_config = factor_config or {
+        "return_20d": 1.0,
+        "volatility_20d": -1.0,
+        "turnover_mean_20d": 1.0,
+    }
     resolved_ts_codes = _resolve_ts_codes(
         ts_codes=ts_codes,
         universe_name=universe_name,
         as_of_date=end_date,
         signal_dates=rebalance_schedule["signal_date"].tolist() if not rebalance_schedule.empty else None,
     )
-    factor_panel = build_factor_panel(ts_codes=resolved_ts_codes, start_date=start_date, end_date=end_date)
+    factor_panel = build_factor_panel(
+        ts_codes=resolved_ts_codes,
+        start_date=start_date,
+        end_date=end_date,
+        factor_config=factor_config,
+    )
     scored = combine_factor_scores(
         factor_panel,
-        factor_cols=["return_20d", "volatility_20d", "turnover_mean_20d"],
-        directions={"return_20d": 1, "volatility_20d": -1, "turnover_mean_20d": 1},
+        factor_cols=list(factor_config.keys()),
+        directions={factor_name: 1 if weight >= 0 else -1 for factor_name, weight in factor_config.items()},
+        weights={factor_name: abs(weight) for factor_name, weight in factor_config.items()},
     )
     ranked = rank_signal(scored, score_col="score")
     if universe_name and not ts_codes:
@@ -161,11 +173,7 @@ def run_minimal_pipeline(
             "universe_name": universe_name or "custom",
             "benchmark_code": benchmark_code,
             "selection_logic": "等权综合因子打分后按日排序取Top N",
-            "factor_config": {
-                "return_20d": 1.0,
-                "volatility_20d": -1.0,
-                "turnover_mean_20d": 1.0,
-            },
+            "factor_config": factor_config,
         },
     )
     report_text = render_strategy_report_text(report)
