@@ -21,6 +21,16 @@ from research.storage import (
 from research.summary import rebuild_summary_from_disk
 
 
+def _format_factor_report_text(factor_report_text: dict[str, str]) -> str:
+    sections: list[str] = []
+    for factor_name, content in factor_report_text.items():
+        if not content:
+            continue
+        sections.append(f"[{factor_name}]")
+        sections.append(content)
+    return "\n\n".join(sections)
+
+
 def run_experiments(
     config: dict[str, object],
     *,
@@ -63,21 +73,26 @@ def run_experiments(
         latest_selection_path = experiment_dir / "latest_selection.json"
         report_path = experiment_dir / "report.json"
         report_text_path = experiment_dir / "report.txt"
+        factor_diagnostics_path = experiment_dir / "factor_diagnostics.json"
+        factor_report_text_path = experiment_dir / "factor_report.txt"
         error_path = experiment_dir / "error.txt"
 
         write_json(config_path, experiment_config)
         status = load_status(status_path, name)
         if status.get("status") == "completed" and metrics_path.exists() and report_path.exists():
-            results.append(
-                {
-                    "name": name,
-                    "config": read_json(config_path),
-                    "performance": read_json(metrics_path),
-                    "latest_selection": read_json(latest_selection_path) if latest_selection_path.exists() else {},
-                    "report": read_json(report_path),
-                    "report_text": report_text_path.read_text(encoding="utf-8") if report_text_path.exists() else "",
-                }
-            )
+            result = {
+                "name": name,
+                "config": read_json(config_path),
+                "performance": read_json(metrics_path),
+                "latest_selection": read_json(latest_selection_path) if latest_selection_path.exists() else {},
+                "report": read_json(report_path),
+                "report_text": report_text_path.read_text(encoding="utf-8") if report_text_path.exists() else "",
+            }
+            if factor_diagnostics_path.exists():
+                result["factor_diagnostics"] = read_json(factor_diagnostics_path)
+            if factor_report_text_path.exists():
+                result["factor_report_text"] = factor_report_text_path.read_text(encoding="utf-8")
+            results.append(result)
             continue
 
         status = mark_running(status_path, status)
@@ -90,26 +105,44 @@ def run_experiments(
                 top_n=int(experiment_config.get("top_n", 20)),
                 benchmark_code=experiment_config.get("benchmark_code", "000300.SH"),
                 factor_config=experiment_config.get("factor_config"),
+                enable_factor_diagnostics=bool(experiment_config.get("enable_factor_diagnostics", False)),
+                analysis_horizons=tuple(experiment_config.get("analysis_horizons", (5, 10, 20))),
             )
 
             write_json(metrics_path, pipeline_result["performance"])
             write_json(latest_selection_path, pipeline_result["latest_selection"])
             write_json(report_path, pipeline_result["report"])
             write_text(report_text_path, pipeline_result["report_text"])
+            factor_diagnostics = pipeline_result.get("factor_diagnostics")
+            factor_report_text = pipeline_result.get("factor_report_text")
+            if factor_diagnostics is not None:
+                write_json(factor_diagnostics_path, factor_diagnostics)
+            elif factor_diagnostics_path.exists():
+                factor_diagnostics_path.unlink()
+            if factor_report_text is not None:
+                if isinstance(factor_report_text, dict):
+                    write_text(factor_report_text_path, _format_factor_report_text(factor_report_text))
+                else:
+                    write_text(factor_report_text_path, str(factor_report_text))
+            elif factor_report_text_path.exists():
+                factor_report_text_path.unlink()
             if error_path.exists():
                 error_path.unlink()
             mark_completed(status_path, status)
 
-            results.append(
-                {
-                    "name": name,
-                    "config": experiment_config,
-                    "performance": pipeline_result["performance"],
-                    "latest_selection": pipeline_result["latest_selection"],
-                    "report": pipeline_result["report"],
-                    "report_text": pipeline_result["report_text"],
-                }
-            )
+            result = {
+                "name": name,
+                "config": experiment_config,
+                "performance": pipeline_result["performance"],
+                "latest_selection": pipeline_result["latest_selection"],
+                "report": pipeline_result["report"],
+                "report_text": pipeline_result["report_text"],
+            }
+            if factor_diagnostics is not None:
+                result["factor_diagnostics"] = factor_diagnostics
+            if factor_report_text is not None:
+                result["factor_report_text"] = factor_report_text
+            results.append(result)
         except Exception as exc:
             write_text(error_path, str(exc))
             mark_failed(status_path, status, str(exc))
