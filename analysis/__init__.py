@@ -1,5 +1,11 @@
 """Factor analysis helpers."""
 
+from .data_checks import (
+    check_duplicate_keys,
+    check_factor_signal_alignment,
+    check_missing_ratio_by_date,
+    check_universe_stability,
+)
 from .factor_metrics import (
     calc_factor_coverage,
     calc_forward_returns,
@@ -11,6 +17,10 @@ from .factor_metrics import (
 from .factor_report import build_factor_diagnostics_report, render_factor_report_text
 
 __all__ = [
+    "check_duplicate_keys",
+    "check_factor_signal_alignment",
+    "check_missing_ratio_by_date",
+    "check_universe_stability",
     "calc_factor_coverage",
     "calc_forward_returns",
     "calc_ic",
