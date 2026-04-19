@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from pipeline.main import run_minimal_pipeline
+from pipeline.main import build_factor_panel, run_minimal_pipeline
 
 
 class PipelineMainTestCase(unittest.TestCase):
@@ -40,6 +40,41 @@ class PipelineMainTestCase(unittest.TestCase):
                 "selected": [True, False],
             }
         )
+
+    def test_build_factor_panel_uses_registered_factor_function(self) -> None:
+        def fake_factor(*, ts_code: str, start_date: str, end_date: str) -> pd.DataFrame:
+            self.assertEqual(ts_code, "000001.SZ")
+            self.assertEqual(start_date, "20240101")
+            self.assertEqual(end_date, "20240131")
+            return pd.DataFrame(
+                {
+                    "trade_date": ["20240102"],
+                    "ts_code": ["000001.SZ"],
+                    "factor_value": [0.12],
+                }
+            )
+
+        with patch("pipeline.main.get_factor_function", return_value=fake_factor) as mock_get_factor:
+            result = build_factor_panel(
+                ts_codes=["000001.SZ"],
+                start_date="20240101",
+                end_date="20240131",
+                factor_config={"momentum_60d": 1.0},
+            )
+
+        mock_get_factor.assert_called_once_with("momentum_60d")
+        self.assertEqual(result.columns.tolist(), ["trade_date", "ts_code", "momentum_60d"])
+        self.assertEqual(result.iloc[0]["momentum_60d"], 0.12)
+
+    def test_build_factor_panel_unknown_factor_raises_clear_error(self) -> None:
+        with patch("pipeline.main.get_factor_function", side_effect=KeyError("Unknown factor: unknown_factor")):
+            with self.assertRaisesRegex(ValueError, "Unsupported factor in factor_config: unknown_factor"):
+                build_factor_panel(
+                    ts_codes=["000001.SZ"],
+                    start_date="20240101",
+                    end_date="20240131",
+                    factor_config={"unknown_factor": 1.0},
+                )
 
     @patch("pipeline.main.render_strategy_report_text", return_value="strategy report")
     @patch("pipeline.main.format_strategy_report", return_value={"report": "ok"})

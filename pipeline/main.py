@@ -24,7 +24,7 @@ from backtest import (
     run_backtest,
 )
 from data import get_a_share_daily_prices, get_a_share_index_daily
-from factors import return_20d_factor, turnover_mean_20d_factor, volatility_20d_factor
+from factors.library import get_factor_function
 from reports import format_latest_selection, format_strategy_report, render_strategy_report_text
 from signals import combine_factor_scores, rank_signal, top_n_selection
 from universe import get_universe, get_universe_history
@@ -55,21 +55,18 @@ def build_factor_panel(
         "volatility_20d": -1.0,
         "turnover_mean_20d": 1.0,
     }
-    factor_function_map = {
-        "return_20d": return_20d_factor,
-        "volatility_20d": volatility_20d_factor,
-        "turnover_mean_20d": turnover_mean_20d_factor,
-    }
 
     factor_frames: list[pd.DataFrame] = []
     for ts_code in ts_codes:
         frames = []
         for factor_name in factor_config:
-            if factor_name not in factor_function_map:
-                raise ValueError(f"Unsupported factor in factor_config: {factor_name}")
+            try:
+                factor_func = get_factor_function(factor_name)
+            except KeyError as exc:
+                raise ValueError(f"Unsupported factor in factor_config: {factor_name}") from exc
             frames.append(
                 _factor_to_wide(
-                    factor_function_map[factor_name],
+                    factor_func,
                     factor_name=factor_name,
                     ts_code=ts_code,
                     start_date=start_date,
