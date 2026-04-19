@@ -181,6 +181,35 @@ def _apply_execution_constraints(
     return {asset: weight for asset, weight in current_weights.items() if weight > 0}
 
 
+def _normalize_asset_gross_return(gross_return: float | int | None) -> float:
+    if gross_return is None or pd.isna(gross_return) or gross_return <= 0:
+        return 1.0
+    return float(gross_return)
+
+
+def _drift_weights_to_close(
+    start_weights: dict[str, float],
+    asset_gross_returns: dict[str, float],
+) -> tuple[float, dict[str, float]]:
+    cash_weight = max(0.0, 1.0 - sum(float(weight) for weight in start_weights.values()))
+    asset_values: dict[str, float] = {}
+    for asset, start_weight in start_weights.items():
+        gross = _normalize_asset_gross_return(asset_gross_returns.get(asset))
+        asset_values[asset] = float(start_weight) * gross
+
+    portfolio_close_value = cash_weight + sum(asset_values.values())
+    if portfolio_close_value <= 0:
+        return 0.0, {}
+
+    gross_return = portfolio_close_value - 1.0
+    close_weights = {
+        asset: asset_value / portfolio_close_value
+        for asset, asset_value in asset_values.items()
+        if asset_value > 0
+    }
+    return float(gross_return), close_weights
+
+
 def generate_weights(
     signals: pd.DataFrame,
     market_data: pd.DataFrame,
@@ -267,26 +296,29 @@ def run_backtest(
                 for asset in all_assets
             )
             cost = turnover * (fee_bps + slippage_bps) / 10000.0
-
-            for asset, weight in realized_exec_weights.items():
+            asset_gross_returns: dict[str, float] = {}
+            for asset in realized_exec_weights:
                 asset_open = open_wide.loc[trade_date, asset]
                 asset_close = close_wide.loc[trade_date, asset]
-                if pd.isna(asset_open) or pd.isna(asset_close) or asset_open == 0:
-                    continue
-                gross_return += weight * (asset_close / asset_open - 1.0)
-            end_of_day_weights = realized_exec_weights.copy()
+                if pd.isna(asset_open) or pd.isna(asset_close) or asset_open == 0 or asset_close <= 0:
+                    asset_gross_returns[asset] = 1.0
+                else:
+                    asset_gross_returns[asset] = float(asset_close / asset_open)
+            gross_return, end_of_day_weights = _drift_weights_to_close(realized_exec_weights, asset_gross_returns)
         else:
             if idx == 0:
                 end_of_day_weights = {}
             else:
                 prev_date = trade_dates[idx - 1]
-                for asset, weight in previous_close_weights.items():
+                asset_gross_returns = {}
+                for asset in previous_close_weights:
                     prev_close = close_wide.loc[prev_date, asset] if asset in close_wide.columns else pd.NA
                     today_close = close_wide.loc[trade_date, asset] if asset in close_wide.columns else pd.NA
-                    if pd.isna(prev_close) or pd.isna(today_close) or prev_close == 0:
-                        continue
-                    gross_return += weight * (today_close / prev_close - 1.0)
-                end_of_day_weights = previous_close_weights.copy()
+                    if pd.isna(prev_close) or pd.isna(today_close) or prev_close == 0 or today_close <= 0:
+                        asset_gross_returns[asset] = 1.0
+                    else:
+                        asset_gross_returns[asset] = float(today_close / prev_close)
+                gross_return, end_of_day_weights = _drift_weights_to_close(previous_close_weights, asset_gross_returns)
 
         strategy_return = gross_return - cost
         records.append(

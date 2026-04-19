@@ -37,6 +37,58 @@ class BacktestEngineTestCase(unittest.TestCase):
         )
         self.assertEqual(holdings.loc[holdings["trade_date"] == "20240201", "ts_code"].tolist(), ["A"])
 
+    def test_run_backtest_exec_day_weights_drift_to_close(self) -> None:
+        signals = pd.DataFrame(
+            {
+                "trade_date": ["20240131", "20240131"],
+                "ts_code": ["A", "B"],
+                "selected": [True, True],
+            }
+        )
+        market_data = pd.DataFrame(
+            {
+                "trade_date": ["20240131", "20240131", "20240201", "20240201"],
+                "ts_code": ["A", "B", "A", "B"],
+                "open": [10.0, 10.0, 10.0, 10.0],
+                "close": [10.0, 10.0, 20.0, 10.0],
+            }
+        )
+
+        _, holdings = run_backtest(signals, market_data, fee_bps=0.0)
+
+        day_holdings = holdings.loc[holdings["trade_date"] == "20240201"].sort_values("ts_code").reset_index(drop=True)
+        self.assertAlmostEqual(day_holdings.loc[0, "weight"], 2.0 / 3.0)
+        self.assertAlmostEqual(day_holdings.loc[1, "weight"], 1.0 / 3.0)
+
+    def test_run_backtest_non_exec_day_weights_continue_to_drift(self) -> None:
+        signals = pd.DataFrame(
+            {
+                "trade_date": ["20240131", "20240131"],
+                "ts_code": ["A", "B"],
+                "selected": [True, True],
+            }
+        )
+        market_data = pd.DataFrame(
+            {
+                "trade_date": ["20240131", "20240131", "20240201", "20240201", "20240202", "20240202"],
+                "ts_code": ["A", "B", "A", "B", "A", "B"],
+                "open": [10.0, 10.0, 10.0, 10.0, 20.0, 10.0],
+                "close": [10.0, 10.0, 20.0, 10.0, 20.0, 20.0],
+            }
+        )
+
+        returns, holdings = run_backtest(signals, market_data, fee_bps=0.0)
+
+        day_one = holdings.loc[holdings["trade_date"] == "20240201"].sort_values("ts_code").reset_index(drop=True)
+        day_two = holdings.loc[holdings["trade_date"] == "20240202"].sort_values("ts_code").reset_index(drop=True)
+        day_two_return = returns.loc[returns["trade_date"] == "20240202", "strategy_return"].iloc[0]
+
+        self.assertAlmostEqual(day_one.loc[0, "weight"], 2.0 / 3.0)
+        self.assertAlmostEqual(day_one.loc[1, "weight"], 1.0 / 3.0)
+        self.assertAlmostEqual(day_two.loc[0, "weight"], 0.5)
+        self.assertAlmostEqual(day_two.loc[1, "weight"], 0.5)
+        self.assertAlmostEqual(day_two_return, 1.0 / 3.0)
+
     def test_run_backtest_slippage_adds_to_cost(self) -> None:
         signals = pd.DataFrame(
             {
