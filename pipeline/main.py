@@ -166,7 +166,10 @@ def run_minimal_pipeline(
         signals=selected.loc[:, ["trade_date", "ts_code", "selected"]],
         market_data=market_panel,
     )
-    benchmark_returns = calc_benchmark_returns(benchmark_data)
+    benchmark_returns = calc_benchmark_returns(
+        benchmark_data,
+        execution_dates=rebalance_schedule["execution_date"].tolist() if not rebalance_schedule.empty else None,
+    )
     returns_with_benchmark = attach_benchmark(strategy_returns, benchmark_returns)
 
     performance = calc_performance(strategy_returns)

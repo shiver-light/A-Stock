@@ -4,10 +4,46 @@ import unittest
 
 import pandas as pd
 
-from backtest.engine import run_backtest
+from backtest.engine import calc_benchmark_returns, run_backtest
 
 
 class BacktestEngineTestCase(unittest.TestCase):
+    def test_calc_benchmark_returns_empty_input(self) -> None:
+        benchmark_data = pd.DataFrame(columns=["trade_date", "open", "close", "pre_close"])
+
+        result = calc_benchmark_returns(benchmark_data, execution_dates=["20240201"])
+
+        self.assertEqual(list(result.columns), ["trade_date", "benchmark_return"])
+        self.assertTrue(result.empty)
+
+    def test_calc_benchmark_returns_uses_close_to_close_on_normal_days(self) -> None:
+        benchmark_data = pd.DataFrame(
+            {
+                "trade_date": ["20240201"],
+                "open": [101.0],
+                "close": [103.0],
+                "pre_close": [100.0],
+            }
+        )
+
+        result = calc_benchmark_returns(benchmark_data, execution_dates=["20240202"])
+
+        self.assertAlmostEqual(result.loc[0, "benchmark_return"], 103.0 / 100.0 - 1.0)
+
+    def test_calc_benchmark_returns_uses_open_to_close_on_execution_days(self) -> None:
+        benchmark_data = pd.DataFrame(
+            {
+                "trade_date": ["20240201"],
+                "open": [101.0],
+                "close": [103.0],
+                "pre_close": [100.0],
+            }
+        )
+
+        result = calc_benchmark_returns(benchmark_data, execution_dates=["20240201"])
+
+        self.assertAlmostEqual(result.loc[0, "benchmark_return"], 103.0 / 101.0 - 1.0)
+
     def test_run_backtest_without_constraints_preserves_baseline_behavior(self) -> None:
         signals = pd.DataFrame(
             {

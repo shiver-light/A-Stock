@@ -343,12 +343,22 @@ def calc_benchmark_returns(
     benchmark_data: pd.DataFrame,
     *,
     date_col: str = "trade_date",
+    execution_dates: list[str] | None = None,
 ) -> pd.DataFrame:
     _validate_columns(benchmark_data, [date_col, "open", "close", "pre_close"])
     data = benchmark_data.loc[:, [date_col, "open", "close", "pre_close"]].copy()
     data[date_col] = data[date_col].astype(str)
     data = data.sort_values(date_col).drop_duplicates(subset=[date_col], keep="last").reset_index(drop=True)
-    data["benchmark_return"] = data["close"] / data["pre_close"] - 1.0
+    if data.empty:
+        return data.loc[:, [date_col]].assign(benchmark_return=pd.Series(dtype="float64"))
+
+    execution_date_set = {str(trade_date) for trade_date in execution_dates or []}
+    close_to_close_return = data["close"] / data["pre_close"] - 1.0
+    open_to_close_return = data["close"] / data["open"] - 1.0
+
+    data["benchmark_return"] = close_to_close_return
+    exec_mask = data[date_col].isin(execution_date_set) & data["open"].notna() & (data["open"] != 0)
+    data.loc[exec_mask, "benchmark_return"] = open_to_close_return.loc[exec_mask]
     return data.loc[:, [date_col, "benchmark_return"]]
 
 
