@@ -1,6 +1,9 @@
 global:
-  start_date: "20250101"
-  end_date: "20250415"
+  # Use a multi-year but still manageable window for the first formal research pass.
+  # This is long enough to see different market regimes without turning the default
+  # batch into an unnecessarily heavy full-history sweep.
+  start_date: "20230101"
+  end_date: "20260331"
   benchmark_code: "000300.SH"
   top_n: 20
   enable_factor_diagnostics: true
@@ -259,3 +262,197 @@ experiments:
       return_20d: 0.5
       volatility_20d: -1.5
       turnover_mean_20d: 0.5
+
+  # Formal robustness matrix: two universes, three concentration levels,
+  # four interpretable weight schemes.
+  - name: "r01_hs300_baseline_top10"
+    universe_name: "hs300"
+    top_n: 10
+    factor_config:
+      return_20d: 1.0
+      volatility_20d: -1.0
+      turnover_mean_20d: 1.0
+
+  - name: "r02_hs300_baseline_top20"
+    universe_name: "hs300"
+    top_n: 20
+    factor_config:
+      return_20d: 1.0
+      volatility_20d: -1.0
+      turnover_mean_20d: 1.0
+
+  - name: "r03_hs300_baseline_top30"
+    universe_name: "hs300"
+    top_n: 30
+    factor_config:
+      return_20d: 1.0
+      volatility_20d: -1.0
+      turnover_mean_20d: 1.0
+
+  - name: "r04_hs300_lowvol_bias_top10"
+    universe_name: "hs300"
+    top_n: 10
+    factor_config:
+      return_20d: 0.5
+      volatility_20d: -1.5
+      turnover_mean_20d: 0.5
+
+  - name: "r05_hs300_lowvol_bias_top20"
+    universe_name: "hs300"
+    top_n: 20
+    factor_config:
+      return_20d: 0.5
+      volatility_20d: -1.5
+      turnover_mean_20d: 0.5
+
+  - name: "r06_hs300_lowvol_bias_top30"
+    universe_name: "hs300"
+    top_n: 30
+    factor_config:
+      return_20d: 0.5
+      volatility_20d: -1.5
+      turnover_mean_20d: 0.5
+
+  - name: "r07_hs300_momentum_bias_top10"
+    universe_name: "hs300"
+    top_n: 10
+    factor_config:
+      return_20d: 1.5
+      volatility_20d: -0.5
+      turnover_mean_20d: 0.5
+
+  - name: "r08_hs300_momentum_bias_top20"
+    universe_name: "hs300"
+    top_n: 20
+    factor_config:
+      return_20d: 1.5
+      volatility_20d: -0.5
+      turnover_mean_20d: 0.5
+
+  - name: "r09_hs300_momentum_bias_top30"
+    universe_name: "hs300"
+    top_n: 30
+    factor_config:
+      return_20d: 1.5
+      volatility_20d: -0.5
+      turnover_mean_20d: 0.5
+
+  - name: "r10_hs300_turnover_bias_top10"
+    universe_name: "hs300"
+    top_n: 10
+    factor_config:
+      return_20d: 0.5
+      volatility_20d: -0.5
+      turnover_mean_20d: 1.5
+
+  - name: "r11_hs300_turnover_bias_top20"
+    universe_name: "hs300"
+    top_n: 20
+    factor_config:
+      return_20d: 0.5
+      volatility_20d: -0.5
+      turnover_mean_20d: 1.5
+
+  - name: "r12_hs300_turnover_bias_top30"
+    universe_name: "hs300"
+    top_n: 30
+    factor_config:
+      return_20d: 0.5
+      volatility_20d: -0.5
+      turnover_mean_20d: 1.5
+
+  - name: "r13_zz500_baseline_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      return_20d: 1.0
+      volatility_20d: -1.0
+      turnover_mean_20d: 1.0
+
+  - name: "r14_zz500_baseline_top20"
+    universe_name: "zz500"
+    top_n: 20
+    factor_config:
+      return_20d: 1.0
+      volatility_20d: -1.0
+      turnover_mean_20d: 1.0
+
+  - name: "r15_zz500_baseline_top30"
+    universe_name: "zz500"
+    top_n: 30
+    factor_config:
+      return_20d: 1.0
+      volatility_20d: -1.0
+      turnover_mean_20d: 1.0
+
+  - name: "r16_zz500_lowvol_bias_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      return_20d: 0.5
+      volatility_20d: -1.5
+      turnover_mean_20d: 0.5
+
+  - name: "r17_zz500_lowvol_bias_top20"
+    universe_name: "zz500"
+    top_n: 20
+    factor_config:
+      return_20d: 0.5
+      volatility_20d: -1.5
+      turnover_mean_20d: 0.5
+
+  - name: "r18_zz500_lowvol_bias_top30"
+    universe_name: "zz500"
+    top_n: 30
+    factor_config:
+      return_20d: 0.5
+      volatility_20d: -1.5
+      turnover_mean_20d: 0.5
+
+  - name: "r19_zz500_momentum_bias_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      return_20d: 1.5
+      volatility_20d: -0.5
+      turnover_mean_20d: 0.5
+
+  - name: "r20_zz500_momentum_bias_top20"
+    universe_name: "zz500"
+    top_n: 20
+    factor_config:
+      return_20d: 1.5
+      volatility_20d: -0.5
+      turnover_mean_20d: 0.5
+
+  - name: "r21_zz500_momentum_bias_top30"
+    universe_name: "zz500"
+    top_n: 30
+    factor_config:
+      return_20d: 1.5
+      volatility_20d: -0.5
+      turnover_mean_20d: 0.5
+
+  - name: "r22_zz500_turnover_bias_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      return_20d: 0.5
+      volatility_20d: -0.5
+      turnover_mean_20d: 1.5
+
+  - name: "r23_zz500_turnover_bias_top20"
+    universe_name: "zz500"
+    top_n: 20
+    factor_config:
+      return_20d: 0.5
+      volatility_20d: -0.5
+      turnover_mean_20d: 1.5
+
+  - name: "r24_zz500_turnover_bias_top30"
+    universe_name: "zz500"
+    top_n: 30
+    factor_config:
+      return_20d: 0.5
+      volatility_20d: -0.5
+      turnover_mean_20d: 1.5
