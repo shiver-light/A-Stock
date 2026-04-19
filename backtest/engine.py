@@ -257,6 +257,13 @@ def run_backtest(
     date_col: str = "trade_date",
     asset_col: str = "ts_code",
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Run the current monthly-rebalance backtest with optional execution constraints.
+
+    Constraint flags only take effect when the required market_data columns are present.
+    When optional fields such as ``amount`` / ``up_limit`` / ``down_limit`` /
+    ``suspended`` are absent, the engine falls back to the unconstrained behavior
+    for that rule instead of failing.
+    """
     market = _prepare_market_data(market_data).rename(columns={"trade_date": date_col, "ts_code": asset_col})
     weights = generate_weights(signals, market.rename(columns={date_col: "trade_date", asset_col: "ts_code"}))
 

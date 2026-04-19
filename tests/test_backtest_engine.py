@@ -189,6 +189,95 @@ class BacktestEngineTestCase(unittest.TestCase):
         self.assertEqual(march_holdings, ["A"])
         self.assertAlmostEqual(march_return, 9.5 / 9.0 - 1.0)
 
+    def test_run_backtest_block_suspended_blocks_buy_when_field_present(self) -> None:
+        signals = pd.DataFrame(
+            {
+                "trade_date": ["20240131"],
+                "ts_code": ["A"],
+                "selected": [True],
+            }
+        )
+        market_data = pd.DataFrame(
+            {
+                "trade_date": ["20240131", "20240201"],
+                "ts_code": ["A", "A"],
+                "open": [10.0, 10.0],
+                "close": [10.0, 11.0],
+                "suspended": [False, True],
+            }
+        )
+
+        returns, holdings = run_backtest(
+            signals,
+            market_data,
+            fee_bps=0.0,
+            block_suspended=True,
+        )
+
+        exec_day = returns.loc[returns["trade_date"] == "20240201"].iloc[0]
+        self.assertAlmostEqual(exec_day["turnover"], 0.0)
+        self.assertAlmostEqual(exec_day["strategy_return"], 0.0)
+        self.assertTrue(holdings.empty)
+
+    def test_run_backtest_block_limit_up_buy_blocks_new_entry(self) -> None:
+        signals = pd.DataFrame(
+            {
+                "trade_date": ["20240131"],
+                "ts_code": ["A"],
+                "selected": [True],
+            }
+        )
+        market_data = pd.DataFrame(
+            {
+                "trade_date": ["20240131", "20240201"],
+                "ts_code": ["A", "A"],
+                "open": [10.0, 10.0],
+                "close": [10.0, 10.5],
+                "up_limit": [11.0, 10.0],
+            }
+        )
+
+        returns, holdings = run_backtest(
+            signals,
+            market_data,
+            fee_bps=0.0,
+            block_limit_up_buy=True,
+        )
+
+        exec_day = returns.loc[returns["trade_date"] == "20240201"].iloc[0]
+        self.assertAlmostEqual(exec_day["turnover"], 0.0)
+        self.assertAlmostEqual(exec_day["strategy_return"], 0.0)
+        self.assertTrue(holdings.empty)
+
+    def test_run_backtest_min_amount_gracefully_ignores_missing_field(self) -> None:
+        signals = pd.DataFrame(
+            {
+                "trade_date": ["20240131"],
+                "ts_code": ["A"],
+                "selected": [True],
+            }
+        )
+        market_data = pd.DataFrame(
+            {
+                "trade_date": ["20240131", "20240201"],
+                "ts_code": ["A", "A"],
+                "open": [10.0, 10.0],
+                "close": [10.0, 11.0],
+            }
+        )
+
+        returns, holdings = run_backtest(
+            signals,
+            market_data,
+            fee_bps=0.0,
+            min_amount=1_000_000.0,
+        )
+
+        exec_day = returns.loc[returns["trade_date"] == "20240201"].iloc[0]
+        self.assertAlmostEqual(exec_day["turnover"], 1.0)
+        self.assertAlmostEqual(exec_day["strategy_return"], 0.1)
+        self.assertEqual(holdings.loc[holdings["trade_date"] == "20240201", "ts_code"].tolist(), ["A"])
+
 
 if __name__ == "__main__":
     unittest.main()
