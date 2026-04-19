@@ -100,6 +100,105 @@ class PipelineMainTestCase(unittest.TestCase):
         ),
     )
     @patch("pipeline.main._build_market_panel")
+    @patch("pipeline.main._build_raw_factor_panel")
+    @patch("pipeline.main.top_n_selection")
+    @patch("pipeline.main.rank_signal")
+    @patch("pipeline.main.combine_factor_scores")
+    @patch("pipeline.main.build_factor_panel")
+    @patch("pipeline.main._resolve_ts_codes", return_value=["000001.SZ", "000002.SZ"])
+    @patch(
+        "pipeline.main.get_rebalance_schedule",
+        return_value=pd.DataFrame({"signal_date": ["20240102"], "execution_date": ["20240103"]}),
+    )
+    @patch("pipeline.main.get_a_share_index_daily")
+    def test_run_minimal_pipeline_returns_data_diagnostics_when_enabled(
+        self,
+        mock_index_daily,
+        mock_rebalance,
+        mock_resolve,
+        mock_build_factor_panel,
+        mock_combine_scores,
+        mock_rank_signal,
+        mock_top_n_selection,
+        mock_build_raw_factor_panel,
+        mock_build_market_panel,
+        mock_run_backtest,
+        mock_benchmark_returns,
+        mock_attach_benchmark,
+        mock_performance,
+        mock_relative_performance,
+        mock_latest_selection,
+        mock_format_report,
+        mock_render_text,
+    ) -> None:
+        mock_index_daily.return_value = self._benchmark_data()
+        mock_build_factor_panel.return_value = pd.DataFrame(
+            {
+                "trade_date": ["20240102"],
+                "ts_code": ["000001.SZ"],
+                "return_20d": [0.1],
+                "volatility_20d": [0.2],
+            }
+        )
+        mock_build_raw_factor_panel.return_value = pd.DataFrame(
+            {
+                "trade_date": ["20240102", "20240102", "20240103"],
+                "ts_code": ["000001.SZ", "000002.SZ", "000001.SZ"],
+                "return_20d": [0.1, None, 0.2],
+                "volatility_20d": [0.3, 0.4, None],
+            }
+        )
+        mock_combine_scores.return_value = pd.DataFrame(
+            {"trade_date": ["20240102"], "ts_code": ["000001.SZ"], "score": [1.0]}
+        )
+        mock_rank_signal.return_value = pd.DataFrame(
+            {"trade_date": ["20240102"], "ts_code": ["000001.SZ"], "score": [1.0], "rank": [1]}
+        )
+        mock_top_n_selection.return_value = self._selected()
+        mock_build_market_panel.return_value = self._market_panel()
+
+        result = run_minimal_pipeline(
+            ts_codes=["000001.SZ", "000002.SZ"],
+            start_date="20240101",
+            end_date="20240131",
+            factor_config={"return_20d": 1.0, "volatility_20d": -1.0},
+            enable_data_diagnostics=True,
+        )
+
+        self.assertIn("diagnostics", result)
+        self.assertIn("universe_count_by_date", result["diagnostics"])
+        self.assertIn("factor_coverage", result["diagnostics"])
+        self.assertIn("complete_case_count_by_date", result["diagnostics"])
+        self.assertEqual(result["diagnostics"]["universe_count_by_date"]["date_count"], 2)
+        self.assertEqual(
+            result["diagnostics"]["complete_case_count_by_date"]["per_date"][0]["complete_case_count"],
+            1,
+        )
+
+    @patch("pipeline.main.render_strategy_report_text", return_value="strategy report")
+    @patch("pipeline.main.format_strategy_report", return_value={"report": "ok"})
+    @patch(
+        "pipeline.main.format_latest_selection",
+        return_value={"as_of_date": "20240102", "top_n": 1, "top_stocks": []},
+    )
+    @patch("pipeline.main.calc_relative_performance", return_value={"excess_cumulative_return": 0.01})
+    @patch("pipeline.main.calc_performance", return_value={"cumulative_return": 0.02})
+    @patch(
+        "pipeline.main.attach_benchmark",
+        return_value=pd.DataFrame({"trade_date": ["20240102"], "strategy_return": [0.01], "benchmark_return": [0.0]}),
+    )
+    @patch(
+        "pipeline.main.calc_benchmark_returns",
+        return_value=pd.DataFrame({"trade_date": ["20240102"], "benchmark_return": [0.0]}),
+    )
+    @patch(
+        "pipeline.main.run_backtest",
+        return_value=(
+            pd.DataFrame({"trade_date": ["20240102"], "strategy_return": [0.01]}),
+            pd.DataFrame({"trade_date": ["20240102"], "ts_code": ["000001.SZ"], "weight": [1.0]}),
+        ),
+    )
+    @patch("pipeline.main._build_market_panel")
     @patch("pipeline.main.top_n_selection")
     @patch("pipeline.main.rank_signal")
     @patch("pipeline.main.combine_factor_scores")

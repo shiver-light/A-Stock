@@ -14,6 +14,9 @@ from analysis import (
     calc_quantile_returns,
     calc_rank_ic,
     render_factor_report_text,
+    summarize_complete_case_count_by_date,
+    summarize_factor_coverage,
+    summarize_universe_count_by_date,
 )
 from backtest import (
     attach_benchmark,
@@ -89,6 +92,52 @@ def build_factor_panel(
     )
 
 
+def _build_raw_factor_panel(
+    *,
+    ts_codes: list[str],
+    start_date: str,
+    end_date: str,
+    factor_config: dict[str, float] | None = None,
+) -> pd.DataFrame:
+    factor_config = factor_config or {
+        "return_20d": 1.0,
+        "volatility_20d": -1.0,
+        "turnover_mean_20d": 1.0,
+    }
+
+    factor_frames: list[pd.DataFrame] = []
+    for ts_code in ts_codes:
+        frames = []
+        for factor_name in factor_config:
+            try:
+                factor_func = get_factor_function(factor_name)
+            except KeyError as exc:
+                raise ValueError(f"Unsupported factor in factor_config: {factor_name}") from exc
+            frames.append(
+                _factor_to_wide(
+                    factor_func,
+                    factor_name=factor_name,
+                    ts_code=ts_code,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+            )
+        merged = reduce(
+            lambda left, right: left.merge(right, on=["trade_date", "ts_code"], how="outer"),
+            frames,
+        )
+        factor_frames.append(merged)
+
+    if not factor_frames:
+        return pd.DataFrame(columns=["trade_date", "ts_code", *factor_config.keys()])
+    return (
+        pd.concat(factor_frames, ignore_index=True)
+        .sort_values(["trade_date", "ts_code"])
+        .drop_duplicates(subset=["trade_date", "ts_code"], keep="last")
+        .reset_index(drop=True)
+    )
+
+
 def _build_market_panel(
     *,
     ts_codes: list[str],
@@ -120,6 +169,7 @@ def run_minimal_pipeline(
     universe_name: str | None = None,
     factor_config: dict[str, float] | None = None,
     enable_factor_diagnostics: bool = False,
+    enable_data_diagnostics: bool = False,
     analysis_horizons: tuple[int, ...] = (5, 10, 20),
 ) -> dict[str, object]:
     benchmark_data = get_a_share_index_daily(
@@ -202,6 +252,17 @@ def run_minimal_pipeline(
         "report": report,
         "report_text": report_text,
     }
+    if enable_data_diagnostics:
+        raw_factor_panel = _build_raw_factor_panel(
+            ts_codes=resolved_ts_codes,
+            start_date=start_date,
+            end_date=end_date,
+            factor_config=factor_config,
+        )
+        result["diagnostics"] = _build_data_diagnostics_outputs(
+            raw_factor_panel=raw_factor_panel,
+            factor_names=list(factor_config.keys()),
+        )
     if enable_factor_diagnostics:
         factor_diagnostics, factor_report_text = _build_factor_diagnostics_outputs(
             factor_panel=factor_panel,
@@ -309,3 +370,23 @@ def _build_factor_diagnostics_outputs(
         )
 
     return diagnostics, report_text
+
+
+def _build_data_diagnostics_outputs(
+    *,
+    raw_factor_panel: pd.DataFrame,
+    factor_names: list[str],
+) -> dict[str, object]:
+    return {
+        "notes": {
+            "original_universe_count": "Per-date unique ts_code count in the raw outer-merged factor panel before complete-case filtering.",
+            "factor_available_count": "Per-date non-null observations for each configured factor within the raw outer-merged factor panel.",
+            "complete_case_count": "Per-date ts_code count where all configured factors are non-null; this is the sample pool entering score combination.",
+        },
+        "universe_count_by_date": summarize_universe_count_by_date(raw_factor_panel),
+        "factor_coverage": summarize_factor_coverage(raw_factor_panel, factor_cols=factor_names),
+        "complete_case_count_by_date": summarize_complete_case_count_by_date(
+            raw_factor_panel,
+            factor_cols=factor_names,
+        ),
+    }

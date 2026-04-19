@@ -1,5 +1,10 @@
 """Factor analysis helpers."""
 
+from .data_diagnostics import (
+    summarize_complete_case_count_by_date,
+    summarize_factor_coverage,
+    summarize_universe_count_by_date,
+)
 from .data_checks import (
     check_duplicate_keys,
     check_factor_signal_alignment,
@@ -17,6 +22,9 @@ from .factor_metrics import (
 from .factor_report import build_factor_diagnostics_report, render_factor_report_text
 
 __all__ = [
+    "summarize_complete_case_count_by_date",
+    "summarize_factor_coverage",
+    "summarize_universe_count_by_date",
     "check_duplicate_keys",
     "check_factor_signal_alignment",
     "check_missing_ratio_by_date",
