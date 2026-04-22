@@ -5,7 +5,14 @@ from __future__ import annotations
 import argparse
 import json
 
-from research import load_research_config, rebuild_summary_from_disk, run_experiments, sort_research_summary
+from research import (
+    generate_daily_recommendations_from_run,
+    load_research_config,
+    rebuild_summary_from_disk,
+    render_recommendation_text,
+    run_experiments,
+    sort_research_summary,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -36,6 +43,19 @@ def build_parser() -> argparse.ArgumentParser:
         default="table",
         help="Output a plain table or JSON payload.",
     )
+
+    recommend_parser = subparsers.add_parser("recommend", help="Generate daily recommendations from a completed research run.")
+    recommend_parser.add_argument("--run-dir", required=True, help="Path to an existing research run directory.")
+    recommend_parser.add_argument("--as-of-date", required=True, help="Recommendation end date in YYYYMMDD format.")
+    recommend_parser.add_argument("--start-date", default=None, help="Optional override for pipeline start date.")
+    recommend_parser.add_argument("--top-k-models", type=int, default=5, help="Maximum number of stable models to reuse.")
+    recommend_parser.add_argument("--top-k-stocks", type=int, default=20, help="Maximum number of consensus recommendations.")
+    recommend_parser.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output text report or JSON payload.",
+    )
     return parser
 
 
@@ -52,6 +72,18 @@ def main() -> int:
             resume=args.command == "resume",
         )
         print(f"completed_results={len(results)}")
+    elif args.command == "recommend":
+        recommendation = generate_daily_recommendations_from_run(
+            args.run_dir,
+            as_of_date=args.as_of_date,
+            start_date=args.start_date,
+            top_k_models=args.top_k_models,
+            top_k_stocks=args.top_k_stocks,
+        )
+        if args.output == "json":
+            print(json.dumps(recommendation, ensure_ascii=False, indent=2, default=str))
+        else:
+            print(render_recommendation_text(recommendation))
     else:
         summary = rebuild_summary_from_disk(args.run_dir)
         ascending = args.sort_by == "max_drawdown"
