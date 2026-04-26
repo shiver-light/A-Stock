@@ -1,0 +1,106 @@
+global:
+  # Focused weight-search window for turnover / 60d return / 60d volatility.
+  # Keep the same benchmark and research window as the main experiment set so
+  # results are directly comparable.
+  start_date: "20230101"
+  end_date: "20260331"
+  benchmark_code: "000300.SH"
+  top_n: 20
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+
+experiments:
+  # Two-factor ratio search: turnover_mean_20d + return_60d
+  - name: "w01_hs300_turnover_ret60_70_30_top20"
+    universe_name: "hs300"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.7
+      return_60d: 0.3
+
+  - name: "w02_zz500_turnover_ret60_70_30_top20"
+    universe_name: "zz500"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.7
+      return_60d: 0.3
+
+  - name: "w03_hs300_turnover_ret60_60_40_top20"
+    universe_name: "hs300"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.6
+      return_60d: 0.4
+
+  - name: "w04_zz500_turnover_ret60_60_40_top20"
+    universe_name: "zz500"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.6
+      return_60d: 0.4
+
+  - name: "w05_hs300_turnover_ret60_50_50_top20"
+    universe_name: "hs300"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.5
+
+  - name: "w06_zz500_turnover_ret60_50_50_top20"
+    universe_name: "zz500"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.5
+
+  # Three-factor ratio search: turnover_mean_20d + return_60d - volatility_60d
+  - name: "w07_hs300_turnover_ret60_vol60_60_30_10_top20"
+    universe_name: "hs300"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.6
+      return_60d: 0.3
+      volatility_60d: -0.1
+
+  - name: "w08_zz500_turnover_ret60_vol60_60_30_10_top20"
+    universe_name: "zz500"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.6
+      return_60d: 0.3
+      volatility_60d: -0.1
+
+  - name: "w09_hs300_turnover_ret60_vol60_50_30_20_top20"
+    universe_name: "hs300"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.3
+      volatility_60d: -0.2
+
+  - name: "w10_zz500_turnover_ret60_vol60_50_30_20_top20"
+    universe_name: "zz500"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.3
+      volatility_60d: -0.2
+
+  - name: "w11_hs300_turnover_ret60_vol60_40_40_20_top20"
+    universe_name: "hs300"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.4
+      return_60d: 0.4
+      volatility_60d: -0.2
+
+  - name: "w12_zz500_turnover_ret60_vol60_40_40_20_top20"
+    universe_name: "zz500"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.4
+      return_60d: 0.4
+      volatility_60d: -0.2
