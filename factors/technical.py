@@ -73,6 +73,16 @@ def return_20d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: 
     return build_factor_output(data, "return_20d", "return_20d")
 
 
+def return_60d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
+    """60-day qfq return, kept separate from momentum_60d for research config readability."""
+
+    data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=90)
+    validate_factor_input(data, ["trade_date", "ts_code", "close"])
+    data["return_60d"] = data.groupby("ts_code")["close"].pct_change(60)
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "return_60d", "return_60d")
+
+
 def volatility_20d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
     data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=45)
     validate_factor_input(data, ["trade_date", "ts_code", "close"])
@@ -80,6 +90,17 @@ def volatility_20d_factor(*, ts_code: str, start_date: str, end_date: str, refre
     data["volatility_20d"] = returns.groupby(data["ts_code"]).rolling(20).std().reset_index(level=0, drop=True)
     data = _clip_dates(data, start_date, end_date)
     return build_factor_output(data, "volatility_20d", "volatility_20d")
+
+
+def volatility_60d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
+    """60-day rolling volatility of daily qfq close returns."""
+
+    data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=90)
+    validate_factor_input(data, ["trade_date", "ts_code", "close"])
+    returns = data.groupby("ts_code")["close"].pct_change()
+    data["volatility_60d"] = returns.groupby(data["ts_code"]).rolling(60).std().reset_index(level=0, drop=True)
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "volatility_60d", "volatility_60d")
 
 
 def price_rank_60d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:

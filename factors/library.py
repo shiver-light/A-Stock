@@ -9,18 +9,22 @@ from factors.technical import (
     momentum_60d_factor,
     price_rank_60d_factor,
     return_20d_factor,
+    return_60d_factor,
     return_5d_factor,
     reversal_5d_factor,
     turnover_volatility_20d_factor,
     volatility_20d_factor,
+    volatility_60d_factor,
 )
 
 FACTOR_REGISTRY = {
     "return_5d": return_5d_factor,
     "return_20d": return_20d_factor,
+    "return_60d": return_60d_factor,
     "momentum_60d": momentum_60d_factor,
     "reversal_5d": reversal_5d_factor,
     "volatility_20d": volatility_20d_factor,
+    "volatility_60d": volatility_60d_factor,
     "turnover_mean_20d": turnover_mean_20d_factor,
     "turnover_volatility_20d": turnover_volatility_20d_factor,
     "price_rank_60d": price_rank_60d_factor,

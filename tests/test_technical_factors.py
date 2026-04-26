@@ -10,14 +10,37 @@ from factors.technical import (
     amplitude_20d_factor,
     close_to_high_20d_factor,
     momentum_60d_factor,
+    return_60d_factor,
     reversal_5d_factor,
     turnover_volatility_20d_factor,
+    volatility_60d_factor,
 )
 
 
 class TechnicalFactorsTestCase(unittest.TestCase):
     def _date_range(self, periods: int) -> list[str]:
         return pd.date_range("2024-01-01", periods=periods, freq="D").strftime("%Y%m%d").tolist()
+
+    @patch("factors.technical._load_qfq_daily")
+    def test_return_60d_factor(self, mock_load_qfq_daily) -> None:
+        dates = self._date_range(65)
+        closes = [100.0 * (1.01**index) for index in range(65)]
+        mock_load_qfq_daily.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * 65,
+                "close": closes,
+            }
+        )
+
+        result = return_60d_factor(
+            ts_code="000001.SZ",
+            start_date=dates[60],
+            end_date=dates[-1],
+        )
+
+        self.assertEqual(result.iloc[-1]["factor_name"], "return_60d")
+        self.assertAlmostEqual(result.iloc[-1]["factor_value"], (1.01**60) - 1.0, places=10)
 
     @patch("factors.technical._load_qfq_daily")
     def test_momentum_60d_factor(self, mock_load_qfq_daily) -> None:
@@ -39,6 +62,27 @@ class TechnicalFactorsTestCase(unittest.TestCase):
 
         self.assertEqual(result.iloc[-1]["factor_name"], "momentum_60d")
         self.assertAlmostEqual(result.iloc[-1]["factor_value"], (1.01**60) - 1.0, places=10)
+
+    @patch("factors.technical._load_qfq_daily")
+    def test_volatility_60d_factor(self, mock_load_qfq_daily) -> None:
+        dates = self._date_range(65)
+        closes = [100.0 + float(index % 5) for index in range(65)]
+        mock_load_qfq_daily.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * 65,
+                "close": closes,
+            }
+        )
+
+        result = volatility_60d_factor(
+            ts_code="000001.SZ",
+            start_date=dates[60],
+            end_date=dates[-1],
+        )
+
+        self.assertEqual(result.iloc[-1]["factor_name"], "volatility_60d")
+        self.assertGreaterEqual(result.iloc[-1]["factor_value"], 0.0)
 
     @patch("factors.technical._load_qfq_daily")
     def test_reversal_5d_factor(self, mock_load_qfq_daily) -> None:
@@ -124,8 +168,10 @@ class TechnicalFactorsTestCase(unittest.TestCase):
         self.assertAlmostEqual(result.iloc[-1]["factor_value"], 0.8)
 
     def test_factor_library_registers_new_technical_factors(self) -> None:
+        self.assertIs(get_factor_function("return_60d"), return_60d_factor)
         self.assertIs(get_factor_function("momentum_60d"), momentum_60d_factor)
         self.assertIs(get_factor_function("reversal_5d"), reversal_5d_factor)
+        self.assertIs(get_factor_function("volatility_60d"), volatility_60d_factor)
         self.assertIs(get_factor_function("turnover_volatility_20d"), turnover_volatility_20d_factor)
         self.assertIs(get_factor_function("amplitude_20d"), amplitude_20d_factor)
         self.assertIs(get_factor_function("close_to_high_20d"), close_to_high_20d_factor)
