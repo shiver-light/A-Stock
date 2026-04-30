@@ -89,7 +89,7 @@ class ResearchRecommendTestCase(unittest.TestCase):
             self.assertEqual(len(selected), 1)
             self.assertEqual(selected[0]["name"], "exp_a")
 
-    @patch("research.recommend.run_minimal_pipeline")
+    @patch("research.recommend.run_recommendation_pipeline")
     def test_generate_daily_recommendations_from_run_builds_consensus(self, mock_pipeline) -> None:
         mock_pipeline.side_effect = [
             {
@@ -203,7 +203,7 @@ class ResearchRecommendTestCase(unittest.TestCase):
         self.assertEqual(buckets["watch_list"][0]["ts_code"], "000003.SZ")
         self.assertEqual(buckets["watch_list"][0]["recommend_level"], "C")
 
-    @patch("research.recommend.run_minimal_pipeline")
+    @patch("research.recommend.run_recommendation_pipeline")
     def test_generate_daily_consensus_recommendations_uses_named_model_roles(self, mock_pipeline) -> None:
         mock_pipeline.side_effect = [
             {

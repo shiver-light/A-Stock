@@ -8,7 +8,7 @@ from typing import Any
 
 import pandas as pd
 
-from pipeline import run_minimal_pipeline
+from pipeline import run_recommendation_pipeline
 from research.storage import read_json
 
 
@@ -293,13 +293,12 @@ def generate_daily_recommendations_from_run(
     model_outputs: list[dict[str, object]] = []
     for item in selected_models:
         config = item["config"]
-        pipeline_result = run_minimal_pipeline(
+        pipeline_result = run_recommendation_pipeline(
             ts_codes=config.get("ts_codes"),
             universe_name=config.get("universe_name"),
             start_date=start_date or str(config["start_date"]),
             end_date=as_of_date,
             top_n=int(config.get("top_n", 20)),
-            benchmark_code=config.get("benchmark_code", "000300.SH"),
             factor_config=config.get("factor_config"),
         )
 
@@ -368,13 +367,12 @@ def generate_daily_consensus_recommendations(
     model_outputs: list[dict[str, object]] = []
     for item in selected_models:
         config = item["config"]
-        pipeline_result = run_minimal_pipeline(
+        pipeline_result = run_recommendation_pipeline(
             ts_codes=config.get("ts_codes"),
             universe_name=config.get("universe_name"),
             start_date=start_date or str(config["start_date"]),
             end_date=as_of_date,
             top_n=int(config.get("top_n", 20)),
-            benchmark_code=config.get("benchmark_code", "000300.SH"),
             factor_config=config.get("factor_config"),
         )
         model_outputs.append(

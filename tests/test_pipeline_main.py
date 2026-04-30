@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from pipeline.main import build_factor_panel, run_minimal_pipeline
+from pipeline.main import build_factor_panel, run_minimal_pipeline, run_recommendation_pipeline
 
 
 class PipelineMainTestCase(unittest.TestCase):
@@ -40,6 +40,74 @@ class PipelineMainTestCase(unittest.TestCase):
                 "selected": [True, False],
             }
         )
+
+    @patch(
+        "pipeline.main.format_latest_selection",
+        return_value={"as_of_date": "20240103", "top_n": 2, "top_stocks": [{"ts_code": "000001.SZ"}]},
+    )
+    @patch("pipeline.main.top_n_selection")
+    @patch("pipeline.main.rank_signal")
+    @patch("pipeline.main.combine_factor_scores")
+    @patch("pipeline.main.build_factor_panel")
+    @patch("pipeline.main._resolve_ts_codes", return_value=["000001.SZ", "000002.SZ"])
+    def test_run_recommendation_pipeline_uses_daily_latest_selection(
+        self,
+        mock_resolve,
+        mock_build_factor_panel,
+        mock_combine_scores,
+        mock_rank_signal,
+        mock_top_n_selection,
+        mock_latest_selection,
+    ) -> None:
+        mock_build_factor_panel.return_value = pd.DataFrame(
+            {
+                "trade_date": ["20240102", "20240102", "20240103", "20240103"],
+                "ts_code": ["000001.SZ", "000002.SZ", "000001.SZ", "000002.SZ"],
+                "turnover_mean_20d": [0.1, 0.2, 0.3, 0.4],
+            }
+        )
+        mock_combine_scores.return_value = pd.DataFrame(
+            {
+                "trade_date": ["20240102", "20240102", "20240103", "20240103"],
+                "ts_code": ["000001.SZ", "000002.SZ", "000001.SZ", "000002.SZ"],
+                "score": [0.1, 0.2, 0.3, 0.4],
+            }
+        )
+        mock_rank_signal.return_value = pd.DataFrame(
+            {
+                "trade_date": ["20240102", "20240102", "20240103", "20240103"],
+                "ts_code": ["000001.SZ", "000002.SZ", "000001.SZ", "000002.SZ"],
+                "score": [0.1, 0.2, 0.3, 0.4],
+                "rank": [2, 1, 2, 1],
+            }
+        )
+        mock_top_n_selection.return_value = pd.DataFrame(
+            {
+                "trade_date": ["20240102", "20240102", "20240103", "20240103"],
+                "ts_code": ["000001.SZ", "000002.SZ", "000001.SZ", "000002.SZ"],
+                "score": [0.1, 0.2, 0.3, 0.4],
+                "rank": [2, 1, 2, 1],
+                "selected": [True, True, True, True],
+            }
+        )
+
+        result = run_recommendation_pipeline(
+            universe_name="hs300",
+            start_date="20240101",
+            end_date="20240131",
+            top_n=2,
+            factor_config={"turnover_mean_20d": 1.0},
+        )
+
+        self.assertIn("latest_selection", result)
+        mock_resolve.assert_called_once_with(
+            ts_codes=None,
+            universe_name="hs300",
+            as_of_date="20240131",
+            signal_dates=None,
+        )
+        mock_latest_selection.assert_called_once()
+        self.assertEqual(mock_latest_selection.call_args.kwargs["as_of_date"], "20240103")
 
     def test_build_factor_panel_uses_registered_factor_function(self) -> None:
         def fake_factor(*, ts_code: str, start_date: str, end_date: str) -> pd.DataFrame:

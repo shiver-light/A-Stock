@@ -276,6 +276,62 @@ def run_minimal_pipeline(
     return result
 
 
+def run_recommendation_pipeline(
+    *,
+    ts_codes: list[str] | None = None,
+    start_date: str,
+    end_date: str,
+    top_n: int = 20,
+    universe_name: str | None = None,
+    factor_config: dict[str, float] | None = None,
+) -> dict[str, object]:
+    """Run a daily recommendation pipeline using the latest available trading date.
+
+    This path is intentionally separate from the monthly backtest pipeline:
+    - backtest uses monthly rebalance signal dates
+    - recommendation uses the latest available daily factor cross-section as of end_date
+    """
+
+    factor_config = factor_config or {
+        "return_20d": 1.0,
+        "volatility_20d": -1.0,
+        "turnover_mean_20d": 1.0,
+    }
+    resolved_ts_codes = _resolve_ts_codes(
+        ts_codes=ts_codes,
+        universe_name=universe_name,
+        as_of_date=end_date,
+        signal_dates=None,
+    )
+    factor_panel = build_factor_panel(
+        ts_codes=resolved_ts_codes,
+        start_date=start_date,
+        end_date=end_date,
+        factor_config=factor_config,
+    )
+    scored = combine_factor_scores(
+        factor_panel,
+        factor_cols=list(factor_config.keys()),
+        directions={factor_name: 1 if weight >= 0 else -1 for factor_name, weight in factor_config.items()},
+        weights={factor_name: abs(weight) for factor_name, weight in factor_config.items()},
+    )
+    ranked = rank_signal(scored, score_col="score")
+    selected = top_n_selection(ranked, top_n=top_n)
+
+    latest_date = None
+    if not selected.empty:
+        latest_date = str(selected["trade_date"].astype(str).max())
+    latest_selection = format_latest_selection(selected, top_n=top_n, as_of_date=latest_date)
+
+    return {
+        "factor_data": factor_panel,
+        "scored_signals": scored,
+        "ranked_signals": ranked,
+        "selected_signals": selected,
+        "latest_selection": latest_selection,
+    }
+
+
 def _resolve_ts_codes(
     *,
     ts_codes: list[str] | None,
