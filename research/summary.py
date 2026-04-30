@@ -9,27 +9,44 @@ import pandas as pd
 from research.storage import read_json
 
 
+SUMMARY_METRIC_COLUMNS = (
+    "cumulative_return",
+    "annual_return",
+    "max_drawdown",
+    "sharpe",
+    "benchmark_cumulative_return",
+    "excess_cumulative_return",
+    "excess_annual_return",
+    "mean_daily_turnover",
+    "mean_rebalance_turnover",
+    "median_rebalance_turnover",
+    "max_rebalance_turnover",
+    "positive_month_ratio",
+    "positive_excess_month_ratio",
+    "latest_rolling_5m_excess_return",
+    "mean_rolling_5m_excess_return",
+    "worst_rolling_5m_excess_return",
+    "latest_rolling_5m_sharpe",
+    "mean_rolling_5m_sharpe",
+    "worst_rolling_5m_sharpe",
+)
+
+
 def build_research_summary(results: list[dict[str, object]]) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     for item in results:
         config = item["config"]
         performance = item["performance"]
-        rows.append(
-            {
-                "name": item["name"],
-                "universe_name": config.get("universe_name", "custom"),
-                "top_n": config.get("top_n"),
-                "benchmark_code": config.get("benchmark_code", "000300.SH"),
-                "factor_config": config.get("factor_config"),
-                "cumulative_return": performance.get("cumulative_return"),
-                "annual_return": performance.get("annual_return"),
-                "max_drawdown": performance.get("max_drawdown"),
-                "sharpe": performance.get("sharpe"),
-                "benchmark_cumulative_return": performance.get("benchmark_cumulative_return"),
-                "excess_cumulative_return": performance.get("excess_cumulative_return"),
-                "excess_annual_return": performance.get("excess_annual_return"),
-            }
-        )
+        row = {
+            "name": item["name"],
+            "universe_name": config.get("universe_name", "custom"),
+            "top_n": config.get("top_n"),
+            "benchmark_code": config.get("benchmark_code", "000300.SH"),
+            "factor_config": config.get("factor_config"),
+        }
+        for metric_name in SUMMARY_METRIC_COLUMNS:
+            row[metric_name] = performance.get(metric_name)
+        rows.append(row)
     return pd.DataFrame(rows)
 
 

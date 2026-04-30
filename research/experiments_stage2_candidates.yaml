@@ -1,0 +1,33 @@
+global:
+  # Stage 2 candidate set: only keep the three models that still have
+  # research value after stage1. Evaluation should rely on metrics.json,
+  # not only the compact summary.csv.
+  start_date: "20230101"
+  end_date: "20260331"
+  benchmark_code: "000300.SH"
+  top_n: 20
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+
+experiments:
+  - name: "c01_hs300_turnover_top10"
+    universe_name: "hs300"
+    top_n: 10
+    factor_config:
+      turnover_mean_20d: 1.0
+
+  - name: "c03_hs300_turnover_ret60_70_30_top20"
+    universe_name: "hs300"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.7
+      return_60d: 0.3
+
+  - name: "c04_zz500_turnover_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      turnover_mean_20d: 1.0
