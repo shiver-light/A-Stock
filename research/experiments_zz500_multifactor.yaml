@@ -1,0 +1,142 @@
+global:
+  # First zz500 multi-factor research set.
+  # This file only uses factors that are already implemented and tested in-repo.
+  # Current scoring still follows the existing pipeline path; the new
+  # factor_preprocess module is not silently injected here.
+  start_date: "20230101"
+  end_date: "20260331"
+  benchmark_code: "000300.SH"
+  top_n: 20
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+
+experiments:
+  # Single-factor lines: confirm standalone signal direction on zz500.
+  - name: "m01_zz500_turnover_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      turnover_mean_20d: 1.0
+
+  - name: "m02_zz500_return60_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      return_60d: 1.0
+
+  - name: "m03_zz500_bp_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      bp: 1.0
+
+  - name: "m04_zz500_ep_ttm_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      ep_ttm: 1.0
+
+  - name: "m05_zz500_roe_ttm_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      roe_ttm: 1.0
+
+  - name: "m06_zz500_lowvol20_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      volatility_20d_negative: 1.0
+
+  - name: "m07_zz500_illiq_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      illiq_negative: 1.0
+
+  # Two-factor lines: liquidity/momentum main line plus simple value or risk support.
+  - name: "m08_zz500_turnover_ret60_70_30_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      turnover_mean_20d: 0.7
+      return_60d: 0.3
+
+  - name: "m09_zz500_turnover_ret60_60_40_top20"
+    universe_name: "zz500"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.6
+      return_60d: 0.4
+
+  - name: "m10_zz500_turnover_bp_70_30_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      turnover_mean_20d: 0.7
+      bp: 0.3
+
+  - name: "m11_zz500_turnover_ep_70_30_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      turnover_mean_20d: 0.7
+      ep_ttm: 0.3
+
+  - name: "m12_zz500_turnover_lowvol20_70_30_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      turnover_mean_20d: 0.7
+      volatility_20d_negative: 0.3
+
+  - name: "m13_zz500_turnover_illiq_70_30_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      turnover_mean_20d: 0.7
+      illiq_negative: 0.3
+
+  # Three-factor lines: keep the structure interpretable.
+  - name: "m14_zz500_turnover_ret60_bp_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.3
+      bp: 0.2
+
+  - name: "m15_zz500_turnover_ret60_ep_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.3
+      ep_ttm: 0.2
+
+  - name: "m16_zz500_turnover_ret60_lowvol20_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.3
+      volatility_20d_negative: 0.2
+
+  - name: "m17_zz500_turnover_ret60_roe_ttm_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.3
+      roe_ttm: 0.2
+
+  - name: "m18_zz500_turnover_ret60_illiq_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.3
+      illiq_negative: 0.2
