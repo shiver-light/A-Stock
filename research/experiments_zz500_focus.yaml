@@ -1,0 +1,56 @@
+global:
+  # Focused zz500 research track:
+  # keep the window consistent with the current main research set so results
+  # are comparable across runs.
+  start_date: "20230101"
+  end_date: "20260331"
+  benchmark_code: "000300.SH"
+  top_n: 20
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+
+experiments:
+  # Base turnover-only line.
+  - name: "z01_zz500_turnover_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      turnover_mean_20d: 1.0
+
+  - name: "z02_zz500_turnover_top20"
+    universe_name: "zz500"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 1.0
+
+  # Turnover + medium-term return: the most plausible enhancement direction.
+  - name: "z03_zz500_turnover_ret60_70_30_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      turnover_mean_20d: 0.7
+      return_60d: 0.3
+
+  - name: "z04_zz500_turnover_ret60_70_30_top20"
+    universe_name: "zz500"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.7
+      return_60d: 0.3
+
+  - name: "z05_zz500_turnover_ret60_60_40_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      turnover_mean_20d: 0.6
+      return_60d: 0.4
+
+  - name: "z06_zz500_turnover_ret60_60_40_top20"
+    universe_name: "zz500"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.6
+      return_60d: 0.4
