@@ -83,6 +83,16 @@ def return_60d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: 
     return build_factor_output(data, "return_60d", "return_60d")
 
 
+def return_120d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
+    """120-day qfq return."""
+
+    data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=160)
+    validate_factor_input(data, ["trade_date", "ts_code", "close"])
+    data["return_120d"] = data.groupby("ts_code")["close"].pct_change(120)
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "return_120d", "return_120d")
+
+
 def volatility_20d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
     data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=45)
     validate_factor_input(data, ["trade_date", "ts_code", "close"])
@@ -101,6 +111,76 @@ def volatility_60d_factor(*, ts_code: str, start_date: str, end_date: str, refre
     data["volatility_60d"] = returns.groupby(data["ts_code"]).rolling(60).std().reset_index(level=0, drop=True)
     data = _clip_dates(data, start_date, end_date)
     return build_factor_output(data, "volatility_60d", "volatility_60d")
+
+
+def return_5d_negative_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
+    """Negative 5-day return for short-term overheating penalty."""
+
+    data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=15)
+    validate_factor_input(data, ["trade_date", "ts_code", "close"])
+    data["return_5d_negative"] = -data.groupby("ts_code")["close"].pct_change(5)
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "return_5d_negative", "return_5d_negative")
+
+
+def volatility_20d_negative_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """Negative 20-day volatility so larger values mean lower risk."""
+
+    data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=45)
+    validate_factor_input(data, ["trade_date", "ts_code", "close"])
+    returns = data.groupby("ts_code")["close"].pct_change()
+    data["volatility_20d_negative"] = -returns.groupby(data["ts_code"]).rolling(20).std().reset_index(
+        level=0, drop=True
+    )
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "volatility_20d_negative", "volatility_20d_negative")
+
+
+def volatility_60d_negative_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """Negative 60-day volatility so larger values mean lower risk."""
+
+    data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=90)
+    validate_factor_input(data, ["trade_date", "ts_code", "close"])
+    returns = data.groupby("ts_code")["close"].pct_change()
+    data["volatility_60d_negative"] = -returns.groupby(data["ts_code"]).rolling(60).std().reset_index(
+        level=0, drop=True
+    )
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "volatility_60d_negative", "volatility_60d_negative")
+
+
+def max_drawdown_60d_negative_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """Negative 60-day maximum drawdown magnitude so larger values mean lower drawdown."""
+
+    data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=90)
+    validate_factor_input(data, ["trade_date", "ts_code", "close"])
+    data["max_drawdown_60d_negative"] = (
+        data.groupby("ts_code")["close"]
+        .rolling(60)
+        .apply(_window_max_drawdown, raw=False)
+        .reset_index(level=0, drop=True)
+        * -1.0
+    )
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "max_drawdown_60d_negative", "max_drawdown_60d_negative")
 
 
 def price_rank_60d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
@@ -160,6 +240,44 @@ def turnover_volatility_20d_factor(
     return build_factor_output(data, "turnover_volatility_20d", "turnover_volatility_20d")
 
 
+def amount_mean_20d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
+    """20-day average daily amount."""
+
+    data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=45,
+        fields=("amount",),
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "amount"])
+    data["amount_mean_20d"] = data.groupby("ts_code")["amount"].rolling(20).mean().reset_index(level=0, drop=True)
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "amount_mean_20d", "amount_mean_20d")
+
+
+def illiq_negative_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
+    """Negative 20-day Amihud illiquidity so larger values mean better liquidity."""
+
+    data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=45,
+        fields=("close", "amount"),
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "close", "amount"])
+    returns = data.groupby("ts_code")["close"].pct_change().abs()
+    daily_illiq = np.where(data["amount"] > 0, returns / data["amount"], np.nan)
+    data["illiq_negative"] = -pd.Series(daily_illiq, index=data.index).groupby(data["ts_code"]).rolling(20).mean().reset_index(
+        level=0, drop=True
+    )
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "illiq_negative", "illiq_negative")
+
+
 def amplitude_20d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
     """20-day mean daily amplitude, where daily amplitude is (high - low) / pre_close on qfq prices."""
 
@@ -182,6 +300,14 @@ def amplitude_20d_factor(*, ts_code: str, start_date: str, end_date: str, refres
     )
     data = _clip_dates(data, start_date, end_date)
     return build_factor_output(data, "amplitude_20d", "amplitude_20d")
+
+
+def _window_max_drawdown(window: pd.Series) -> float:
+    if window.empty:
+        return np.nan
+    running_peak = window.cummax()
+    drawdown = 1.0 - (window / running_peak)
+    return float(drawdown.max())
 
 
 def close_to_high_20d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:

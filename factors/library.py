@@ -2,37 +2,63 @@
 
 from __future__ import annotations
 
-from factors.fundamental import pb_factor, pe_ttm_factor, revenue_growth_factor, roe_factor, turnover_mean_20d_factor
+from factors.fundamental import (
+    bp_factor,
+    ep_ttm_factor,
+    pb_factor,
+    pe_ttm_factor,
+    revenue_growth_factor,
+    roe_factor,
+    roe_ttm_factor,
+    turnover_mean_20d_factor,
+)
 from factors.technical import (
+    amount_mean_20d_factor,
     amplitude_20d_factor,
     close_to_high_20d_factor,
+    illiq_negative_factor,
+    max_drawdown_60d_negative_factor,
     momentum_60d_factor,
     price_rank_60d_factor,
+    return_120d_factor,
     return_20d_factor,
+    return_5d_negative_factor,
     return_60d_factor,
     return_5d_factor,
     reversal_5d_factor,
     turnover_volatility_20d_factor,
     volatility_20d_factor,
+    volatility_20d_negative_factor,
     volatility_60d_factor,
+    volatility_60d_negative_factor,
 )
 
 FACTOR_REGISTRY = {
     "return_5d": return_5d_factor,
     "return_20d": return_20d_factor,
     "return_60d": return_60d_factor,
+    "return_120d": return_120d_factor,
+    "return_5d_negative": return_5d_negative_factor,
     "momentum_60d": momentum_60d_factor,
     "reversal_5d": reversal_5d_factor,
     "volatility_20d": volatility_20d_factor,
+    "volatility_20d_negative": volatility_20d_negative_factor,
     "volatility_60d": volatility_60d_factor,
+    "volatility_60d_negative": volatility_60d_negative_factor,
+    "max_drawdown_60d_negative": max_drawdown_60d_negative_factor,
     "turnover_mean_20d": turnover_mean_20d_factor,
     "turnover_volatility_20d": turnover_volatility_20d_factor,
+    "amount_mean_20d": amount_mean_20d_factor,
+    "illiq_negative": illiq_negative_factor,
     "price_rank_60d": price_rank_60d_factor,
     "amplitude_20d": amplitude_20d_factor,
     "close_to_high_20d": close_to_high_20d_factor,
+    "ep_ttm": ep_ttm_factor,
     "pe_ttm": pe_ttm_factor,
+    "bp": bp_factor,
     "pb": pb_factor,
     "roe": roe_factor,
+    "roe_ttm": roe_ttm_factor,
     "revenue_growth": revenue_growth_factor,
 }
 
