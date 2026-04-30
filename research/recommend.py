@@ -55,6 +55,18 @@ def load_completed_experiment_results(run_dir: str | Path) -> list[dict[str, obj
     return results
 
 
+def _load_named_completed_models(
+    run_dir: str | Path,
+    model_names: list[str],
+) -> list[dict[str, object]]:
+    completed = load_completed_experiment_results(run_dir)
+    by_name = {item["name"]: item for item in completed}
+    missing = [name for name in model_names if name not in by_name]
+    if missing:
+        raise ValueError(f"Completed experiment(s) not found in run_dir: {', '.join(missing)}")
+    return [by_name[name] for name in model_names]
+
+
 def select_recommendation_models(
     run_dir: str | Path,
     *,
@@ -159,6 +171,102 @@ def build_recommendation_consensus(
     return consensus.head(top_k_stocks).to_dict(orient="records")
 
 
+def _summarize_selected_stocks(model_output: dict[str, object]) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for stock in model_output.get("top_stocks", []):
+        if not stock.get("selected", False):
+            continue
+        rows.append(
+            {
+                "ts_code": stock["ts_code"],
+                "model_name": model_output["name"],
+                "rank": int(stock["rank"]),
+                "score": float(stock["score"]),
+            }
+        )
+    return rows
+
+
+def build_daily_consensus_output(
+    model_outputs: list[dict[str, object]],
+    *,
+    core_model_names: list[str],
+    confirm_model_names: list[str],
+    watch_model_names: list[str],
+) -> dict[str, list[dict[str, object]]]:
+    """Build structured daily recommendation buckets from model-role assignments."""
+
+    rows: list[dict[str, object]] = []
+    for model_output in model_outputs:
+        rows.extend(_summarize_selected_stocks(model_output))
+
+    if not rows:
+        return {
+            "trade_consensus": [],
+            "trade_core": [],
+            "watch_list": [],
+            "all_recommendations": [],
+        }
+
+    data = pd.DataFrame(rows)
+    grouped_rows: list[dict[str, object]] = []
+    for ts_code, group in data.groupby("ts_code", sort=False):
+        source_models = sorted(group["model_name"].drop_duplicates().tolist())
+        in_core = any(name in core_model_names for name in source_models)
+        in_confirm = any(name in confirm_model_names for name in source_models)
+        in_watch = any(name in watch_model_names for name in source_models)
+
+        if in_core and in_confirm:
+            recommend_level = "A"
+        elif in_core:
+            recommend_level = "B"
+        else:
+            recommend_level = "C"
+
+        if in_core and in_confirm:
+            level_order = 0
+        elif in_core:
+            level_order = 1
+        elif in_confirm:
+            level_order = 2
+        else:
+            level_order = 3
+
+        grouped_rows.append(
+            {
+                "ts_code": ts_code,
+                "recommend_level": recommend_level,
+                "consensus_count": int(len(source_models)),
+                "source_models": source_models,
+                "best_rank": int(group["rank"].min()),
+                "avg_rank": float(group["rank"].mean()),
+                "avg_score": float(group["score"].mean()),
+                "in_core_model": bool(in_core),
+                "in_confirm_model": bool(in_confirm),
+                "in_watch_model": bool(in_watch),
+                "level_order": level_order,
+            }
+        )
+
+    recommendations = pd.DataFrame(grouped_rows)
+    recommendations = recommendations.sort_values(
+        ["level_order", "consensus_count", "best_rank", "avg_rank", "avg_score", "ts_code"],
+        ascending=[True, False, True, True, False, True],
+    ).reset_index(drop=True)
+    recommendations = recommendations.drop(columns=["level_order"])
+
+    trade_consensus = recommendations[recommendations["recommend_level"] == "A"]
+    trade_core = recommendations[recommendations["recommend_level"].isin(["A", "B"])]
+    watch_list = recommendations[recommendations["recommend_level"] == "C"]
+
+    return {
+        "trade_consensus": trade_consensus.to_dict(orient="records"),
+        "trade_core": trade_core.to_dict(orient="records"),
+        "watch_list": watch_list.to_dict(orient="records"),
+        "all_recommendations": recommendations.to_dict(orient="records"),
+    }
+
+
 def generate_daily_recommendations_from_run(
     run_dir: str | Path,
     *,
@@ -234,6 +342,83 @@ def generate_daily_recommendations_from_run(
     }
 
 
+def generate_daily_consensus_recommendations(
+    run_dir: str | Path,
+    *,
+    as_of_date: str,
+    start_date: str | None = None,
+    core_model_names: list[str] | None = None,
+    confirm_model_names: list[str] | None = None,
+    watch_model_names: list[str] | None = None,
+) -> dict[str, object]:
+    """Generate daily recommendation buckets from explicit core/confirm/watch model roles."""
+
+    core_model_names = core_model_names or ["c01_hs300_turnover_top10"]
+    confirm_model_names = confirm_model_names or ["c03_hs300_turnover_ret60_70_30_top20"]
+    watch_model_names = watch_model_names or ["c04_zz500_turnover_top10"]
+
+    ordered_names: list[str] = []
+    for group in [core_model_names, confirm_model_names, watch_model_names]:
+        for name in group:
+            if name not in ordered_names:
+                ordered_names.append(name)
+
+    selected_models = _load_named_completed_models(run_dir, ordered_names)
+
+    model_outputs: list[dict[str, object]] = []
+    for item in selected_models:
+        config = item["config"]
+        pipeline_result = run_minimal_pipeline(
+            ts_codes=config.get("ts_codes"),
+            universe_name=config.get("universe_name"),
+            start_date=start_date or str(config["start_date"]),
+            end_date=as_of_date,
+            top_n=int(config.get("top_n", 20)),
+            benchmark_code=config.get("benchmark_code", "000300.SH"),
+            factor_config=config.get("factor_config"),
+        )
+        model_outputs.append(
+            {
+                "name": item["name"],
+                "config": config,
+                "performance": item["performance"],
+                "latest_selection": pipeline_result["latest_selection"],
+                "top_stocks": pipeline_result["latest_selection"].get("top_stocks", []),
+            }
+        )
+
+    buckets = build_daily_consensus_output(
+        model_outputs,
+        core_model_names=core_model_names,
+        confirm_model_names=confirm_model_names,
+        watch_model_names=watch_model_names,
+    )
+
+    return {
+        "run_dir": str(run_dir),
+        "as_of_date": as_of_date,
+        "model_roles": {
+            "core_models": core_model_names,
+            "confirm_models": confirm_model_names,
+            "watch_models": watch_model_names,
+        },
+        "selected_models": [
+            {
+                "name": item["name"],
+                "universe_name": item["config"].get("universe_name", "custom"),
+                "top_n": item["config"].get("top_n"),
+                "factor_config": item["config"].get("factor_config", {}),
+                "sharpe": float(item["performance"].get("sharpe", 0.0)),
+                "excess_cumulative_return": float(item["performance"].get("excess_cumulative_return", 0.0)),
+                "max_drawdown": float(item["performance"].get("max_drawdown", 0.0)),
+                "positive_excess_month_ratio": float(item["performance"].get("positive_excess_month_ratio", 0.0)),
+            }
+            for item in model_outputs
+        ],
+        **buckets,
+    }
+
+
 def render_recommendation_text(report: dict[str, object]) -> str:
     """Render a compact daily recommendation report."""
 
@@ -280,5 +465,59 @@ def render_recommendation_text(report: dict[str, object]) -> str:
             lines.append(f"   source_models={', '.join(item['source_models'])}")
     else:
         lines.append("N/A")
+
+    return "\n".join(lines)
+
+
+def render_consensus_recommendation_text(report: dict[str, object]) -> str:
+    """Render daily recommendation buckets with A/B/C levels."""
+
+    roles = report.get("model_roles", {})
+    selected_models = report.get("selected_models", [])
+    trade_consensus = report.get("trade_consensus", [])
+    trade_core = report.get("trade_core", [])
+    watch_list = report.get("watch_list", [])
+
+    lines = [
+        "research run:",
+        str(report.get("run_dir", "N/A")),
+        "",
+        "as of date:",
+        str(report.get("as_of_date", "N/A")),
+        "",
+        "model roles:",
+        f"core_models={', '.join(roles.get('core_models', [])) or 'N/A'}",
+        f"confirm_models={', '.join(roles.get('confirm_models', [])) or 'N/A'}",
+        f"watch_models={', '.join(roles.get('watch_models', [])) or 'N/A'}",
+        "",
+        "selected models:",
+    ]
+
+    if selected_models:
+        for item in selected_models:
+            lines.append(
+                f"{item['name']} universe={item['universe_name']} top_n={item['top_n']} "
+                f"sharpe={item['sharpe']:.6f} excess={item['excess_cumulative_return']:.6f} "
+                f"mdd={item['max_drawdown']:.6f} pos_excess_month={item['positive_excess_month_ratio']:.6f}"
+            )
+    else:
+        lines.append("N/A")
+
+    def _append_bucket(title: str, items: list[dict[str, object]]) -> None:
+        lines.extend(["", title + ":"])
+        if not items:
+            lines.append("N/A")
+            return
+        for index, item in enumerate(items, start=1):
+            lines.append(
+                f"{index}. {item['ts_code']} level={item['recommend_level']} "
+                f"consensus={item['consensus_count']} best_rank={item['best_rank']} "
+                f"avg_rank={item['avg_rank']:.2f} avg_score={item['avg_score']:.6f}"
+            )
+            lines.append(f"   source_models={', '.join(item['source_models'])}")
+
+    _append_bucket("trade consensus", trade_consensus)
+    _append_bucket("trade core", trade_core)
+    _append_bucket("watch list", watch_list)
 
     return "\n".join(lines)

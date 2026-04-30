@@ -2,9 +2,12 @@
 
 from .config import load_research_config
 from .recommend import (
+    build_daily_consensus_output,
     build_recommendation_consensus,
+    generate_daily_consensus_recommendations,
     generate_daily_recommendations_from_run,
     load_completed_experiment_results,
+    render_consensus_recommendation_text,
     render_recommendation_text,
     select_recommendation_models,
 )
@@ -16,8 +19,11 @@ __all__ = [
     "load_research_config",
     "load_completed_experiment_results",
     "select_recommendation_models",
+    "build_daily_consensus_output",
     "build_recommendation_consensus",
+    "generate_daily_consensus_recommendations",
     "generate_daily_recommendations_from_run",
+    "render_consensus_recommendation_text",
     "render_recommendation_text",
     "normalize_stale_statuses",
     "run_experiments",

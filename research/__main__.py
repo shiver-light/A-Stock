@@ -6,9 +6,11 @@ import argparse
 import json
 
 from research import (
+    generate_daily_consensus_recommendations,
     generate_daily_recommendations_from_run,
     load_research_config,
     rebuild_summary_from_disk,
+    render_consensus_recommendation_text,
     render_recommendation_text,
     run_experiments,
     sort_research_summary,
@@ -56,6 +58,38 @@ def build_parser() -> argparse.ArgumentParser:
         default="text",
         help="Output text report or JSON payload.",
     )
+
+    consensus_parser = subparsers.add_parser(
+        "recommend-consensus",
+        help="Generate A/B/C daily recommendation buckets from explicit model roles.",
+    )
+    consensus_parser.add_argument("--run-dir", required=True, help="Path to an existing research run directory.")
+    consensus_parser.add_argument("--as-of-date", required=True, help="Recommendation end date in YYYYMMDD format.")
+    consensus_parser.add_argument("--start-date", default=None, help="Optional override for pipeline start date.")
+    consensus_parser.add_argument(
+        "--core-models",
+        nargs="*",
+        default=["c01_hs300_turnover_top10"],
+        help="Model names used as the main trade core.",
+    )
+    consensus_parser.add_argument(
+        "--confirm-models",
+        nargs="*",
+        default=["c03_hs300_turnover_ret60_70_30_top20"],
+        help="Model names used for confirmation.",
+    )
+    consensus_parser.add_argument(
+        "--watch-models",
+        nargs="*",
+        default=["c04_zz500_turnover_top10"],
+        help="Model names used only for observation.",
+    )
+    consensus_parser.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output text report or JSON payload.",
+    )
     return parser
 
 
@@ -84,6 +118,19 @@ def main() -> int:
             print(json.dumps(recommendation, ensure_ascii=False, indent=2, default=str))
         else:
             print(render_recommendation_text(recommendation))
+    elif args.command == "recommend-consensus":
+        recommendation = generate_daily_consensus_recommendations(
+            args.run_dir,
+            as_of_date=args.as_of_date,
+            start_date=args.start_date,
+            core_model_names=args.core_models,
+            confirm_model_names=args.confirm_models,
+            watch_model_names=args.watch_models,
+        )
+        if args.output == "json":
+            print(json.dumps(recommendation, ensure_ascii=False, indent=2, default=str))
+        else:
+            print(render_consensus_recommendation_text(recommendation))
     else:
         summary = rebuild_summary_from_disk(args.run_dir)
         ascending = args.sort_by == "max_drawdown"
