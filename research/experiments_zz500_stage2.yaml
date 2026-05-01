@@ -1,0 +1,54 @@
+global:
+  # Stage 2 zz500 candidates:
+  # keep only the lines that still have research value after the first
+  # multi-factor pass, and run them under a more realistic but still minimal
+  # execution setup.
+  #
+  # Notes:
+  # - slippage_bps and min_amount are effective under the current pipeline
+  # - block_suspended / limit-up / limit-down are passed through, but the
+  #   current market panel does not yet provide those fields, so they degrade
+  #   gracefully to unconstrained behavior for now
+  start_date: "20230101"
+  end_date: "20260331"
+  benchmark_code: "000300.SH"
+  top_n: 20
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 10.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 50000000.0
+
+experiments:
+  - name: "s2_m01_zz500_turnover_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      turnover_mean_20d: 1.0
+
+  - name: "s2_m09_zz500_turnover_ret60_60_40_top20"
+    universe_name: "zz500"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.6
+      return_60d: 0.4
+
+  - name: "s2_m17_zz500_turnover_ret60_roe_ttm_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.3
+      roe_ttm: 0.2
+
+  - name: "s2_m04_zz500_ep_ttm_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      ep_ttm: 1.0

@@ -101,6 +101,36 @@ class ResearchRunnerTestCase(unittest.TestCase):
             self.assertFalse(kwargs["enable_factor_diagnostics"])
             self.assertEqual(kwargs["analysis_horizons"], (5, 10, 20))
 
+    @patch("research.runner.run_minimal_pipeline")
+    def test_run_experiments_passes_backtest_config(self, mock_pipeline) -> None:
+        mock_pipeline.return_value = {
+            "performance": {"cumulative_return": 0.1},
+            "latest_selection": {"top_stocks": []},
+            "report": {"backtest_summary": {"cumulative_return": 0.1}},
+            "report_text": "strategy report",
+        }
+
+        config = {
+            "global": {
+                "start_date": "20240101",
+                "end_date": "20240131",
+                "backtest_config": {"slippage_bps": 10.0, "min_amount": 5000000.0},
+            },
+            "experiments": [
+                {
+                    "name": "exp_with_backtest_config",
+                    "ts_codes": ["000001.SZ"],
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            results = run_experiments(config, output_dir=tmp_dir, run_name="demo_run", resume=False)
+
+            self.assertEqual(len(results), 1)
+            _, kwargs = mock_pipeline.call_args
+            self.assertEqual(kwargs["backtest_config"], {"slippage_bps": 10.0, "min_amount": 5000000.0})
+
 
 if __name__ == "__main__":
     unittest.main()

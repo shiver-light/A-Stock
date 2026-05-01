@@ -147,10 +147,11 @@ def _build_market_panel(
     market_frames: list[pd.DataFrame] = []
     for ts_code in ts_codes:
         data = get_a_share_daily_prices(ts_code=ts_code, start_date=start_date, end_date=end_date)
-        market_frames.append(data.loc[:, ["trade_date", "ts_code", "open", "close"]].copy())
+        available_columns = [column for column in ["trade_date", "ts_code", "open", "close", "amount"] if column in data.columns]
+        market_frames.append(data.loc[:, available_columns].copy())
 
     if not market_frames:
-        return pd.DataFrame(columns=["trade_date", "ts_code", "open", "close"])
+        return pd.DataFrame(columns=["trade_date", "ts_code", "open", "close", "amount"])
     return (
         pd.concat(market_frames, ignore_index=True)
         .sort_values(["trade_date", "ts_code"])
@@ -168,6 +169,7 @@ def run_minimal_pipeline(
     benchmark_code: str = "000300.SH",
     universe_name: str | None = None,
     factor_config: dict[str, float] | None = None,
+    backtest_config: dict[str, object] | None = None,
     enable_factor_diagnostics: bool = False,
     enable_data_diagnostics: bool = False,
     analysis_horizons: tuple[int, ...] = (5, 10, 20),
@@ -185,6 +187,7 @@ def run_minimal_pipeline(
         "volatility_20d": -1.0,
         "turnover_mean_20d": 1.0,
     }
+    backtest_config = backtest_config or {}
     resolved_ts_codes = _resolve_ts_codes(
         ts_codes=ts_codes,
         universe_name=universe_name,
@@ -212,6 +215,7 @@ def run_minimal_pipeline(
     strategy_returns, holdings = run_backtest(
         signals=selected.loc[:, ["trade_date", "ts_code", "selected"]],
         market_data=market_panel,
+        **backtest_config,
     )
     benchmark_returns = calc_benchmark_returns(
         benchmark_data,
@@ -235,6 +239,7 @@ def run_minimal_pipeline(
             "benchmark_code": benchmark_code,
             "selection_logic": "等权综合因子打分后按日排序取Top N",
             "factor_config": factor_config,
+            "backtest_config": backtest_config,
         },
     )
     report_text = render_strategy_report_text(report)
