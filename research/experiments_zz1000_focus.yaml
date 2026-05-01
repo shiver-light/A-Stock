@@ -1,0 +1,113 @@
+global:
+  # Focused zz1000 research track:
+  # zz1000 should be studied under stronger execution constraints and simpler
+  # factor structures before trying large multi-factor mixes.
+  start_date: "20230101"
+  end_date: "20260331"
+  benchmark_code: "000300.SH"
+  top_n: 30
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 10.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 300000.0
+
+experiments:
+  # Single-factor: test whether liquidity or medium-term trend can survive
+  # the zz1000 execution environment on their own.
+  - name: "y01_zz1000_turnover_top20"
+    universe_name: "zz1000"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 1.0
+
+  - name: "y02_zz1000_turnover_top30"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      turnover_mean_20d: 1.0
+
+  - name: "y03_zz1000_turnover_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      turnover_mean_20d: 1.0
+
+  - name: "y04_zz1000_return60_top20"
+    universe_name: "zz1000"
+    top_n: 20
+    factor_config:
+      return_60d: 1.0
+
+  - name: "y05_zz1000_illiq_top20"
+    universe_name: "zz1000"
+    top_n: 20
+    factor_config:
+      illiq_negative: 1.0
+
+  - name: "y06_zz1000_lowvol20_top20"
+    universe_name: "zz1000"
+    top_n: 20
+    factor_config:
+      volatility_20d_negative: 1.0
+
+  # Two-factor: liquidity + momentum is the primary hypothesis for zz1000.
+  - name: "y07_zz1000_turnover_ret60_70_30_top20"
+    universe_name: "zz1000"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.7
+      return_60d: 0.3
+
+  - name: "y08_zz1000_turnover_ret60_70_30_top30"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      turnover_mean_20d: 0.7
+      return_60d: 0.3
+
+  - name: "y09_zz1000_turnover_ret60_60_40_top30"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      turnover_mean_20d: 0.6
+      return_60d: 0.4
+
+  # Two-factor: liquidity + execution quality.
+  - name: "y10_zz1000_turnover_illiq_70_30_top30"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      turnover_mean_20d: 0.7
+      illiq_negative: 0.3
+
+  # Two-factor: momentum + risk control.
+  - name: "y11_zz1000_ret60_lowvol20_70_30_top30"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      return_60d: 0.7
+      volatility_20d_negative: 0.3
+
+  # Three-factor: primary candidate structure for zz1000.
+  - name: "y12_zz1000_turnover_ret60_lowvol20_top30"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.3
+      volatility_20d_negative: 0.2
+
+  - name: "y13_zz1000_turnover_ret60_illiq_top30"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.3
+      illiq_negative: 0.2
