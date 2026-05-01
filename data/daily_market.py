@@ -78,6 +78,11 @@ class AShareDailyMarketService:
                 request.end_date,
                 request.refresh,
             )
+            factors = self._ensure_factor_coverage(
+                ts_code=request.ts_code,
+                daily=data,
+                factors=factors,
+            )
             data = self._apply_adjustment(data, factors, request.adjust, request.end_date)
         elif request.adjust not in {None, ""}:
             raise ValueError("adjust must be one of None, 'qfq', or 'hfq'.")
@@ -204,7 +209,11 @@ class AShareDailyMarketService:
             validate="one_to_one",
         )
         if merged["adj_factor"].isna().any():
-            raise ValueError("Missing adj_factor rows after merge; cannot compute adjusted prices.")
+            missing_dates = sorted(merged.loc[merged["adj_factor"].isna(), "trade_date"].astype(str).unique().tolist())
+            raise ValueError(
+                "Missing adj_factor rows after merge; cannot compute adjusted prices. "
+                f"Missing dates sample: {missing_dates[:10]}"
+            )
 
         anchor_rows = merged.loc[merged["trade_date"] <= anchor_end_date, ["trade_date", "adj_factor"]]
         if anchor_rows.empty:
@@ -221,6 +230,53 @@ class AShareDailyMarketService:
             result[column] = result[column] * scale
 
         return result
+
+    def _ensure_factor_coverage(
+        self,
+        *,
+        ts_code: str,
+        daily: pd.DataFrame,
+        factors: pd.DataFrame,
+    ) -> pd.DataFrame:
+        if daily.empty:
+            return factors
+
+        daily_dates = set(daily["trade_date"].astype(str))
+        factor_dates = set(factors.get("trade_date", pd.Series(dtype="object")).astype(str))
+        missing_dates = sorted(daily_dates - factor_dates)
+        if not missing_dates:
+            return factors
+
+        frames = [factors] if not factors.empty else []
+        for missing_start, missing_end in self._compress_date_ranges(missing_dates):
+            fetched = self.client.adj_factor(
+                ts_code=ts_code,
+                start_date=missing_start,
+                end_date=missing_end,
+            )
+            frames.append(self._normalize_frame(fetched))
+
+        merged = self._merge_frames(frames)
+        self._write_cache(self._factor_cache_path(ts_code), merged)
+        return merged
+
+    def _compress_date_ranges(self, trade_dates: list[str]) -> list[tuple[str, str]]:
+        if not trade_dates:
+            return []
+
+        timestamps = [pd.Timestamp(date) for date in sorted(set(trade_dates))]
+        ranges: list[tuple[str, str]] = []
+        range_start = timestamps[0]
+        previous = timestamps[0]
+
+        for current in timestamps[1:]:
+            if current - previous > pd.Timedelta(days=1):
+                ranges.append((range_start.strftime("%Y%m%d"), previous.strftime("%Y%m%d")))
+                range_start = current
+            previous = current
+
+        ranges.append((range_start.strftime("%Y%m%d"), previous.strftime("%Y%m%d")))
+        return ranges
 
     def _slice_dates(self, data: pd.DataFrame, start_date: str, end_date: str) -> pd.DataFrame:
         mask = (data["trade_date"] >= start_date) & (data["trade_date"] <= end_date)

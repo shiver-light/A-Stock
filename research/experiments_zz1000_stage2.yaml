@@ -1,0 +1,80 @@
+global:
+  # Stage 2 for zz1000:
+  # 1. stronger liquidity filter than the first pass
+  # 2. larger top_n to reduce concentration risk
+  # 3. explicit direction audit for illiq_negative
+  start_date: "20230101"
+  end_date: "20260331"
+  benchmark_code: "000300.SH"
+  top_n: 30
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 10.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 500000.0
+
+experiments:
+  # Liquidity-direction audit: current diagnostics and realized returns disagree,
+  # so keep both signs and compare them under stronger execution constraints.
+  - name: "z2_i01_zz1000_illiq_negative_top30"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      illiq_negative: 1.0
+
+  - name: "z2_i02_zz1000_illiq_negative_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      illiq_negative: 1.0
+
+  - name: "z2_i03_zz1000_illiq_reversed_top30"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      illiq_negative: -1.0
+
+  - name: "z2_i04_zz1000_illiq_reversed_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      illiq_negative: -1.0
+
+  # Structural candidates: larger top_n and stronger liquidity filter.
+  - name: "z2_i05_zz1000_turnover_ret60_lowvol20_top30"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.3
+      volatility_20d_negative: 0.2
+
+  - name: "z2_i06_zz1000_turnover_ret60_lowvol20_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.3
+      volatility_20d_negative: 0.2
+
+  - name: "z2_i07_zz1000_turnover_ret60_illiq_negative_top30"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.3
+      illiq_negative: 0.2
+
+  - name: "z2_i08_zz1000_turnover_ret60_illiq_reversed_top30"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.3
+      illiq_negative: -0.2
