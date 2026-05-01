@@ -51,6 +51,12 @@ tushare_token: "你的token"
 python3 -m research run --config research/experiments.yaml
 ```
 
+当前也提供日度荐股共识入口：
+
+```bash
+python3 -m research recommend-consensus --run-dir <run_dir> --as-of-date YYYYMMDD
+```
+
 最常用参数：
 
 - `--config`
@@ -59,6 +65,12 @@ python3 -m research run --config research/experiments.yaml
   - 指定实验输出根目录，默认 `research_runs`
 - `--run-name`
   - 指定本次实验目录名；不传则自动生成
+- `--core-models`
+  - 指定主交易模型
+- `--confirm-models`
+  - 指定确认模型
+- `--watch-models`
+  - 指定观察模型；不传则默认为空
 
 ## 推荐运行命令
 
@@ -96,6 +108,77 @@ python3 -m research summary \
   --sort-by excess_cumulative_return \
   --output json
 ```
+
+## 共识荐股入口
+
+`recommend-consensus` 用于把已完成的 research run 转成日度荐股结果。
+
+输出分三层：
+
+- `trade_consensus`
+  - 同时命中主模型和确认模型的 `A` 级候选
+- `trade_core`
+  - 主模型命中的 `A + B` 级候选
+- `watch_list`
+  - 只在确认模型或观察模型里命中的 `C` 级候选
+
+### HS300 示例
+
+基于 [research_runs/stage2_candidates](/Users/raymond/src/A-Stock/research_runs/stage2_candidates)：
+
+```bash
+python3 -m research recommend-consensus \
+  --run-dir research_runs/stage2_candidates \
+  --as-of-date 20260501 \
+  --core-models c01_hs300_turnover_top10 \
+  --confirm-models c03_hs300_turnover_ret60_70_30_top20 \
+  --watch-models c04_zz500_turnover_top10
+```
+
+如果要 JSON：
+
+```bash
+python3 -m research recommend-consensus \
+  --run-dir research_runs/stage2_candidates \
+  --as-of-date 20260501 \
+  --core-models c01_hs300_turnover_top10 \
+  --confirm-models c03_hs300_turnover_ret60_70_30_top20 \
+  --watch-models c04_zz500_turnover_top10 \
+  --output json
+```
+
+### ZZ500 示例
+
+基于 [research_runs/zz500_stage2_min300k](/Users/raymond/src/A-Stock/research_runs/zz500_stage2_min300k)：
+
+```bash
+python3 -m research recommend-consensus \
+  --run-dir research_runs/zz500_stage2_min300k \
+  --as-of-date 20260501 \
+  --core-models s2_m01_zz500_turnover_top10 \
+  --confirm-models s2_m04_zz500_ep_ttm_top10
+```
+
+如果要 JSON：
+
+```bash
+python3 -m research recommend-consensus \
+  --run-dir research_runs/zz500_stage2_min300k \
+  --as-of-date 20260501 \
+  --core-models s2_m01_zz500_turnover_top10 \
+  --confirm-models s2_m04_zz500_ep_ttm_top10 \
+  --output json
+```
+
+说明：
+
+- `HS300` 当前建议：
+  - 主模型 `c01_hs300_turnover_top10`
+  - 确认模型 `c03_hs300_turnover_ret60_70_30_top20`
+- `ZZ500` 当前建议：
+  - 主模型 `s2_m01_zz500_turnover_top10`
+  - 确认模型 `s2_m04_zz500_ep_ttm_top10`
+- 如果不传 `--watch-models`，当前不会自动补旧模型名。
 
 ## 配置文件
 
