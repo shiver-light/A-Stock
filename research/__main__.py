@@ -81,7 +81,7 @@ def build_parser() -> argparse.ArgumentParser:
     consensus_parser.add_argument(
         "--watch-models",
         nargs="*",
-        default=["c04_zz500_turnover_top10"],
+        default=[],
         help="Model names used only for observation.",
     )
     consensus_parser.add_argument(

@@ -354,7 +354,7 @@ def generate_daily_consensus_recommendations(
 
     core_model_names = core_model_names or ["c01_hs300_turnover_top10"]
     confirm_model_names = confirm_model_names or ["c03_hs300_turnover_ret60_70_30_top20"]
-    watch_model_names = watch_model_names or ["c04_zz500_turnover_top10"]
+    watch_model_names = watch_model_names or []
 
     ordered_names: list[str] = []
     for group in [core_model_names, confirm_model_names, watch_model_names]:
