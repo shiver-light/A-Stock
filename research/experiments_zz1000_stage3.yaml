@@ -1,0 +1,110 @@
+global:
+  # Stage 3 for zz1000:
+  # stop expanding factor space and only test whether the illiq-driven line
+  # can survive under stricter tradability assumptions.
+  start_date: "20230101"
+  end_date: "20260331"
+  benchmark_code: "000300.SH"
+  top_n: 50
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+
+experiments:
+  - name: "z3_i01_zz1000_illiq_top50_amt500k_slip10"
+    universe_name: "zz1000"
+    top_n: 50
+    backtest_config:
+      slippage_bps: 10.0
+      block_suspended: true
+      block_limit_up_buy: true
+      block_limit_down_sell: true
+      min_amount: 500000.0
+    factor_config:
+      illiq_negative: 1.0
+
+  - name: "z3_i02_zz1000_illiq_top80_amt500k_slip10"
+    universe_name: "zz1000"
+    top_n: 80
+    backtest_config:
+      slippage_bps: 10.0
+      block_suspended: true
+      block_limit_up_buy: true
+      block_limit_down_sell: true
+      min_amount: 500000.0
+    factor_config:
+      illiq_negative: 1.0
+
+  - name: "z3_i03_zz1000_illiq_top50_amt800k_slip10"
+    universe_name: "zz1000"
+    top_n: 50
+    backtest_config:
+      slippage_bps: 10.0
+      block_suspended: true
+      block_limit_up_buy: true
+      block_limit_down_sell: true
+      min_amount: 800000.0
+    factor_config:
+      illiq_negative: 1.0
+
+  - name: "z3_i04_zz1000_illiq_top80_amt800k_slip10"
+    universe_name: "zz1000"
+    top_n: 80
+    backtest_config:
+      slippage_bps: 10.0
+      block_suspended: true
+      block_limit_up_buy: true
+      block_limit_down_sell: true
+      min_amount: 800000.0
+    factor_config:
+      illiq_negative: 1.0
+
+  - name: "z3_i05_zz1000_illiq_top50_amt1000k_slip10"
+    universe_name: "zz1000"
+    top_n: 50
+    backtest_config:
+      slippage_bps: 10.0
+      block_suspended: true
+      block_limit_up_buy: true
+      block_limit_down_sell: true
+      min_amount: 1000000.0
+    factor_config:
+      illiq_negative: 1.0
+
+  - name: "z3_i06_zz1000_illiq_top80_amt1000k_slip10"
+    universe_name: "zz1000"
+    top_n: 80
+    backtest_config:
+      slippage_bps: 10.0
+      block_suspended: true
+      block_limit_up_buy: true
+      block_limit_down_sell: true
+      min_amount: 1000000.0
+    factor_config:
+      illiq_negative: 1.0
+
+  - name: "z3_i07_zz1000_illiq_top50_amt500k_slip15"
+    universe_name: "zz1000"
+    top_n: 50
+    backtest_config:
+      slippage_bps: 15.0
+      block_suspended: true
+      block_limit_up_buy: true
+      block_limit_down_sell: true
+      min_amount: 500000.0
+    factor_config:
+      illiq_negative: 1.0
+
+  - name: "z3_i08_zz1000_illiq_top80_amt500k_slip15"
+    universe_name: "zz1000"
+    top_n: 80
+    backtest_config:
+      slippage_bps: 15.0
+      block_suspended: true
+      block_limit_up_buy: true
+      block_limit_down_sell: true
+      min_amount: 500000.0
+    factor_config:
+      illiq_negative: 1.0
