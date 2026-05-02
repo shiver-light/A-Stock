@@ -11,12 +11,17 @@ from factors.technical import (
     amount_mean_20d_factor,
     amplitude_20d_factor,
     close_to_high_20d_factor,
+    down_day_support_20d_factor,
+    high_turnover_low_range_20d_factor,
     illiq_negative_factor,
     max_drawdown_60d_negative_factor,
     momentum_60d_factor,
+    money_flow_strength_20d_factor,
+    position_safety_60d_factor,
     return_120d_factor,
     return_5d_negative_factor,
     return_60d_factor,
+    price_suppression_20d_factor,
     reversal_5d_factor,
     turnover_volatility_20d_factor,
     volatility_20d_negative_factor,
@@ -322,6 +327,131 @@ class TechnicalFactorsTestCase(unittest.TestCase):
         self.assertEqual(result.iloc[-1]["factor_name"], "illiq_negative")
         self.assertLessEqual(result.iloc[-1]["factor_value"], 0.0)
 
+    @patch("factors.technical._load_qfq_market_data")
+    def test_money_flow_strength_20d_factor(self, mock_load_qfq_market_data) -> None:
+        dates = self._date_range(25)
+        mock_load_qfq_market_data.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * 25,
+                "high": [10.0] * 25,
+                "low": [8.0] * 25,
+                "close": [9.5] * 25,
+                "amount": [100.0] * 25,
+            }
+        )
+
+        result = money_flow_strength_20d_factor(
+            ts_code="000001.SZ",
+            start_date=dates[20],
+            end_date=dates[-1],
+        )
+
+        self.assertEqual(result.iloc[-1]["factor_name"], "money_flow_strength_20d")
+        self.assertAlmostEqual(result.iloc[-1]["factor_value"], 50.0)
+
+    @patch("factors.technical._load_qfq_market_data")
+    @patch("factors.technical._load_turnover_data")
+    def test_high_turnover_low_range_20d_factor(self, mock_load_turnover_data, mock_load_qfq_market_data) -> None:
+        dates = self._date_range(25)
+        mock_load_qfq_market_data.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * 25,
+                "high": [11.0] * 25,
+                "low": [9.0] * 25,
+                "pre_close": [10.0] * 25,
+            }
+        )
+        mock_load_turnover_data.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * 25,
+                "turnover_rate_f": [2.0] * 25,
+            }
+        )
+
+        result = high_turnover_low_range_20d_factor(
+            ts_code="000001.SZ",
+            start_date=dates[20],
+            end_date=dates[-1],
+        )
+
+        self.assertEqual(result.iloc[-1]["factor_name"], "high_turnover_low_range_20d")
+        self.assertAlmostEqual(result.iloc[-1]["factor_value"], 10.0)
+
+    @patch("factors.technical._load_qfq_daily")
+    @patch("factors.technical._load_turnover_data")
+    def test_price_suppression_20d_factor(self, mock_load_turnover_data, mock_load_qfq_daily) -> None:
+        dates = self._date_range(25)
+        mock_load_qfq_daily.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * 25,
+                "close": [10.0] * 25,
+            }
+        )
+        mock_load_turnover_data.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * 25,
+                "turnover_rate_f": [2.0] * 25,
+            }
+        )
+
+        result = price_suppression_20d_factor(
+            ts_code="000001.SZ",
+            start_date=dates[20],
+            end_date=dates[-1],
+        )
+
+        self.assertEqual(result.iloc[-1]["factor_name"], "price_suppression_20d")
+        self.assertAlmostEqual(result.iloc[-1]["factor_value"], 2.0)
+
+    @patch("factors.technical._load_qfq_market_data")
+    def test_down_day_support_20d_factor(self, mock_load_qfq_market_data) -> None:
+        dates = self._date_range(25)
+        mock_load_qfq_market_data.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * 25,
+                "high": [10.0] * 25,
+                "low": [6.0] * 25,
+                "close": [9.0] * 25,
+                "pre_close": [9.5] * 25,
+            }
+        )
+
+        result = down_day_support_20d_factor(
+            ts_code="000001.SZ",
+            start_date=dates[20],
+            end_date=dates[-1],
+        )
+
+        self.assertEqual(result.iloc[-1]["factor_name"], "down_day_support_20d")
+        self.assertAlmostEqual(result.iloc[-1]["factor_value"], 0.75)
+
+    @patch("factors.technical._load_qfq_market_data")
+    def test_position_safety_60d_factor(self, mock_load_qfq_market_data) -> None:
+        dates = self._date_range(65)
+        mock_load_qfq_market_data.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * 65,
+                "close": [8.0] * 65,
+                "high": [10.0] * 65,
+            }
+        )
+
+        result = position_safety_60d_factor(
+            ts_code="000001.SZ",
+            start_date=dates[60],
+            end_date=dates[-1],
+        )
+
+        self.assertEqual(result.iloc[-1]["factor_name"], "position_safety_60d")
+        self.assertAlmostEqual(result.iloc[-1]["factor_value"], 0.2)
+
     @patch("factors.fundamental.get_a_share_daily_valuation")
     def test_ep_ttm_factor(self, mock_get_daily_valuation) -> None:
         mock_get_daily_valuation.return_value = pd.DataFrame(
@@ -380,6 +510,11 @@ class TechnicalFactorsTestCase(unittest.TestCase):
         self.assertIs(get_factor_function("turnover_volatility_20d"), turnover_volatility_20d_factor)
         self.assertIs(get_factor_function("amount_mean_20d"), amount_mean_20d_factor)
         self.assertIs(get_factor_function("illiq_negative"), illiq_negative_factor)
+        self.assertIs(get_factor_function("money_flow_strength_20d"), money_flow_strength_20d_factor)
+        self.assertIs(get_factor_function("high_turnover_low_range_20d"), high_turnover_low_range_20d_factor)
+        self.assertIs(get_factor_function("price_suppression_20d"), price_suppression_20d_factor)
+        self.assertIs(get_factor_function("down_day_support_20d"), down_day_support_20d_factor)
+        self.assertIs(get_factor_function("position_safety_60d"), position_safety_60d_factor)
         self.assertIs(get_factor_function("amplitude_20d"), amplitude_20d_factor)
         self.assertIs(get_factor_function("close_to_high_20d"), close_to_high_20d_factor)
         self.assertIs(get_factor_function("ep_ttm"), ep_ttm_factor)

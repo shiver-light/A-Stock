@@ -57,6 +57,37 @@ def _load_qfq_daily(
     )
 
 
+def _load_turnover_data(
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool,
+    lookback_days: int,
+) -> pd.DataFrame:
+    return get_a_share_daily_valuation(
+        ts_code=ts_code,
+        start_date=_buffered_start_date(start_date, lookback_days),
+        end_date=end_date,
+        refresh=refresh,
+    )
+
+
+def _merge_market_and_turnover(
+    market_data: pd.DataFrame,
+    turnover_data: pd.DataFrame,
+    *,
+    turnover_col: str = "turnover_rate_f",
+) -> pd.DataFrame:
+    merged = market_data.merge(
+        turnover_data.loc[:, ["trade_date", "ts_code", turnover_col]],
+        on=["trade_date", "ts_code"],
+        how="left",
+        validate="one_to_one",
+    )
+    validate_factor_input(merged, ["trade_date", "ts_code", turnover_col])
+    return merged
+
+
 def return_5d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
     data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=15)
     validate_factor_input(data, ["trade_date", "ts_code", "close"])
@@ -276,6 +307,140 @@ def illiq_negative_factor(*, ts_code: str, start_date: str, end_date: str, refre
     )
     data = _clip_dates(data, start_date, end_date)
     return build_factor_output(data, "illiq_negative", "illiq_negative")
+
+
+def money_flow_strength_20d_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """20-day mean close-location-value times amount as a daily money flow proxy."""
+
+    data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=45,
+        fields=("high", "low", "close", "amount"),
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "high", "low", "close", "amount"])
+    price_range = data["high"] - data["low"]
+    clv = np.where(
+        price_range == 0,
+        0.0,
+        ((data["close"] - data["low"]) - (data["high"] - data["close"])) / price_range,
+    )
+    daily_flow = clv * data["amount"]
+    data["money_flow_strength_20d"] = (
+        pd.Series(daily_flow, index=data.index).groupby(data["ts_code"]).rolling(20).mean().reset_index(level=0, drop=True)
+    )
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "money_flow_strength_20d", "money_flow_strength_20d")
+
+
+def high_turnover_low_range_20d_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """20-day mean turnover divided by 20-day mean amplitude as a stealth accumulation proxy."""
+
+    market_data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=45,
+        fields=("high", "low", "pre_close"),
+    )
+    turnover_data = _load_turnover_data(ts_code, start_date, end_date, refresh, lookback_days=45)
+    data = _merge_market_and_turnover(market_data, turnover_data)
+    validate_factor_input(data, ["trade_date", "ts_code", "high", "low", "pre_close", "turnover_rate_f"])
+    daily_amplitude = np.where(data["pre_close"] == 0, np.nan, (data["high"] - data["low"]) / data["pre_close"])
+    amplitude_mean = (
+        pd.Series(daily_amplitude, index=data.index).groupby(data["ts_code"]).rolling(20).mean().reset_index(level=0, drop=True)
+    )
+    turnover_mean = data.groupby("ts_code")["turnover_rate_f"].rolling(20).mean().reset_index(level=0, drop=True)
+    data["high_turnover_low_range_20d"] = np.where(amplitude_mean == 0, np.nan, turnover_mean / amplitude_mean)
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "high_turnover_low_range_20d", "high_turnover_low_range_20d")
+
+
+def price_suppression_20d_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """20-day mean turnover scaled by muted 20-day return magnitude as a price suppression proxy."""
+
+    market_data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=90)
+    turnover_data = _load_turnover_data(ts_code, start_date, end_date, refresh, lookback_days=90)
+    data = _merge_market_and_turnover(market_data, turnover_data)
+    validate_factor_input(data, ["trade_date", "ts_code", "close", "turnover_rate_f"])
+    turnover_mean = data.groupby("ts_code")["turnover_rate_f"].rolling(20).mean().reset_index(level=0, drop=True)
+    return_20d = data.groupby("ts_code")["close"].pct_change(20).abs()
+    data["price_suppression_20d"] = turnover_mean / (1.0 + return_20d)
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "price_suppression_20d", "price_suppression_20d")
+
+
+def down_day_support_20d_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """20-day mean close-from-low ratio on down days as a trading support proxy."""
+
+    data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=45,
+        fields=("high", "low", "close", "pre_close"),
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "high", "low", "close", "pre_close"])
+    price_range = data["high"] - data["low"]
+    recovery = np.where(price_range == 0, np.nan, (data["close"] - data["low"]) / price_range)
+    down_day_support = np.where(data["close"] < data["pre_close"], recovery, np.nan)
+    data["down_day_support_20d"] = (
+        pd.Series(down_day_support, index=data.index).groupby(data["ts_code"]).rolling(20).mean().reset_index(level=0, drop=True)
+    )
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "down_day_support_20d", "down_day_support_20d")
+
+
+def position_safety_60d_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """Distance below the rolling 60-day high so larger values mean less overbought positioning."""
+
+    data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=90,
+        fields=("close", "high"),
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "close", "high"])
+    rolling_high = data.groupby("ts_code")["high"].rolling(60).max().reset_index(level=0, drop=True)
+    data["position_safety_60d"] = np.where(rolling_high == 0, np.nan, 1.0 - (data["close"] / rolling_high))
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "position_safety_60d", "position_safety_60d")
 
 
 def amplitude_20d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:

@@ -1,0 +1,104 @@
+global:
+  # Proxy-style accumulation research for zz1000.
+  # This is still daily-factor research, not direct institutional flow observation.
+  start_date: "20230101"
+  end_date: "20260331"
+  benchmark_code: "000300.SH"
+  top_n: 50
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 10.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 500000.0
+
+experiments:
+  # Single-factor proxies
+  - name: "a01_zz1000_money_flow_top30"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      money_flow_strength_20d: 1.0
+
+  - name: "a02_zz1000_hidden_accumulation_top30"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      high_turnover_low_range_20d: 1.0
+
+  - name: "a03_zz1000_price_suppression_top30"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      price_suppression_20d: 1.0
+
+  - name: "a04_zz1000_down_day_support_top30"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      down_day_support_20d: 1.0
+
+  - name: "a05_zz1000_position_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      position_safety_60d: 1.0
+
+  # Two-factor structures
+  - name: "a06_zz1000_flow_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      money_flow_strength_20d: 0.7
+      position_safety_60d: 0.3
+
+  - name: "a07_zz1000_hidden_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      high_turnover_low_range_20d: 0.7
+      position_safety_60d: 0.3
+
+  - name: "a08_zz1000_support_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      down_day_support_20d: 0.7
+      position_safety_60d: 0.3
+
+  - name: "a09_zz1000_flow_hidden_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      money_flow_strength_20d: 0.5
+      high_turnover_low_range_20d: 0.5
+
+  # Three-factor structures
+  - name: "a10_zz1000_flow_hidden_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      money_flow_strength_20d: 0.4
+      high_turnover_low_range_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "a11_zz1000_flow_support_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      money_flow_strength_20d: 0.4
+      down_day_support_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "a12_zz1000_hidden_suppression_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      high_turnover_low_range_20d: 0.4
+      price_suppression_20d: 0.3
+      position_safety_60d: 0.3
