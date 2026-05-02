@@ -412,8 +412,9 @@ def down_day_support_20d_factor(
     price_range = data["high"] - data["low"]
     recovery = np.where(price_range == 0, np.nan, (data["close"] - data["low"]) / price_range)
     down_day_support = np.where(data["close"] < data["pre_close"], recovery, np.nan)
+    down_day_series = pd.Series(down_day_support, index=data.index, dtype="float64")
     data["down_day_support_20d"] = (
-        pd.Series(down_day_support, index=data.index).groupby(data["ts_code"]).rolling(20).mean().reset_index(level=0, drop=True)
+        down_day_series.groupby(data["ts_code"]).rolling(20).mean().reset_index(level=0, drop=True)
     )
     data = _clip_dates(data, start_date, end_date)
     return build_factor_output(data, "down_day_support_20d", "down_day_support_20d")
