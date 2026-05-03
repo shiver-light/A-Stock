@@ -241,6 +241,8 @@ def generate_weights(
                     "signal_date": row.signal_date,
                 }
             )
+    if not weight_rows:
+        return pd.DataFrame(columns=["trade_date", "ts_code", "target_weight", "signal_date"])
     return pd.DataFrame(weight_rows).sort_values(["trade_date", "ts_code"]).reset_index(drop=True)
 
 

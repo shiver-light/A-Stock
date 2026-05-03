@@ -548,7 +548,7 @@ def down_day_absorption_20d_factor(
     down_day_weighted = pd.Series(down_day_weighted, index=data.index, dtype="float64")
     data["down_day_absorption_20d"] = (
         down_day_weighted.groupby(data["ts_code"])
-        .rolling(20, min_periods=20)
+        .rolling(20, min_periods=3)
         .mean()
         .reset_index(level=0, drop=True)
     )

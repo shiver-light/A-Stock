@@ -4,7 +4,7 @@ import unittest
 
 import pandas as pd
 
-from backtest.engine import calc_benchmark_returns, run_backtest
+from backtest.engine import calc_benchmark_returns, generate_weights, run_backtest
 
 
 class BacktestEngineTestCase(unittest.TestCase):
@@ -277,6 +277,28 @@ class BacktestEngineTestCase(unittest.TestCase):
         self.assertAlmostEqual(exec_day["turnover"], 1.0)
         self.assertAlmostEqual(exec_day["strategy_return"], 0.1)
         self.assertEqual(holdings.loc[holdings["trade_date"] == "20240201", "ts_code"].tolist(), ["A"])
+
+    def test_generate_weights_returns_empty_schema_when_no_assets_selected(self) -> None:
+        signals = pd.DataFrame(
+            {
+                "trade_date": ["20240131"],
+                "ts_code": ["A"],
+                "selected": [False],
+            }
+        )
+        market_data = pd.DataFrame(
+            {
+                "trade_date": ["20240131", "20240201"],
+                "ts_code": ["A", "A"],
+                "open": [10.0, 10.0],
+                "close": [10.0, 10.0],
+            }
+        )
+
+        weights = generate_weights(signals, market_data)
+
+        self.assertEqual(weights.columns.tolist(), ["trade_date", "ts_code", "target_weight", "signal_date"])
+        self.assertTrue(weights.empty)
 
 
 if __name__ == "__main__":
