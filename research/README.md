@@ -180,6 +180,41 @@ python3 -m research recommend-consensus \
   - 确认模型 `s2_m04_zz500_ep_ttm_top10`
 - 如果不传 `--watch-models`，当前不会自动补旧模型名。
 
+### ZZ1000 观察示例
+
+基于 [research_runs/zz1000_structure_stage4](/Users/raymond/src/A-Stock/research_runs/zz1000_structure_stage4)：
+
+```bash
+python3 -m research recommend-consensus \
+  --run-dir research_runs/zz1000_structure_stage4 \
+  --as-of-date 20260501 \
+  --core-models st4_01_zz1000_position_safety_top50 \
+  --confirm-models st4_07_zz1000_turnover_stability_close_high_safety_top50
+```
+
+如果要 JSON：
+
+```bash
+python3 -m research recommend-consensus \
+  --run-dir research_runs/zz1000_structure_stage4 \
+  --as-of-date 20260501 \
+  --core-models st4_01_zz1000_position_safety_top50 \
+  --confirm-models st4_07_zz1000_turnover_stability_close_high_safety_top50 \
+  --output json
+```
+
+说明：
+
+- `ZZ1000` 当前建议是 `watch-only`，不直接进入正式交易主池。
+- 主观察模型：
+  - `st4_01_zz1000_position_safety_top50`
+- 确认模型：
+  - `st4_07_zz1000_turnover_stability_close_high_safety_top50`
+- 推荐层级仍然是：
+  - `A`: 主观察模型和确认模型同时命中
+  - `B`: 仅主观察模型命中
+  - `C`: 仅确认模型命中
+
 ## 配置文件
 
 默认配置文件是 [research/experiments.yaml](/Users/raymond/src/A-Stock/research/experiments.yaml)。
