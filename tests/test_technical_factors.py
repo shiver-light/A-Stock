@@ -533,6 +533,37 @@ class TechnicalFactorsTestCase(unittest.TestCase):
         self.assertEqual(result.iloc[-1]["factor_name"], "down_day_absorption_20d")
         self.assertAlmostEqual(result.iloc[-1]["factor_value"], 0.75 * np.log(100.0), places=6)
 
+    @patch("factors.technical._load_qfq_market_data")
+    def test_down_day_absorption_20d_factor_preserves_schema_without_down_days(
+        self,
+        mock_load_qfq_market_data,
+    ) -> None:
+        dates = self._date_range(25)
+        mock_load_qfq_market_data.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * 25,
+                "high": [10.0] * 25,
+                "low": [6.0] * 25,
+                "close": [9.0] * 25,
+                "pre_close": [8.5] * 25,
+                "amount": [99.0] * 25,
+            }
+        )
+
+        result = down_day_absorption_20d_factor(
+            ts_code="000001.SZ",
+            start_date=dates[20],
+            end_date=dates[-1],
+        )
+
+        self.assertEqual(
+            result.columns.tolist(),
+            ["trade_date", "ts_code", "factor_name", "factor_value"],
+        )
+        self.assertEqual(result["trade_date"].tolist(), dates[20:])
+        self.assertTrue(result["factor_value"].isna().all())
+
     @patch("factors.fundamental.get_a_share_daily_valuation")
     def test_ep_ttm_factor(self, mock_get_daily_valuation) -> None:
         mock_get_daily_valuation.return_value = pd.DataFrame(

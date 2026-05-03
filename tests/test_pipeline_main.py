@@ -570,6 +570,51 @@ class PipelineMainTestCase(unittest.TestCase):
         self.assertEqual(result["factor_diagnostics"]["return_20d"], [])
         self.assertEqual(result["factor_report_text"]["return_20d"], "")
 
+    @patch("pipeline.main._resolve_ts_codes", return_value=["000001.SZ"])
+    @patch("pipeline.main.build_factor_panel")
+    @patch("pipeline.main._build_market_panel")
+    @patch(
+        "pipeline.main.get_rebalance_schedule",
+        return_value=pd.DataFrame({"signal_date": ["20240102"], "execution_date": ["20240103"]}),
+    )
+    @patch("pipeline.main.get_a_share_index_daily")
+    def test_run_minimal_pipeline_all_nan_absorption_factor_does_not_break_schema(
+        self,
+        mock_index_daily,
+        mock_rebalance_schedule,
+        mock_build_market_panel,
+        mock_build_factor_panel,
+        mock_resolve,
+    ) -> None:
+        mock_index_daily.return_value = self._benchmark_data()
+        mock_build_market_panel.return_value = self._market_panel()
+        mock_build_factor_panel.return_value = pd.DataFrame(
+            {
+                "trade_date": ["20240102", "20240103"],
+                "ts_code": ["000001.SZ", "000001.SZ"],
+                "down_day_absorption_20d": [float("nan"), float("nan")],
+                "position_safety_60d": [0.1, 0.2],
+            }
+        )
+
+        result = run_minimal_pipeline(
+            universe_name="zz1000",
+            start_date="20240101",
+            end_date="20240131",
+            top_n=50,
+            factor_config={
+                "down_day_absorption_20d": 0.7,
+                "position_safety_60d": 0.3,
+            },
+            enable_factor_diagnostics=True,
+            analysis_horizons=(5,),
+        )
+
+        self.assertEqual(result["selected_signals"].columns.tolist(), ["trade_date", "ts_code", "score", "rank", "selected"])
+        self.assertTrue(result["selected_signals"].empty)
+        self.assertEqual(result["factor_diagnostics"]["down_day_absorption_20d"], [])
+        self.assertEqual(result["latest_selection"]["top_stocks"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

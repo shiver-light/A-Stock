@@ -540,17 +540,15 @@ def down_day_absorption_20d_factor(
         fields=("high", "low", "close", "pre_close", "amount"),
     )
     validate_factor_input(data, ["trade_date", "ts_code", "high", "low", "close", "pre_close", "amount"])
-    price_range = data["high"] - data["low"]
-    recovery = np.where(price_range == 0, np.nan, (data["close"] - data["low"]) / price_range)
-    down_day_weighted = np.where(
-        data["close"] < data["pre_close"],
-        recovery * np.log1p(data["amount"].clip(lower=0.0)),
-        np.nan,
-    )
+    data = data.sort_values(["ts_code", "trade_date"]).reset_index(drop=True)
+    price_range = pd.to_numeric(data["high"] - data["low"], errors="coerce")
+    recovery = ((data["close"] - data["low"]) / price_range).where(price_range != 0)
+    amount_weight = pd.to_numeric(data["amount"], errors="coerce").clip(lower=0.0).map(np.log1p)
+    down_day_weighted = (recovery * amount_weight).where(data["close"] < data["pre_close"])
+    down_day_weighted = pd.Series(down_day_weighted, index=data.index, dtype="float64")
     data["down_day_absorption_20d"] = (
-        pd.Series(down_day_weighted, index=data.index)
-        .groupby(data["ts_code"])
-        .rolling(20)
+        down_day_weighted.groupby(data["ts_code"])
+        .rolling(20, min_periods=20)
         .mean()
         .reset_index(level=0, drop=True)
     )
