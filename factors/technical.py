@@ -271,6 +271,30 @@ def turnover_volatility_20d_factor(
     return build_factor_output(data, "turnover_volatility_20d", "turnover_volatility_20d")
 
 
+def turnover_stability_20d_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """Negative 20-day turnover volatility so larger values mean more stable turnover."""
+
+    data = get_a_share_daily_valuation(
+        ts_code=ts_code,
+        start_date=_buffered_start_date(start_date, 45),
+        end_date=end_date,
+        refresh=refresh,
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "turnover_rate_f"])
+    data["turnover_stability_20d"] = -data.groupby("ts_code")["turnover_rate_f"].rolling(20).std().reset_index(
+        level=0,
+        drop=True,
+    )
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "turnover_stability_20d", "turnover_stability_20d")
+
+
 def amount_mean_20d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
     """20-day average daily amount."""
 
@@ -286,6 +310,32 @@ def amount_mean_20d_factor(*, ts_code: str, start_date: str, end_date: str, refr
     data["amount_mean_20d"] = data.groupby("ts_code")["amount"].rolling(20).mean().reset_index(level=0, drop=True)
     data = _clip_dates(data, start_date, end_date)
     return build_factor_output(data, "amount_mean_20d", "amount_mean_20d")
+
+
+def gap_risk_20d_negative_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """Negative 20-day mean absolute open gap so larger values mean lower gap risk."""
+
+    data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=45,
+        fields=("open", "pre_close"),
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "open", "pre_close"])
+    abs_gap = ((data["open"] / data["pre_close"]) - 1.0).abs().where(data["pre_close"] != 0)
+    data["gap_risk_20d_negative"] = -(
+        pd.Series(abs_gap, index=data.index).groupby(data["ts_code"]).rolling(20).mean().reset_index(level=0, drop=True)
+    )
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "gap_risk_20d_negative", "gap_risk_20d_negative")
 
 
 def illiq_negative_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
@@ -307,6 +357,43 @@ def illiq_negative_factor(*, ts_code: str, start_date: str, end_date: str, refre
     )
     data = _clip_dates(data, start_date, end_date)
     return build_factor_output(data, "illiq_negative", "illiq_negative")
+
+
+def low_range_high_amount_days_ratio_20d_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """20-day ratio of quiet-range but high-amount sessions as an accumulation proxy."""
+
+    data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=45,
+        fields=("high", "low", "pre_close", "amount"),
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "high", "low", "pre_close", "amount"])
+    amplitude = ((data["high"] - data["low"]) / data["pre_close"]).where(data["pre_close"] != 0)
+    amount = pd.to_numeric(data["amount"], errors="coerce")
+    grouped = data["ts_code"]
+    rolling_amplitude_mean = (
+        pd.Series(amplitude, index=data.index).groupby(grouped).rolling(20).mean().reset_index(level=0, drop=True)
+    )
+    rolling_amount_mean = amount.groupby(grouped).rolling(20).mean().reset_index(level=0, drop=True)
+    quiet_with_amount = ((amplitude <= rolling_amplitude_mean) & (amount >= rolling_amount_mean)).astype("float64")
+    data["low_range_high_amount_days_ratio_20d"] = (
+        quiet_with_amount.groupby(grouped).rolling(20).mean().reset_index(level=0, drop=True)
+    )
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(
+        data,
+        "low_range_high_amount_days_ratio_20d",
+        "low_range_high_amount_days_ratio_20d",
+    )
 
 
 def money_flow_strength_20d_factor(

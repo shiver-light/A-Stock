@@ -1,0 +1,71 @@
+global:
+  # Stage 4 for zz1000 structure / tradability proxies:
+  # keep position safety as the anchor factor and test whether a small set of
+  # tradability and quiet-accumulation proxies can improve robustness.
+  start_date: "20230101"
+  end_date: "20260331"
+  benchmark_code: "000300.SH"
+  top_n: 50
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 800000.0
+
+experiments:
+  - name: "st4_01_zz1000_position_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      position_safety_60d: 1.0
+
+  - name: "st4_02_zz1000_turnover_stability_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      turnover_stability_20d: 0.7
+      position_safety_60d: 0.3
+
+  - name: "st4_03_zz1000_gap_risk_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      gap_risk_20d_negative: 0.7
+      position_safety_60d: 0.3
+
+  - name: "st4_04_zz1000_low_range_amount_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      low_range_high_amount_days_ratio_20d: 0.7
+      position_safety_60d: 0.3
+
+  - name: "st4_05_zz1000_turnover_stability_gap_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      turnover_stability_20d: 0.4
+      gap_risk_20d_negative: 0.3
+      position_safety_60d: 0.3
+
+  - name: "st4_06_zz1000_close_high_low_range_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      low_range_high_amount_days_ratio_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "st4_07_zz1000_turnover_stability_close_high_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      turnover_stability_20d: 0.4
+      close_near_high_on_high_amount_20d: 0.3
+      position_safety_60d: 0.3
