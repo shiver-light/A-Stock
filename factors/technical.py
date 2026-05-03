@@ -444,6 +444,120 @@ def position_safety_60d_factor(
     return build_factor_output(data, "position_safety_60d", "position_safety_60d")
 
 
+def small_body_high_turnover_20d_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """20-day turnover intensity relative to average candle body size.
+
+    Larger values indicate repeated turnover without large daily body expansion,
+    which serves as a daily proxy for stealth accumulation via smaller orders.
+    """
+
+    market_data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=45,
+        fields=("open", "close", "pre_close"),
+    )
+    turnover_data = _load_turnover_data(ts_code, start_date, end_date, refresh, lookback_days=45)
+    data = _merge_market_and_turnover(market_data, turnover_data)
+    validate_factor_input(data, ["trade_date", "ts_code", "open", "close", "pre_close", "turnover_rate_f"])
+    body_ratio = np.where(data["pre_close"] == 0, np.nan, (data["close"] - data["open"]).abs() / data["pre_close"])
+    body_mean = (
+        pd.Series(body_ratio, index=data.index).groupby(data["ts_code"]).rolling(20).mean().reset_index(level=0, drop=True)
+    )
+    turnover_mean = data.groupby("ts_code")["turnover_rate_f"].rolling(20).mean().reset_index(level=0, drop=True)
+    data["small_body_high_turnover_20d"] = turnover_mean / (body_mean + 1e-6)
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "small_body_high_turnover_20d", "small_body_high_turnover_20d")
+
+
+def close_near_high_on_high_amount_20d_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """20-day mean close-to-high strength weighted by trading amount.
+
+    Larger values indicate repeated heavy trading on sessions that close near
+    the intraday high, which is a daily proxy for persistent buying support.
+    """
+
+    data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=45,
+        fields=("high", "low", "close", "amount"),
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "high", "low", "close", "amount"])
+    price_range = data["high"] - data["low"]
+    close_location = np.where(price_range == 0, 0.0, (data["close"] - data["low"]) / price_range)
+    weighted_strength = close_location * np.log1p(data["amount"].clip(lower=0.0))
+    data["close_near_high_on_high_amount_20d"] = (
+        pd.Series(weighted_strength, index=data.index)
+        .groupby(data["ts_code"])
+        .rolling(20)
+        .mean()
+        .reset_index(level=0, drop=True)
+    )
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(
+        data,
+        "close_near_high_on_high_amount_20d",
+        "close_near_high_on_high_amount_20d",
+    )
+
+
+def down_day_absorption_20d_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """20-day weighted support on down days as an absorption proxy.
+
+    Larger values indicate that down days still show good recovery from intraday
+    lows while trading amount remains meaningful.
+    """
+
+    data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=45,
+        fields=("high", "low", "close", "pre_close", "amount"),
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "high", "low", "close", "pre_close", "amount"])
+    price_range = data["high"] - data["low"]
+    recovery = np.where(price_range == 0, np.nan, (data["close"] - data["low"]) / price_range)
+    down_day_weighted = np.where(
+        data["close"] < data["pre_close"],
+        recovery * np.log1p(data["amount"].clip(lower=0.0)),
+        np.nan,
+    )
+    data["down_day_absorption_20d"] = (
+        pd.Series(down_day_weighted, index=data.index)
+        .groupby(data["ts_code"])
+        .rolling(20)
+        .mean()
+        .reset_index(level=0, drop=True)
+    )
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "down_day_absorption_20d", "down_day_absorption_20d")
+
+
 def amplitude_20d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
     """20-day mean daily amplitude, where daily amplitude is (high - low) / pre_close on qfq prices."""
 

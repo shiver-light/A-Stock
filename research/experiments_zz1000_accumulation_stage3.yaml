@@ -1,0 +1,64 @@
+global:
+  # Stage 3 for zz1000 accumulation proxies:
+  # keep the existing position-safety baseline and test whether a small number
+  # of order-splitting / absorption proxies can improve it under the same
+  # tradability assumptions.
+  start_date: "20230101"
+  end_date: "20260331"
+  benchmark_code: "000300.SH"
+  top_n: 50
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 800000.0
+
+experiments:
+  - name: "ab3_01_zz1000_position_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      position_safety_60d: 1.0
+
+  - name: "ab3_02_zz1000_small_body_turnover_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      small_body_high_turnover_20d: 0.7
+      position_safety_60d: 0.3
+
+  - name: "ab3_03_zz1000_close_near_high_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.7
+      position_safety_60d: 0.3
+
+  - name: "ab3_04_zz1000_absorption_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      down_day_absorption_20d: 0.7
+      position_safety_60d: 0.3
+
+  - name: "ab3_05_zz1000_hidden_absorption_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      high_turnover_low_range_20d: 0.4
+      down_day_absorption_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "ab3_06_zz1000_split_order_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      small_body_high_turnover_20d: 0.4
+      close_near_high_on_high_amount_20d: 0.3
+      position_safety_60d: 0.3
