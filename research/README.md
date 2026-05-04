@@ -43,6 +43,10 @@ tushare_token: "你的token"
   - factor 组合
   - factor 权重
 
+配套验收标准见：
+
+- [research/FACTOR_ACCEPTANCE.md](/Users/raymond/src/A-Stock/research/FACTOR_ACCEPTANCE.md)
+
 ## 运行入口
 
 当前仓库已经提供最小 CLI 入口：
