@@ -12,6 +12,7 @@ SUPPORTED_UNIVERSES = {
     "hs300",
     "zz500",
     "zz1000",
+    "zz2000",
     "sse50",
     "main_board",
     "chinext",
@@ -48,7 +49,7 @@ def get_universe(
             raise ValueError("custom universe requires ts_codes.")
         return get_custom_universe(ts_codes, as_of_date=as_of_date)
 
-    if universe_name in {"hs300", "zz500", "zz1000", "sse50"}:
+    if universe_name in {"hs300", "zz500", "zz1000", "zz2000", "sse50"}:
         result = get_index_constituents(
             index_code=INDEX_CODE_MAP[universe_name],
             as_of_date=as_of_date,

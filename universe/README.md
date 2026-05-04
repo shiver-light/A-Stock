@@ -12,6 +12,7 @@
 - `hs300`
 - `zz500`
 - `zz1000`
+- `zz2000`
 - `sse50`
 - `main_board`
 - `chinext`
@@ -19,7 +20,7 @@
 
 ## 历史一致性说明
 
-- `hs300` / `zz500` / `zz1000` / `sse50`
+- `hs300` / `zz500` / `zz1000` / `zz2000` / `sse50`
   - 使用 `index_weight`
   - 取 `trade_date <= as_of_date` 的最近一期成分
   - 属于月度历史成分口径
