@@ -13,6 +13,7 @@
 - `zz500`
 - `zz1000`
 - `zz2000`
+- `zz2000_ex_bj`
 - `sse50`
 - `main_board`
 - `chinext`
@@ -20,10 +21,12 @@
 
 ## 历史一致性说明
 
-- `hs300` / `zz500` / `zz1000` / `zz2000` / `sse50`
+- `hs300` / `zz500` / `zz1000` / `zz2000` / `zz2000_ex_bj` / `sse50`
   - 使用 `index_weight`
   - 取 `trade_date <= as_of_date` 的最近一期成分
   - 属于月度历史成分口径
+  - `zz2000_ex_bj` 会在 `zz2000` 成分上额外排除 `.BJ` 标的
+  - 这是当前数据层对 `adj_factor` / `daily_basic` 尚未完整覆盖北交所时的近似研究口径
 
 - `all_a`
   - 使用 `stock_basic + list_date + delist_date`

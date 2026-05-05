@@ -1,0 +1,75 @@
+global:
+  # Focused zz2000 research excluding BJ constituents due to current data-layer
+  # coverage gaps in adj_factor and daily_basic for part of the universe.
+  start_date: "20230101"
+  end_date: "20260331"
+  benchmark_code: "000300.SH"
+  top_n: 80
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 800000.0
+
+experiments:
+  - name: "z20x_01_zz2000_ex_bj_position_safety_top80"
+    universe_name: "zz2000_ex_bj"
+    top_n: 80
+    factor_config:
+      position_safety_60d: 1.0
+
+  - name: "z20x_02_zz2000_ex_bj_position_safety_top120"
+    universe_name: "zz2000_ex_bj"
+    top_n: 120
+    factor_config:
+      position_safety_60d: 1.0
+
+  - name: "z20x_03_zz2000_ex_bj_turnover_stability_safety_top80"
+    universe_name: "zz2000_ex_bj"
+    top_n: 80
+    factor_config:
+      turnover_stability_20d: 0.4
+      position_safety_60d: 0.6
+
+  - name: "z20x_04_zz2000_ex_bj_gap_risk_safety_top80"
+    universe_name: "zz2000_ex_bj"
+    top_n: 80
+    factor_config:
+      gap_risk_20d_negative: 0.4
+      position_safety_60d: 0.6
+
+  - name: "z20x_05_zz2000_ex_bj_close_high_safety_top80"
+    universe_name: "zz2000_ex_bj"
+    top_n: 80
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      position_safety_60d: 0.6
+
+  - name: "z20x_06_zz2000_ex_bj_low_range_amount_safety_top80"
+    universe_name: "zz2000_ex_bj"
+    top_n: 80
+    factor_config:
+      low_range_high_amount_days_ratio_20d: 0.4
+      position_safety_60d: 0.6
+
+  - name: "z20x_07_zz2000_ex_bj_turnover_stability_close_high_safety_top80"
+    universe_name: "zz2000_ex_bj"
+    top_n: 80
+    factor_config:
+      turnover_stability_20d: 0.3
+      close_near_high_on_high_amount_20d: 0.3
+      position_safety_60d: 0.4
+
+  - name: "z20x_08_zz2000_ex_bj_turnover_stability_close_high_safety_top120"
+    universe_name: "zz2000_ex_bj"
+    top_n: 120
+    factor_config:
+      turnover_stability_20d: 0.3
+      close_near_high_on_high_amount_20d: 0.3
+      position_safety_60d: 0.4

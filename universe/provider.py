@@ -13,6 +13,7 @@ SUPPORTED_UNIVERSES = {
     "zz500",
     "zz1000",
     "zz2000",
+    "zz2000_ex_bj",
     "sse50",
     "main_board",
     "chinext",
@@ -49,12 +50,15 @@ def get_universe(
             raise ValueError("custom universe requires ts_codes.")
         return get_custom_universe(ts_codes, as_of_date=as_of_date)
 
-    if universe_name in {"hs300", "zz500", "zz1000", "zz2000", "sse50"}:
+    if universe_name in {"hs300", "zz500", "zz1000", "zz2000", "zz2000_ex_bj", "sse50"}:
+        index_universe_name = "zz2000" if universe_name == "zz2000_ex_bj" else universe_name
         result = get_index_constituents(
-            index_code=INDEX_CODE_MAP[universe_name],
+            index_code=INDEX_CODE_MAP[index_universe_name],
             as_of_date=as_of_date,
             refresh=refresh,
         )
+        if universe_name == "zz2000_ex_bj":
+            result = result.loc[~result["ts_code"].astype(str).str.endswith(".BJ")].copy()
         result["universe_name"] = universe_name
         ordered_columns = ["as_of_date", "ts_code", "universe_name", "in_universe"]
         if include_weights and "weight" in result.columns:
