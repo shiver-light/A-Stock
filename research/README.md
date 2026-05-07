@@ -276,6 +276,18 @@ macOS 上可用 `crontab -e` 加一条本机定时任务：
 
 这条任务会在工作日 `15:05` 运行。遇到 A 股非交易日时，命令会按交易日历跳过。
 
+如果要使用指定虚拟环境，并保存到访达的“文稿”目录下：
+
+```cron
+5 15 * * 1-5 cd /Users/raymond/src/A-Stock && source ~/src/aquant/venv/bin/activate && scripts/archive_daily_consensus.sh --archive-dir "$HOME/Documents/A-Stock/daily_recommendations" >> /Users/raymond/src/A-Stock/output/daily_consensus.log 2>&1
+```
+
+归档会按下一交易日生成日期文件夹，例如：
+
+```text
+~/Documents/A-Stock/daily_recommendations/20260508/
+```
+
 ## 配置文件
 
 默认配置文件是 [research/experiments.yaml](/Users/raymond/src/A-Stock/research/experiments.yaml)。
