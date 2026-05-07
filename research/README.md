@@ -61,6 +61,12 @@ python3 -m research run --config research/experiments.yaml
 python3 -m research recommend-consensus --run-dir <run_dir> --as-of-date YYYYMMDD
 ```
 
+收盘后归档下一交易日的三类共识荐股：
+
+```bash
+python3 -m research archive-daily-consensus --signal-date YYYYMMDD
+```
+
 最常用参数：
 
 - `--config`
@@ -75,6 +81,8 @@ python3 -m research recommend-consensus --run-dir <run_dir> --as-of-date YYYYMMD
   - 指定确认模型
 - `--watch-models`
   - 指定观察模型；不传则默认为空
+- `--archive-dir`
+  - 指定日度荐股归档根目录；默认 `~/Documents/A-Stock/daily_recommendations`
 
 ## 推荐运行命令
 
@@ -218,6 +226,41 @@ python3 -m research recommend-consensus \
   - `A`: 主观察模型和确认模型同时命中
   - `B`: 仅主观察模型命中
   - `C`: 仅确认模型命中
+
+## 收盘后自动归档
+
+`archive-daily-consensus` 用于在交易日收盘后，用当日收盘数据生成下一交易日的共识荐股，并按下一交易日日期归档。
+
+默认输出目录：
+
+```text
+~/Documents/A-Stock/daily_recommendations/<target_trade_date>/
+```
+
+每个日期目录包含：
+
+- `hs300.json` / `hs300.txt`
+- `zz500.json` / `zz500.txt`
+- `zz1000.json` / `zz1000.txt`
+- `manifest.json`
+- `summary.txt`
+
+手动运行：
+
+```bash
+python3 -m research archive-daily-consensus \
+  --signal-date 20260507
+```
+
+指定归档目录：
+
+```bash
+python3 -m research archive-daily-consensus \
+  --signal-date 20260507 \
+  --archive-dir ~/Documents/A-Stock/daily_recommendations
+```
+
+适合放进本机定时任务，每个交易日 `15:05` 执行一次。若当天不是交易日，命令会跳过且不写归档。
 
 ## 配置文件
 

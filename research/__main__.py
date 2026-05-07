@@ -6,6 +6,7 @@ import argparse
 import json
 
 from research import (
+    archive_daily_consensus_recommendations,
     generate_daily_consensus_recommendations,
     generate_daily_recommendations_from_run,
     load_research_config,
@@ -90,6 +91,27 @@ def build_parser() -> argparse.ArgumentParser:
         default="text",
         help="Output text report or JSON payload.",
     )
+
+    archive_parser = subparsers.add_parser(
+        "archive-daily-consensus",
+        help="Archive HS300/ZZ500/ZZ1000 consensus recommendations for the next trading day.",
+    )
+    archive_parser.add_argument(
+        "--signal-date",
+        default=None,
+        help="Signal date in YYYYMMDD format. Defaults to today in Asia/Shanghai.",
+    )
+    archive_parser.add_argument(
+        "--archive-dir",
+        default=None,
+        help="Archive root directory. Defaults to ~/Documents/A-Stock/daily_recommendations.",
+    )
+    archive_parser.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output compact text status or JSON payload.",
+    )
     return parser
 
 
@@ -131,6 +153,25 @@ def main() -> int:
             print(json.dumps(recommendation, ensure_ascii=False, indent=2, default=str))
         else:
             print(render_consensus_recommendation_text(recommendation))
+    elif args.command == "archive-daily-consensus":
+        result = archive_daily_consensus_recommendations(
+            signal_date=args.signal_date,
+            archive_dir=args.archive_dir,
+        )
+        if args.output == "json":
+            payload = {key: value for key, value in result.items() if key != "reports"}
+            print(json.dumps(payload, ensure_ascii=False, indent=2, default=str))
+        elif result.get("status") == "skipped":
+            print(
+                f"status=skipped signal_date={result.get('signal_date')} "
+                f"reason={result.get('reason')}"
+            )
+        else:
+            print(
+                f"status=completed signal_date={result.get('signal_date')} "
+                f"target_trade_date={result.get('target_trade_date')} "
+                f"archive_path={result.get('archive_path')}"
+            )
     else:
         summary = rebuild_summary_from_disk(args.run_dir)
         ascending = args.sort_by == "max_drawdown"
