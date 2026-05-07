@@ -1,0 +1,57 @@
+global:
+  # Stage 2 for zz2000_ex_bj:
+  # validate the best focus-stage lines under stricter tradability assumptions.
+  # This remains an approximation of zz2000 because current data coverage for
+  # some BJ constituents is incomplete.
+  start_date: "20230101"
+  end_date: "20260331"
+  benchmark_code: "000300.SH"
+  top_n: 80
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 20.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 1200000.0
+
+experiments:
+  - name: "z20x2_01_zz2000_ex_bj_turnover_stability_close_high_safety_top80"
+    universe_name: "zz2000_ex_bj"
+    top_n: 80
+    factor_config:
+      turnover_stability_20d: 0.3
+      close_near_high_on_high_amount_20d: 0.3
+      position_safety_60d: 0.4
+
+  - name: "z20x2_02_zz2000_ex_bj_turnover_stability_close_high_safety_top120"
+    universe_name: "zz2000_ex_bj"
+    top_n: 120
+    factor_config:
+      turnover_stability_20d: 0.3
+      close_near_high_on_high_amount_20d: 0.3
+      position_safety_60d: 0.4
+
+  - name: "z20x2_03_zz2000_ex_bj_position_safety_top120"
+    universe_name: "zz2000_ex_bj"
+    top_n: 120
+    factor_config:
+      position_safety_60d: 1.0
+
+  - name: "z20x2_04_zz2000_ex_bj_turnover_stability_safety_top80"
+    universe_name: "zz2000_ex_bj"
+    top_n: 80
+    factor_config:
+      turnover_stability_20d: 0.7
+      position_safety_60d: 0.3
+
+  - name: "z20x2_05_zz2000_ex_bj_turnover_stability_safety_top120"
+    universe_name: "zz2000_ex_bj"
+    top_n: 120
+    factor_config:
+      turnover_stability_20d: 0.7
+      position_safety_60d: 0.3
