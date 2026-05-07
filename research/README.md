@@ -262,6 +262,20 @@ python3 -m research archive-daily-consensus \
 
 适合放进本机定时任务，每个交易日 `15:05` 执行一次。若当天不是交易日，命令会跳过且不写归档。
 
+仓库也提供了一个薄脚本：
+
+```bash
+scripts/archive_daily_consensus.sh
+```
+
+macOS 上可用 `crontab -e` 加一条本机定时任务：
+
+```cron
+5 15 * * 1-5 cd /Users/raymond/src/A-Stock && scripts/archive_daily_consensus.sh >> /Users/raymond/src/A-Stock/output/daily_consensus.log 2>&1
+```
+
+这条任务会在工作日 `15:05` 运行。遇到 A 股非交易日时，命令会按交易日历跳过。
+
 ## 配置文件
 
 默认配置文件是 [research/experiments.yaml](/Users/raymond/src/A-Stock/research/experiments.yaml)。
