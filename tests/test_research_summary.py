@@ -38,6 +38,7 @@ class ResearchSummaryTestCase(unittest.TestCase):
         self.assertEqual(row["positive_excess_month_ratio"], 0.6)
         self.assertEqual(row["mean_rebalance_turnover"], 0.7)
         self.assertEqual(row["worst_rolling_5m_excess_return"], -0.1)
+        self.assertEqual(row["signal_filters"], [])
 
     def test_rebuild_summary_from_disk_reads_extended_metrics(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

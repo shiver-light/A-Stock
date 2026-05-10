@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from pipeline.main import build_factor_panel, run_minimal_pipeline, run_recommendation_pipeline
+from pipeline.main import _apply_signal_filters, build_factor_panel, run_minimal_pipeline, run_recommendation_pipeline
 
 
 class PipelineMainTestCase(unittest.TestCase):
@@ -41,6 +41,37 @@ class PipelineMainTestCase(unittest.TestCase):
                 "selected": [True, False],
             }
         )
+
+    def test_apply_signal_filters_uses_same_date_quantiles(self) -> None:
+        factor_panel = pd.DataFrame(
+            {
+                "trade_date": ["20240102", "20240102", "20240102", "20240103"],
+                "ts_code": ["000001.SZ", "000002.SZ", "000003.SZ", "000001.SZ"],
+                "accumulation_score": [0.9, 0.6, 0.2, 0.4],
+                "distribution_score": [0.2, 0.8, 0.1, 0.3],
+            }
+        )
+
+        result = _apply_signal_filters(
+            factor_panel,
+            [
+                {"factor": "accumulation_score", "op": "quantile_gte", "value": 0.6},
+                {"factor": "distribution_score", "op": "quantile_lte", "value": 0.7},
+            ],
+        )
+
+        self.assertEqual(result["ts_code"].tolist(), ["000001.SZ", "000001.SZ"])
+
+    def test_apply_signal_filters_rejects_unknown_operator(self) -> None:
+        factor_panel = pd.DataFrame(
+            {"trade_date": ["20240102"], "ts_code": ["000001.SZ"], "accumulation_score": [0.9]}
+        )
+
+        with self.assertRaisesRegex(ValueError, "Unsupported signal filter op"):
+            _apply_signal_filters(
+                factor_panel,
+                [{"factor": "accumulation_score", "op": "bad_op", "value": 0.6}],
+            )
 
     @patch(
         "pipeline.main.format_latest_selection",
@@ -325,6 +356,102 @@ class PipelineMainTestCase(unittest.TestCase):
         self.assertIn("report_text", result)
         self.assertNotIn("factor_diagnostics", result)
         self.assertNotIn("factor_report_text", result)
+
+    @patch("pipeline.main.render_strategy_report_text", return_value="strategy report")
+    @patch("pipeline.main.format_strategy_report", return_value={"report": "ok"})
+    @patch(
+        "pipeline.main.format_latest_selection",
+        return_value={"as_of_date": "20240102", "top_n": 1, "top_stocks": []},
+    )
+    @patch("pipeline.main.calc_relative_performance", return_value={"excess_cumulative_return": 0.01})
+    @patch("pipeline.main.calc_performance", return_value={"cumulative_return": 0.02})
+    @patch(
+        "pipeline.main.attach_benchmark",
+        return_value=pd.DataFrame({"trade_date": ["20240102"], "strategy_return": [0.01], "benchmark_return": [0.0]}),
+    )
+    @patch(
+        "pipeline.main.calc_benchmark_returns",
+        return_value=pd.DataFrame({"trade_date": ["20240102"], "benchmark_return": [0.0]}),
+    )
+    @patch(
+        "pipeline.main.run_backtest",
+        return_value=(
+            pd.DataFrame({"trade_date": ["20240102"], "strategy_return": [0.01]}),
+            pd.DataFrame({"trade_date": ["20240102"], "ts_code": ["000001.SZ"], "weight": [1.0]}),
+        ),
+    )
+    @patch("pipeline.main._build_market_panel")
+    @patch("pipeline.main.top_n_selection")
+    @patch("pipeline.main.rank_signal")
+    @patch("pipeline.main.combine_factor_scores")
+    @patch("pipeline.main.build_factor_panel")
+    @patch("pipeline.main._resolve_ts_codes", return_value=["000001.SZ", "000002.SZ", "000003.SZ"])
+    @patch(
+        "pipeline.main.get_rebalance_schedule",
+        return_value=pd.DataFrame({"signal_date": ["20240102"], "execution_date": ["20240103"]}),
+    )
+    @patch("pipeline.main.get_a_share_index_daily")
+    def test_run_minimal_pipeline_applies_signal_filters_before_scoring(
+        self,
+        mock_index_daily,
+        mock_rebalance,
+        mock_resolve,
+        mock_build_factor_panel,
+        mock_combine_scores,
+        mock_rank_signal,
+        mock_top_n_selection,
+        mock_build_market_panel,
+        mock_run_backtest,
+        mock_benchmark_returns,
+        mock_attach_benchmark,
+        mock_performance,
+        mock_relative_performance,
+        mock_latest_selection,
+        mock_format_report,
+        mock_render_text,
+    ) -> None:
+        mock_index_daily.return_value = self._benchmark_data()
+        mock_build_factor_panel.return_value = pd.DataFrame(
+            {
+                "trade_date": ["20240102", "20240102", "20240102"],
+                "ts_code": ["000001.SZ", "000002.SZ", "000003.SZ"],
+                "position_safety_60d": [0.3, 0.8, 0.7],
+                "money_flow_strength_20d": [0.9, 0.4, 0.8],
+                "close_near_high_on_high_amount_20d": [0.2, 0.6, 0.9],
+            }
+        )
+        mock_combine_scores.return_value = pd.DataFrame(
+            {"trade_date": ["20240102"], "ts_code": ["000001.SZ"], "score": [1.0]}
+        )
+        mock_rank_signal.return_value = pd.DataFrame(
+            {"trade_date": ["20240102"], "ts_code": ["000001.SZ"], "score": [1.0], "rank": [1]}
+        )
+        mock_top_n_selection.return_value = self._selected()
+        mock_build_market_panel.return_value = self._market_panel()
+
+        result = run_minimal_pipeline(
+            ts_codes=["000001.SZ", "000002.SZ", "000003.SZ"],
+            start_date="20240101",
+            end_date="20240131",
+            factor_config={"position_safety_60d": 1.0},
+            signal_filters=[
+                {"factor": "money_flow_strength_20d", "op": "quantile_gte", "value": 0.6},
+                {"factor": "close_near_high_on_high_amount_20d", "op": "quantile_lte", "value": 0.7},
+            ],
+        )
+
+        self.assertIn("filtered_factor_data", result)
+        self.assertEqual(result["filtered_factor_data"]["ts_code"].tolist(), ["000001.SZ"])
+        self.assertEqual(
+            mock_build_factor_panel.call_args.kwargs["factor_config"],
+            {
+                "position_safety_60d": 1.0,
+                "money_flow_strength_20d": 1.0,
+                "close_near_high_on_high_amount_20d": 1.0,
+            },
+        )
+        scored_input = mock_combine_scores.call_args.args[0]
+        self.assertEqual(scored_input["ts_code"].tolist(), ["000001.SZ"])
 
     @patch("pipeline.main.render_strategy_report_text", return_value="strategy report")
     @patch("pipeline.main.format_strategy_report", return_value={"report": "ok"})

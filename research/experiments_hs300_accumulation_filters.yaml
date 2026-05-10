@@ -1,0 +1,116 @@
+global:
+  # HS300 accumulation-filter research:
+  # use same-date cross-sectional filters to require stronger accumulation
+  # proxies while excluding high distribution / overheating proxies before
+  # normal factor scoring. Signals are still generated on T close and executed
+  # by the existing backtest path on the next rebalance execution date.
+  start_date: "20230101"
+  end_date: "20260331"
+  benchmark_code: "000300.SH"
+  top_n: 10
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 10.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 300000.0
+
+experiments:
+  - name: "hsa_01_hs300_accumulation_score_top10"
+    universe_name: "hs300"
+    top_n: 10
+    factor_config:
+      money_flow_strength_20d: 0.4
+      down_day_absorption_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "hsa_02_hs300_accumulation_score_top20"
+    universe_name: "hs300"
+    top_n: 20
+    factor_config:
+      money_flow_strength_20d: 0.4
+      down_day_absorption_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "hsa_03_hs300_accumulation_filtered_top10"
+    universe_name: "hs300"
+    top_n: 10
+    signal_filters:
+      - factor: "money_flow_strength_20d"
+        op: "quantile_gte"
+        value: 0.6
+      - factor: "down_day_absorption_20d"
+        op: "quantile_gte"
+        value: 0.6
+      - factor: "close_near_high_on_high_amount_20d"
+        op: "quantile_lte"
+        value: 0.7
+      - factor: "amplitude_20d"
+        op: "quantile_lte"
+        value: 0.7
+    factor_config:
+      money_flow_strength_20d: 0.4
+      down_day_absorption_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "hsa_04_hs300_accumulation_filtered_top20"
+    universe_name: "hs300"
+    top_n: 20
+    signal_filters:
+      - factor: "money_flow_strength_20d"
+        op: "quantile_gte"
+        value: 0.6
+      - factor: "down_day_absorption_20d"
+        op: "quantile_gte"
+        value: 0.6
+      - factor: "close_near_high_on_high_amount_20d"
+        op: "quantile_lte"
+        value: 0.7
+      - factor: "amplitude_20d"
+        op: "quantile_lte"
+        value: 0.7
+    factor_config:
+      money_flow_strength_20d: 0.4
+      down_day_absorption_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "hsa_05_hs300_accumulation_strict_filtered_top10"
+    universe_name: "hs300"
+    top_n: 10
+    signal_filters:
+      - factor: "money_flow_strength_20d"
+        op: "quantile_gte"
+        value: 0.7
+      - factor: "down_day_absorption_20d"
+        op: "quantile_gte"
+        value: 0.6
+      - factor: "close_near_high_on_high_amount_20d"
+        op: "quantile_lte"
+        value: 0.6
+      - factor: "amplitude_20d"
+        op: "quantile_lte"
+        value: 0.6
+    factor_config:
+      money_flow_strength_20d: 0.4
+      down_day_absorption_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "hsa_06_hs300_accumulation_no_distribution_top10"
+    universe_name: "hs300"
+    top_n: 10
+    signal_filters:
+      - factor: "close_near_high_on_high_amount_20d"
+        op: "quantile_lte"
+        value: 0.6
+      - factor: "amplitude_20d"
+        op: "quantile_lte"
+        value: 0.6
+    factor_config:
+      money_flow_strength_20d: 0.4
+      down_day_absorption_20d: 0.3
+      position_safety_60d: 0.3

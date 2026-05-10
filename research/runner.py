@@ -105,6 +105,7 @@ def run_experiments(
                 top_n=int(experiment_config.get("top_n", 20)),
                 benchmark_code=experiment_config.get("benchmark_code", "000300.SH"),
                 factor_config=experiment_config.get("factor_config"),
+                signal_filters=experiment_config.get("signal_filters"),
                 backtest_config=experiment_config.get("backtest_config"),
                 enable_factor_diagnostics=bool(experiment_config.get("enable_factor_diagnostics", False)),
                 analysis_horizons=tuple(experiment_config.get("analysis_horizons", (5, 10, 20))),

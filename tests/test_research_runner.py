@@ -131,6 +131,41 @@ class ResearchRunnerTestCase(unittest.TestCase):
             _, kwargs = mock_pipeline.call_args
             self.assertEqual(kwargs["backtest_config"], {"slippage_bps": 10.0, "min_amount": 5000000.0})
 
+    @patch("research.runner.run_minimal_pipeline")
+    def test_run_experiments_passes_signal_filters(self, mock_pipeline) -> None:
+        mock_pipeline.return_value = {
+            "performance": {"cumulative_return": 0.1},
+            "latest_selection": {"top_stocks": []},
+            "report": {"backtest_summary": {"cumulative_return": 0.1}},
+            "report_text": "strategy report",
+        }
+
+        signal_filters = [
+            {"factor": "money_flow_strength_20d", "op": "quantile_gte", "value": 0.6},
+            {"factor": "close_near_high_on_high_amount_20d", "op": "quantile_lte", "value": 0.7},
+        ]
+        config = {
+            "global": {
+                "start_date": "20240101",
+                "end_date": "20240131",
+                "signal_filters": signal_filters,
+            },
+            "experiments": [
+                {
+                    "name": "exp_with_signal_filters",
+                    "ts_codes": ["000001.SZ"],
+                    "factor_config": {"position_safety_60d": 1.0},
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            results = run_experiments(config, output_dir=tmp_dir, run_name="demo_run", resume=False)
+
+            self.assertEqual(len(results), 1)
+            _, kwargs = mock_pipeline.call_args
+            self.assertEqual(kwargs["signal_filters"], signal_filters)
+
 
 if __name__ == "__main__":
     unittest.main()

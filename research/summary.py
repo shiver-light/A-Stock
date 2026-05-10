@@ -43,6 +43,7 @@ def build_research_summary(results: list[dict[str, object]]) -> pd.DataFrame:
             "top_n": config.get("top_n"),
             "benchmark_code": config.get("benchmark_code", "000300.SH"),
             "factor_config": config.get("factor_config"),
+            "signal_filters": config.get("signal_filters", []),
         }
         for metric_name in SUMMARY_METRIC_COLUMNS:
             row[metric_name] = performance.get(metric_name)

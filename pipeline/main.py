@@ -138,6 +138,82 @@ def _build_raw_factor_panel(
     )
 
 
+def _get_signal_filter_factor_names(signal_filters: list[dict[str, object]] | None) -> list[str]:
+    if not signal_filters:
+        return []
+    factor_names: list[str] = []
+    for rule in signal_filters:
+        factor_name = rule.get("factor")
+        if not isinstance(factor_name, str) or not factor_name:
+            raise ValueError("Each signal filter must contain a non-empty 'factor'.")
+        if factor_name not in factor_names:
+            factor_names.append(factor_name)
+    return factor_names
+
+
+def _merge_factor_configs(
+    factor_config: dict[str, float],
+    signal_filters: list[dict[str, object]] | None,
+) -> dict[str, float]:
+    merged = dict(factor_config)
+    for factor_name in _get_signal_filter_factor_names(signal_filters):
+        merged.setdefault(factor_name, 1.0)
+    return merged
+
+
+def _apply_signal_filters(
+    factor_panel: pd.DataFrame,
+    signal_filters: list[dict[str, object]] | None,
+    *,
+    date_col: str = "trade_date",
+    asset_col: str = "ts_code",
+) -> pd.DataFrame:
+    """Apply per-date cross-sectional signal filters before score ranking.
+
+    Supported operators:
+    - quantile_gte: keep rows with factor >= same-date quantile threshold
+    - quantile_lte: keep rows with factor <= same-date quantile threshold
+    """
+
+    if not signal_filters:
+        return factor_panel.copy()
+    if factor_panel.empty:
+        return factor_panel.copy()
+
+    result = factor_panel.copy()
+    required_columns = {date_col, asset_col}
+    missing_base = required_columns.difference(result.columns)
+    if missing_base:
+        raise ValueError(f"Missing required columns for signal filters: {sorted(missing_base)}")
+
+    keep = pd.Series(True, index=result.index)
+    for rule in signal_filters:
+        factor_name = rule.get("factor")
+        op = rule.get("op")
+        value = rule.get("value")
+        if not isinstance(factor_name, str) or not factor_name:
+            raise ValueError("Each signal filter must contain a non-empty 'factor'.")
+        if factor_name not in result.columns:
+            raise ValueError(f"Signal filter factor is missing from factor panel: {factor_name}")
+        if op not in {"quantile_gte", "quantile_lte"}:
+            raise ValueError(f"Unsupported signal filter op: {op}")
+        try:
+            threshold_value = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Signal filter value must be numeric: {value}") from exc
+        if not 0.0 <= threshold_value <= 1.0:
+            raise ValueError("Signal filter quantile value must be between 0 and 1.")
+
+        thresholds = result.groupby(date_col)[factor_name].transform(lambda series: series.quantile(threshold_value))
+        if op == "quantile_gte":
+            rule_keep = result[factor_name].notna() & thresholds.notna() & (result[factor_name] >= thresholds)
+        else:
+            rule_keep = result[factor_name].notna() & thresholds.notna() & (result[factor_name] <= thresholds)
+        keep = keep & rule_keep
+
+    return result.loc[keep].sort_values([date_col, asset_col]).reset_index(drop=True)
+
+
 def _build_market_panel(
     *,
     ts_codes: list[str],
@@ -169,6 +245,7 @@ def run_minimal_pipeline(
     benchmark_code: str = "000300.SH",
     universe_name: str | None = None,
     factor_config: dict[str, float] | None = None,
+    signal_filters: list[dict[str, object]] | None = None,
     backtest_config: dict[str, object] | None = None,
     enable_factor_diagnostics: bool = False,
     enable_data_diagnostics: bool = False,
@@ -187,6 +264,7 @@ def run_minimal_pipeline(
         "volatility_20d": -1.0,
         "turnover_mean_20d": 1.0,
     }
+    panel_factor_config = _merge_factor_configs(factor_config, signal_filters)
     backtest_config = backtest_config or {}
     resolved_ts_codes = _resolve_ts_codes(
         ts_codes=ts_codes,
@@ -198,10 +276,11 @@ def run_minimal_pipeline(
         ts_codes=resolved_ts_codes,
         start_date=start_date,
         end_date=end_date,
-        factor_config=factor_config,
+        factor_config=panel_factor_config,
     )
+    filtered_factor_panel = _apply_signal_filters(factor_panel, signal_filters)
     scored = combine_factor_scores(
-        factor_panel,
+        filtered_factor_panel,
         factor_cols=list(factor_config.keys()),
         directions={factor_name: 1 if weight >= 0 else -1 for factor_name, weight in factor_config.items()},
         weights={factor_name: abs(weight) for factor_name, weight in factor_config.items()},
@@ -239,6 +318,7 @@ def run_minimal_pipeline(
             "benchmark_code": benchmark_code,
             "selection_logic": "等权综合因子打分后按日排序取Top N",
             "factor_config": factor_config,
+            "signal_filters": signal_filters or [],
             "backtest_config": backtest_config,
         },
     )
@@ -246,6 +326,7 @@ def run_minimal_pipeline(
 
     result = {
         "factor_data": factor_panel,
+        "filtered_factor_data": filtered_factor_panel,
         "scored_signals": scored,
         "selected_signals": selected,
         "strategy_returns": strategy_returns,
@@ -262,17 +343,17 @@ def run_minimal_pipeline(
             ts_codes=resolved_ts_codes,
             start_date=start_date,
             end_date=end_date,
-            factor_config=factor_config,
+            factor_config=panel_factor_config,
         )
         result["diagnostics"] = _build_data_diagnostics_outputs(
             raw_factor_panel=raw_factor_panel,
-            factor_names=list(factor_config.keys()),
+            factor_names=list(panel_factor_config.keys()),
         )
     if enable_factor_diagnostics:
         factor_diagnostics, factor_report_text = _build_factor_diagnostics_outputs(
             factor_panel=factor_panel,
             market_panel=market_panel,
-            factor_names=list(factor_config.keys()),
+            factor_names=list(panel_factor_config.keys()),
             analysis_horizons=analysis_horizons,
         )
         result["factor_diagnostics"] = factor_diagnostics
@@ -289,6 +370,7 @@ def run_recommendation_pipeline(
     top_n: int = 20,
     universe_name: str | None = None,
     factor_config: dict[str, float] | None = None,
+    signal_filters: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     """Run a daily recommendation pipeline using the latest available trading date.
 
@@ -302,6 +384,7 @@ def run_recommendation_pipeline(
         "volatility_20d": -1.0,
         "turnover_mean_20d": 1.0,
     }
+    panel_factor_config = _merge_factor_configs(factor_config, signal_filters)
     resolved_ts_codes = _resolve_ts_codes(
         ts_codes=ts_codes,
         universe_name=universe_name,
@@ -312,10 +395,11 @@ def run_recommendation_pipeline(
         ts_codes=resolved_ts_codes,
         start_date=start_date,
         end_date=end_date,
-        factor_config=factor_config,
+        factor_config=panel_factor_config,
     )
+    filtered_factor_panel = _apply_signal_filters(factor_panel, signal_filters)
     scored = combine_factor_scores(
-        factor_panel,
+        filtered_factor_panel,
         factor_cols=list(factor_config.keys()),
         directions={factor_name: 1 if weight >= 0 else -1 for factor_name, weight in factor_config.items()},
         weights={factor_name: abs(weight) for factor_name, weight in factor_config.items()},
@@ -330,6 +414,7 @@ def run_recommendation_pipeline(
 
     return {
         "factor_data": factor_panel,
+        "filtered_factor_data": filtered_factor_panel,
         "scored_signals": scored,
         "ranked_signals": ranked,
         "selected_signals": selected,
