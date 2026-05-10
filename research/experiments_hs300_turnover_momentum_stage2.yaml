@@ -1,0 +1,119 @@
+global:
+  # HS300 turnover-momentum stage2:
+  # validate the hsf_05 line with a small weight/top_n grid under the same
+  # tradability assumptions as hs300_factor_expansion. This is a robustness
+  # check, not an unrestricted parameter search.
+  # Signals are generated on T close and executed by the existing backtest path
+  # on the next rebalance execution date.
+  start_date: "20230101"
+  end_date: "20260331"
+  benchmark_code: "000300.SH"
+  top_n: 10
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 10.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 300000.0
+
+experiments:
+  - name: "hstm2_01_hs300_turnover60_ret60_30_rev5_10_top10"
+    universe_name: "hs300"
+    top_n: 10
+    factor_config:
+      turnover_mean_20d: 0.6
+      return_60d: 0.3
+      return_5d_negative: 0.1
+
+  - name: "hstm2_02_hs300_turnover60_ret60_30_rev5_10_top15"
+    universe_name: "hs300"
+    top_n: 15
+    factor_config:
+      turnover_mean_20d: 0.6
+      return_60d: 0.3
+      return_5d_negative: 0.1
+
+  - name: "hstm2_03_hs300_turnover60_ret60_30_rev5_10_top20"
+    universe_name: "hs300"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.6
+      return_60d: 0.3
+      return_5d_negative: 0.1
+
+  - name: "hstm2_04_hs300_turnover50_ret60_40_rev5_10_top10"
+    universe_name: "hs300"
+    top_n: 10
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.4
+      return_5d_negative: 0.1
+
+  - name: "hstm2_05_hs300_turnover50_ret60_40_rev5_10_top15"
+    universe_name: "hs300"
+    top_n: 15
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.4
+      return_5d_negative: 0.1
+
+  - name: "hstm2_06_hs300_turnover50_ret60_40_rev5_10_top20"
+    universe_name: "hs300"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.4
+      return_5d_negative: 0.1
+
+  - name: "hstm2_07_hs300_turnover40_ret60_40_rev5_20_top10"
+    universe_name: "hs300"
+    top_n: 10
+    factor_config:
+      turnover_mean_20d: 0.4
+      return_60d: 0.4
+      return_5d_negative: 0.2
+
+  - name: "hstm2_08_hs300_turnover40_ret60_40_rev5_20_top15"
+    universe_name: "hs300"
+    top_n: 15
+    factor_config:
+      turnover_mean_20d: 0.4
+      return_60d: 0.4
+      return_5d_negative: 0.2
+
+  - name: "hstm2_09_hs300_turnover40_ret60_40_rev5_20_top20"
+    universe_name: "hs300"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.4
+      return_60d: 0.4
+      return_5d_negative: 0.2
+
+  - name: "hstm2_10_hs300_turnover50_ret60_30_rev5_20_top10"
+    universe_name: "hs300"
+    top_n: 10
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.3
+      return_5d_negative: 0.2
+
+  - name: "hstm2_11_hs300_turnover50_ret60_30_rev5_20_top15"
+    universe_name: "hs300"
+    top_n: 15
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.3
+      return_5d_negative: 0.2
+
+  - name: "hstm2_12_hs300_turnover50_ret60_30_rev5_20_top20"
+    universe_name: "hs300"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.3
+      return_5d_negative: 0.2
