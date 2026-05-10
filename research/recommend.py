@@ -19,6 +19,7 @@ def _config_signature(config: dict[str, object]) -> str:
         "top_n": config.get("top_n"),
         "benchmark_code": config.get("benchmark_code", "000300.SH"),
         "factor_config": config.get("factor_config", {}),
+        "signal_filters": config.get("signal_filters", []),
     }
     return json.dumps(signature_payload, ensure_ascii=False, sort_keys=True)
 
@@ -300,6 +301,7 @@ def generate_daily_recommendations_from_run(
             end_date=as_of_date,
             top_n=int(config.get("top_n", 20)),
             factor_config=config.get("factor_config"),
+            signal_filters=config.get("signal_filters"),
         )
 
         model_outputs.append(
@@ -330,6 +332,7 @@ def generate_daily_recommendations_from_run(
                 "universe_name": item["config"].get("universe_name", "custom"),
                 "top_n": item["config"].get("top_n"),
                 "factor_config": item["config"].get("factor_config", {}),
+                "signal_filters": item["config"].get("signal_filters", []),
                 "sharpe": float(item["performance"].get("sharpe", 0.0)),
                 "excess_cumulative_return": float(item["performance"].get("excess_cumulative_return", 0.0)),
                 "max_drawdown": float(item["performance"].get("max_drawdown", 0.0)),
@@ -352,8 +355,8 @@ def generate_daily_consensus_recommendations(
 ) -> dict[str, object]:
     """Generate daily recommendation buckets from explicit core/confirm/watch model roles."""
 
-    core_model_names = core_model_names or ["c01_hs300_turnover_top10"]
-    confirm_model_names = confirm_model_names or ["c03_hs300_turnover_ret60_70_30_top20"]
+    core_model_names = core_model_names or ["hstm2_04_hs300_turnover50_ret60_40_rev5_10_top10"]
+    confirm_model_names = confirm_model_names or ["hstm2_02_hs300_turnover60_ret60_30_rev5_10_top15"]
     watch_model_names = watch_model_names or []
 
     ordered_names: list[str] = []
@@ -374,6 +377,7 @@ def generate_daily_consensus_recommendations(
             end_date=as_of_date,
             top_n=int(config.get("top_n", 20)),
             factor_config=config.get("factor_config"),
+            signal_filters=config.get("signal_filters"),
         )
         model_outputs.append(
             {
@@ -406,6 +410,7 @@ def generate_daily_consensus_recommendations(
                 "universe_name": item["config"].get("universe_name", "custom"),
                 "top_n": item["config"].get("top_n"),
                 "factor_config": item["config"].get("factor_config", {}),
+                "signal_filters": item["config"].get("signal_filters", []),
                 "sharpe": float(item["performance"].get("sharpe", 0.0)),
                 "excess_cumulative_return": float(item["performance"].get("excess_cumulative_return", 0.0)),
                 "max_drawdown": float(item["performance"].get("max_drawdown", 0.0)),

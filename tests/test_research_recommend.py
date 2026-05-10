@@ -90,6 +90,45 @@ class ResearchRecommendTestCase(unittest.TestCase):
             self.assertEqual(selected[0]["name"], "exp_a")
 
     @patch("research.recommend.run_recommendation_pipeline")
+    def test_generate_daily_recommendations_from_run_passes_signal_filters(self, mock_pipeline) -> None:
+        mock_pipeline.return_value = {
+            "latest_selection": {
+                "top_stocks": [
+                    {"ts_code": "000001.SZ", "score": 0.9, "rank": 1, "selected": True},
+                ]
+            }
+        }
+        signal_filters = [{"factor": "turnover_mean_20d", "op": "quantile_gte", "value": 0.6}]
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            run_dir = Path(tmp_dir) / "filtered_run"
+            (run_dir / "experiments").mkdir(parents=True, exist_ok=True)
+            self._write_experiment(
+                run_dir,
+                name="filtered_model",
+                config={
+                    "start_date": "20240101",
+                    "end_date": "20240131",
+                    "universe_name": "hs300",
+                    "top_n": 10,
+                    "factor_config": {"turnover_mean_20d": 1.0},
+                    "signal_filters": signal_filters,
+                },
+                metrics={
+                    "sharpe": 0.6,
+                    "excess_cumulative_return": 0.12,
+                    "max_drawdown": -0.2,
+                    "positive_excess_month_ratio": 0.6,
+                },
+            )
+
+            result = generate_daily_recommendations_from_run(run_dir, as_of_date="20240228")
+
+            _, kwargs = mock_pipeline.call_args
+            self.assertEqual(kwargs["signal_filters"], signal_filters)
+            self.assertEqual(result["selected_models"][0]["signal_filters"], signal_filters)
+
+    @patch("research.recommend.run_recommendation_pipeline")
     def test_generate_daily_recommendations_from_run_builds_consensus(self, mock_pipeline) -> None:
         mock_pipeline.side_effect = [
             {
@@ -232,18 +271,18 @@ class ResearchRecommendTestCase(unittest.TestCase):
         ]
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            run_dir = Path(tmp_dir) / "stage2_candidates"
+            run_dir = Path(tmp_dir) / "hs300_turnover_momentum_stage2"
             (run_dir / "experiments").mkdir(parents=True, exist_ok=True)
 
             self._write_experiment(
                 run_dir,
-                name="c01_hs300_turnover_top10",
+                name="hstm2_04_hs300_turnover50_ret60_40_rev5_10_top10",
                 config={
                     "start_date": "20240101",
                     "end_date": "20240131",
                     "universe_name": "hs300",
                     "top_n": 10,
-                    "factor_config": {"turnover_mean_20d": 1.0},
+                    "factor_config": {"turnover_mean_20d": 0.5, "return_60d": 0.4, "return_5d_negative": 0.1},
                 },
                 metrics={
                     "sharpe": 0.6,
@@ -254,13 +293,13 @@ class ResearchRecommendTestCase(unittest.TestCase):
             )
             self._write_experiment(
                 run_dir,
-                name="c03_hs300_turnover_ret60_70_30_top20",
+                name="hstm2_02_hs300_turnover60_ret60_30_rev5_10_top15",
                 config={
                     "start_date": "20240101",
                     "end_date": "20240131",
                     "universe_name": "hs300",
-                    "top_n": 20,
-                    "factor_config": {"turnover_mean_20d": 0.7, "return_60d": 0.3},
+                    "top_n": 15,
+                    "factor_config": {"turnover_mean_20d": 0.6, "return_60d": 0.3, "return_5d_negative": 0.1},
                 },
                 metrics={
                     "sharpe": 0.4,
@@ -271,13 +310,13 @@ class ResearchRecommendTestCase(unittest.TestCase):
             )
             self._write_experiment(
                 run_dir,
-                name="c04_zz500_turnover_top10",
+                name="hstm2_07_hs300_turnover40_ret60_40_rev5_20_top10",
                 config={
                     "start_date": "20240101",
                     "end_date": "20240131",
-                    "universe_name": "zz500",
+                    "universe_name": "hs300",
                     "top_n": 10,
-                    "factor_config": {"turnover_mean_20d": 1.0},
+                    "factor_config": {"turnover_mean_20d": 0.4, "return_60d": 0.4, "return_5d_negative": 0.2},
                 },
                 metrics={
                     "sharpe": 0.3,
@@ -290,7 +329,7 @@ class ResearchRecommendTestCase(unittest.TestCase):
             result = generate_daily_consensus_recommendations(
                 run_dir,
                 as_of_date="20240228",
-                watch_model_names=["c04_zz500_turnover_top10"],
+                watch_model_names=["hstm2_07_hs300_turnover40_ret60_40_rev5_20_top10"],
             )
 
             self.assertEqual(result["trade_consensus"][0]["ts_code"], "000001.SZ")

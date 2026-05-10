@@ -13,10 +13,10 @@ from research.recommend import generate_daily_consensus_recommendations, render_
 
 DEFAULT_DAILY_CONSENSUS_PROFILES = {
     "hs300": {
-        "run_dir": "research_runs/stage2_candidates",
-        "core_models": ["c01_hs300_turnover_top10"],
-        "confirm_models": ["c03_hs300_turnover_ret60_70_30_top20"],
-        "watch_models": [],
+        "run_dir": "research_runs/hs300_turnover_momentum_stage2",
+        "core_models": ["hstm2_04_hs300_turnover50_ret60_40_rev5_10_top10"],
+        "confirm_models": ["hstm2_02_hs300_turnover60_ret60_30_rev5_10_top15"],
+        "watch_models": ["hstm2_07_hs300_turnover40_ret60_40_rev5_20_top10"],
         "mode": "trade",
     },
     "zz500": {

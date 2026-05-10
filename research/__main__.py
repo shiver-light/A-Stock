@@ -70,13 +70,13 @@ def build_parser() -> argparse.ArgumentParser:
     consensus_parser.add_argument(
         "--core-models",
         nargs="*",
-        default=["c01_hs300_turnover_top10"],
+        default=["hstm2_04_hs300_turnover50_ret60_40_rev5_10_top10"],
         help="Model names used as the main trade core.",
     )
     consensus_parser.add_argument(
         "--confirm-models",
         nargs="*",
-        default=["c03_hs300_turnover_ret60_70_30_top20"],
+        default=["hstm2_02_hs300_turnover60_ret60_30_rev5_10_top15"],
         help="Model names used for confirmation.",
     )
     consensus_parser.add_argument(

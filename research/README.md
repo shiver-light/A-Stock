@@ -136,26 +136,26 @@ python3 -m research summary \
 
 ### HS300 示例
 
-基于 [research_runs/stage2_candidates](/Users/raymond/src/A-Stock/research_runs/stage2_candidates)：
+基于 [research_runs/hs300_turnover_momentum_stage2](/Users/raymond/src/A-Stock/research_runs/hs300_turnover_momentum_stage2)：
 
 ```bash
 python3 -m research recommend-consensus \
-  --run-dir research_runs/stage2_candidates \
+  --run-dir research_runs/hs300_turnover_momentum_stage2 \
   --as-of-date 20260501 \
-  --core-models c01_hs300_turnover_top10 \
-  --confirm-models c03_hs300_turnover_ret60_70_30_top20 \
-  --watch-models c04_zz500_turnover_top10
+  --core-models hstm2_04_hs300_turnover50_ret60_40_rev5_10_top10 \
+  --confirm-models hstm2_02_hs300_turnover60_ret60_30_rev5_10_top15 \
+  --watch-models hstm2_07_hs300_turnover40_ret60_40_rev5_20_top10
 ```
 
 如果要 JSON：
 
 ```bash
 python3 -m research recommend-consensus \
-  --run-dir research_runs/stage2_candidates \
+  --run-dir research_runs/hs300_turnover_momentum_stage2 \
   --as-of-date 20260501 \
-  --core-models c01_hs300_turnover_top10 \
-  --confirm-models c03_hs300_turnover_ret60_70_30_top20 \
-  --watch-models c04_zz500_turnover_top10 \
+  --core-models hstm2_04_hs300_turnover50_ret60_40_rev5_10_top10 \
+  --confirm-models hstm2_02_hs300_turnover60_ret60_30_rev5_10_top15 \
+  --watch-models hstm2_07_hs300_turnover40_ret60_40_rev5_20_top10 \
   --output json
 ```
 
@@ -185,8 +185,9 @@ python3 -m research recommend-consensus \
 说明：
 
 - `HS300` 当前建议：
-  - 主模型 `c01_hs300_turnover_top10`
-  - 确认模型 `c03_hs300_turnover_ret60_70_30_top20`
+  - 主模型 `hstm2_04_hs300_turnover50_ret60_40_rev5_10_top10`
+  - 确认模型 `hstm2_02_hs300_turnover60_ret60_30_rev5_10_top15`
+  - 观察模型 `hstm2_07_hs300_turnover40_ret60_40_rev5_20_top10`
 - `ZZ500` 当前建议：
   - 主模型 `s2_m01_zz500_turnover_top10`
   - 确认模型 `s2_m04_zz500_ep_ttm_top10`
