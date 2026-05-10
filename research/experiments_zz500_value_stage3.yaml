@@ -1,0 +1,164 @@
+global:
+  # ZZ500 value stage3:
+  # narrow validation around the strongest value line. Keep the same realistic
+  # tradability assumptions as zz500_factor_expansion, and compare ep_ttm alone
+  # against value-momentum and value-growth variants.
+  # Signals are generated on T close and executed by the existing backtest path
+  # on the next rebalance execution date.
+  start_date: "20230101"
+  end_date: "20260331"
+  benchmark_code: "000300.SH"
+  top_n: 20
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 800000.0
+
+experiments:
+  - name: "zz5v3_01_ep_ttm_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      ep_ttm: 1.0
+
+  - name: "zz5v3_02_ep_ttm_top20"
+    universe_name: "zz500"
+    top_n: 20
+    factor_config:
+      ep_ttm: 1.0
+
+  - name: "zz5v3_03_ep_ttm_top30"
+    universe_name: "zz500"
+    top_n: 30
+    factor_config:
+      ep_ttm: 1.0
+
+  - name: "zz5v3_04_ep60_bp20_ret60_20_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      ep_ttm: 0.6
+      bp: 0.2
+      return_60d: 0.2
+
+  - name: "zz5v3_05_ep60_bp20_ret60_20_top20"
+    universe_name: "zz500"
+    top_n: 20
+    factor_config:
+      ep_ttm: 0.6
+      bp: 0.2
+      return_60d: 0.2
+
+  - name: "zz5v3_06_ep60_bp20_ret60_20_top30"
+    universe_name: "zz500"
+    top_n: 30
+    factor_config:
+      ep_ttm: 0.6
+      bp: 0.2
+      return_60d: 0.2
+
+  - name: "zz5v3_07_ep50_bp30_ret60_20_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      ep_ttm: 0.5
+      bp: 0.3
+      return_60d: 0.2
+
+  - name: "zz5v3_08_ep50_bp30_ret60_20_top20"
+    universe_name: "zz500"
+    top_n: 20
+    factor_config:
+      ep_ttm: 0.5
+      bp: 0.3
+      return_60d: 0.2
+
+  - name: "zz5v3_09_ep50_bp30_ret60_20_top30"
+    universe_name: "zz500"
+    top_n: 30
+    factor_config:
+      ep_ttm: 0.5
+      bp: 0.3
+      return_60d: 0.2
+
+  - name: "zz5v3_10_ep50_bp20_ret60_30_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      ep_ttm: 0.5
+      bp: 0.2
+      return_60d: 0.3
+
+  - name: "zz5v3_11_ep50_bp20_ret60_30_top20"
+    universe_name: "zz500"
+    top_n: 20
+    factor_config:
+      ep_ttm: 0.5
+      bp: 0.2
+      return_60d: 0.3
+
+  - name: "zz5v3_12_ep50_bp20_ret60_30_top30"
+    universe_name: "zz500"
+    top_n: 30
+    factor_config:
+      ep_ttm: 0.5
+      bp: 0.2
+      return_60d: 0.3
+
+  - name: "zz5v3_13_ep60_bp20_growth20_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      ep_ttm: 0.6
+      bp: 0.2
+      revenue_growth: 0.2
+
+  - name: "zz5v3_14_ep60_bp20_growth20_top20"
+    universe_name: "zz500"
+    top_n: 20
+    factor_config:
+      ep_ttm: 0.6
+      bp: 0.2
+      revenue_growth: 0.2
+
+  - name: "zz5v3_15_ep60_bp20_growth20_top30"
+    universe_name: "zz500"
+    top_n: 30
+    factor_config:
+      ep_ttm: 0.6
+      bp: 0.2
+      revenue_growth: 0.2
+
+  - name: "zz5v3_16_ep50_bp20_ret60_20_growth10_top10"
+    universe_name: "zz500"
+    top_n: 10
+    factor_config:
+      ep_ttm: 0.5
+      bp: 0.2
+      return_60d: 0.2
+      revenue_growth: 0.1
+
+  - name: "zz5v3_17_ep50_bp20_ret60_20_growth10_top20"
+    universe_name: "zz500"
+    top_n: 20
+    factor_config:
+      ep_ttm: 0.5
+      bp: 0.2
+      return_60d: 0.2
+      revenue_growth: 0.1
+
+  - name: "zz5v3_18_ep50_bp20_ret60_20_growth10_top30"
+    universe_name: "zz500"
+    top_n: 30
+    factor_config:
+      ep_ttm: 0.5
+      bp: 0.2
+      return_60d: 0.2
+      revenue_growth: 0.1
