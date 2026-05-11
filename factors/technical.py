@@ -691,3 +691,160 @@ def close_to_high_20d_factor(*, ts_code: str, start_date: str, end_date: str, re
     data["close_to_high_20d"] = np.where(rolling_high == 0, np.nan, data["close"] / rolling_high)
     data = _clip_dates(data, start_date, end_date)
     return build_factor_output(data, "close_to_high_20d", "close_to_high_20d")
+
+
+def pullback_after_trend_60d_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """60-day trend minus recent 5-day return, only when price stays above its 60-day mean.
+
+    Larger values favor stocks with a positive medium-term trend and a recent
+    pullback, avoiding pure short-term reversal candidates without trend support.
+    """
+
+    data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=90)
+    validate_factor_input(data, ["trade_date", "ts_code", "close"])
+    grouped_close = data.groupby("ts_code")["close"]
+    return_60d = grouped_close.pct_change(60)
+    return_5d = grouped_close.pct_change(5)
+    ma_60d = grouped_close.rolling(60).mean().reset_index(level=0, drop=True)
+    data["pullback_after_trend_60d"] = np.where(
+        (return_60d > 0) & (data["close"] >= ma_60d),
+        return_60d - return_5d,
+        np.nan,
+    )
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "pullback_after_trend_60d", "pullback_after_trend_60d")
+
+
+def distribution_risk_20d_negative_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """Negative 20-day distribution-risk proxy, so larger values mean less suspected distribution.
+
+    The raw risk proxy combines high-turnover down days, amount-weighted upper
+    shadows, and high turnover without price progress. It uses only same-day
+    and historical OHLCV/turnover information.
+    """
+
+    market_data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=45,
+        fields=("open", "high", "low", "close", "pre_close", "amount"),
+    )
+    turnover_data = _load_turnover_data(ts_code, start_date, end_date, refresh, lookback_days=45)
+    data = _merge_market_and_turnover(market_data, turnover_data)
+    validate_factor_input(
+        data,
+        ["trade_date", "ts_code", "open", "high", "low", "close", "pre_close", "amount", "turnover_rate_f"],
+    )
+    data = data.sort_values(["ts_code", "trade_date"]).reset_index(drop=True)
+
+    price_range = data["high"] - data["low"]
+    upper_shadow = (data["high"] - data[["open", "close"]].max(axis=1)) / price_range.replace(0, np.nan)
+    daily_return = ((data["close"] / data["pre_close"]) - 1.0).where(data["pre_close"] != 0)
+    amount_weight = pd.to_numeric(data["amount"], errors="coerce").clip(lower=0.0).map(np.log1p)
+    turnover = pd.to_numeric(data["turnover_rate_f"], errors="coerce").clip(lower=0.0)
+
+    down_turnover = turnover.where(data["close"] < data["pre_close"], 0.0)
+    upper_shadow_amount = upper_shadow.clip(lower=0.0) * amount_weight
+    turnover_without_progress = turnover / (daily_return.abs() + 0.01)
+    raw_risk = down_turnover + upper_shadow_amount + turnover_without_progress
+    data["distribution_risk_20d_negative"] = -(
+        pd.Series(raw_risk, index=data.index)
+        .groupby(data["ts_code"])
+        .rolling(20)
+        .mean()
+        .reset_index(level=0, drop=True)
+    )
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "distribution_risk_20d_negative", "distribution_risk_20d_negative")
+
+
+def liquidity_improvement_20d_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """20-day liquidity improvement versus 60-day baseline with unstable turnover penalized."""
+
+    market_data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=90,
+        fields=("amount",),
+    )
+    turnover_data = _load_turnover_data(ts_code, start_date, end_date, refresh, lookback_days=90)
+    data = _merge_market_and_turnover(market_data, turnover_data)
+    validate_factor_input(data, ["trade_date", "ts_code", "amount", "turnover_rate_f"])
+    grouped = data["ts_code"]
+
+    amount = pd.to_numeric(data["amount"], errors="coerce")
+    turnover = pd.to_numeric(data["turnover_rate_f"], errors="coerce")
+    amount_mean_20 = amount.groupby(grouped).rolling(20).mean().reset_index(level=0, drop=True)
+    amount_mean_60 = amount.groupby(grouped).rolling(60).mean().reset_index(level=0, drop=True)
+    turnover_mean_20 = turnover.groupby(grouped).rolling(20).mean().reset_index(level=0, drop=True)
+    turnover_mean_60 = turnover.groupby(grouped).rolling(60).mean().reset_index(level=0, drop=True)
+    turnover_std_20 = turnover.groupby(grouped).rolling(20).std().reset_index(level=0, drop=True)
+
+    amount_ratio = np.where(amount_mean_60 == 0, np.nan, amount_mean_20 / amount_mean_60)
+    turnover_ratio = np.where(turnover_mean_60 == 0, np.nan, turnover_mean_20 / turnover_mean_60)
+    turnover_instability = turnover_std_20 / (turnover_mean_20.abs() + 1e-6)
+    data["liquidity_improvement_20d"] = (0.5 * amount_ratio) + (0.5 * turnover_ratio) - turnover_instability
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "liquidity_improvement_20d", "liquidity_improvement_20d")
+
+
+def volatility_contraction_20d_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """Negative 20-day volatility/amplitude versus 60-day baseline.
+
+    Larger values indicate stronger recent volatility contraction and are meant
+    to be used with trend or buying-support factors, not as a standalone alpha.
+    """
+
+    data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=90,
+        fields=("high", "low", "close", "pre_close"),
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "high", "low", "close", "pre_close"])
+    grouped = data["ts_code"]
+    daily_amplitude = pd.Series(
+        np.where(data["pre_close"] == 0, np.nan, (data["high"] - data["low"]) / data["pre_close"]),
+        index=data.index,
+    )
+    returns = data.groupby("ts_code")["close"].pct_change()
+    amplitude_20 = daily_amplitude.groupby(grouped).rolling(20).mean().reset_index(level=0, drop=True)
+    amplitude_60 = daily_amplitude.groupby(grouped).rolling(60).mean().reset_index(level=0, drop=True)
+    volatility_20 = returns.groupby(grouped).rolling(20).std().reset_index(level=0, drop=True)
+    volatility_60 = returns.groupby(grouped).rolling(60).std().reset_index(level=0, drop=True)
+
+    amplitude_ratio = np.where(amplitude_60 == 0, np.nan, amplitude_20 / amplitude_60)
+    volatility_ratio = np.where(volatility_60 == 0, np.nan, volatility_20 / volatility_60)
+    data["volatility_contraction_20d"] = -((0.5 * amplitude_ratio) + (0.5 * volatility_ratio))
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "volatility_contraction_20d", "volatility_contraction_20d")

@@ -1,0 +1,96 @@
+global:
+  # Stage 5 for zz1000 factor expansion:
+  # keep existing trading assumptions unchanged and test a small set of
+  # interpretable extensions around trend pullback, distribution-risk filtering,
+  # liquidity improvement, and volatility contraction.
+  start_date: "20230101"
+  end_date: "20260331"
+  benchmark_code: "000300.SH"
+  top_n: 50
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 800000.0
+
+experiments:
+  - name: "z5_01_zz1000_position_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      position_safety_60d: 1.0
+
+  - name: "z5_02_zz1000_close_high_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.7
+      position_safety_60d: 0.3
+
+  - name: "z5_03_zz1000_pullback_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      pullback_after_trend_60d: 0.6
+      position_safety_60d: 0.4
+
+  - name: "z5_04_zz1000_pullback_no_distribution_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      pullback_after_trend_60d: 0.5
+      position_safety_60d: 0.3
+      distribution_risk_20d_negative: 0.2
+
+  - name: "z5_05_zz1000_liquidity_improve_safety_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      liquidity_improvement_20d: 0.5
+      turnover_stability_20d: 0.2
+      position_safety_60d: 0.3
+
+  - name: "z5_06_zz1000_close_high_vol_contract_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "z5_07_zz1000_breakout_no_distribution_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      close_to_high_20d: 0.4
+      return_5d_negative: 0.2
+      distribution_risk_20d_negative: 0.4
+
+  - name: "z5_08_zz1000_absorption_no_distribution_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      down_day_absorption_20d: 0.4
+      close_near_high_on_high_amount_20d: 0.3
+      distribution_risk_20d_negative: 0.3
+
+  - name: "z5_09_zz1000_pullback_safety_top80"
+    universe_name: "zz1000"
+    top_n: 80
+    factor_config:
+      pullback_after_trend_60d: 0.6
+      position_safety_60d: 0.4
+
+  - name: "z5_10_zz1000_liquidity_improve_safety_top80"
+    universe_name: "zz1000"
+    top_n: 80
+    factor_config:
+      liquidity_improvement_20d: 0.5
+      turnover_stability_20d: 0.2
+      position_safety_60d: 0.3
