@@ -3,6 +3,7 @@
 from .config import load_research_config
 from .daily_archive import (
     DEFAULT_DAILY_CONSENSUS_PROFILES,
+    archive_consensus_recommendation_csv,
     archive_daily_consensus_recommendations,
     default_archive_dir,
     resolve_next_trading_day,
@@ -24,6 +25,7 @@ from .summary import build_research_summary, rebuild_summary_from_disk, sort_res
 __all__ = [
     "load_research_config",
     "DEFAULT_DAILY_CONSENSUS_PROFILES",
+    "archive_consensus_recommendation_csv",
     "archive_daily_consensus_recommendations",
     "default_archive_dir",
     "resolve_next_trading_day",

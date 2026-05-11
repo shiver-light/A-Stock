@@ -184,6 +184,37 @@ python3 -m research recommend-consensus \
   --output json
 ```
 
+如果要同时把本次共识荐股写成 CSV 到文稿每日目录：
+
+```bash
+python3 -m research recommend-consensus \
+  --run-dir research_runs/zz500_value_stage3 \
+  --as-of-date 20260501 \
+  --core-models zz5v3_01_ep_ttm_top10 \
+  --confirm-models zz5v3_11_ep50_bp20_ret60_30_top20 \
+  --watch-models zz5v3_02_ep_ttm_top20 \
+  --write-csv
+```
+
+默认会写入：
+
+```text
+~/Documents/A-Stock/daily_recommendations/<as_of_date>/zz500.csv
+```
+
+如果需要按下一交易日归档，可以显式指定目录日期：
+
+```bash
+python3 -m research recommend-consensus \
+  --run-dir research_runs/zz500_value_stage3 \
+  --as-of-date 20260501 \
+  --core-models zz5v3_01_ep_ttm_top10 \
+  --confirm-models zz5v3_11_ep50_bp20_ret60_30_top20 \
+  --watch-models zz5v3_02_ep_ttm_top20 \
+  --write-csv \
+  --csv-date 20260506
+```
+
 说明：
 
 - `HS300` 当前建议：

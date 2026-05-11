@@ -177,6 +177,52 @@ def write_recommendation_csv(path: Path, rows: list[dict[str, object]]) -> None:
         writer.writerows(rows)
 
 
+def infer_consensus_universe_name(report: dict[str, object], fallback: str = "consensus") -> str:
+    """Infer a single universe name from a recommendation report."""
+
+    universe_names = {
+        str(item.get("universe_name"))
+        for item in report.get("selected_models", [])
+        if isinstance(item, dict) and item.get("universe_name")
+    }
+    if len(universe_names) == 1:
+        return next(iter(universe_names))
+    return fallback
+
+
+def archive_consensus_recommendation_csv(
+    report: dict[str, object],
+    *,
+    universe_name: str | None = None,
+    archive_dir: str | Path | None = None,
+    archive_date: str | None = None,
+    filename: str | None = None,
+) -> dict[str, object]:
+    """Archive one consensus recommendation report as a CSV file."""
+
+    resolved_archive_date = archive_date or str(report.get("target_trade_date") or report.get("as_of_date") or "")
+    if not resolved_archive_date:
+        raise ValueError("archive_date is required when report has no as_of_date or target_trade_date")
+
+    resolved_universe = universe_name or infer_consensus_universe_name(report)
+    resolved_archive_dir = Path(archive_dir) if archive_dir is not None else default_archive_dir()
+    target_dir = resolved_archive_dir / resolved_archive_date
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    csv_filename = filename or f"{resolved_universe}.csv"
+    csv_path = target_dir / csv_filename
+    csv_rows = build_recommendation_csv_rows(resolved_universe, report)
+    write_recommendation_csv(csv_path, csv_rows)
+    return {
+        "status": "completed",
+        "archive_date": resolved_archive_date,
+        "archive_path": str(target_dir),
+        "csv_path": str(csv_path),
+        "csv_row_count": len(csv_rows),
+        "universe": resolved_universe,
+    }
+
+
 def archive_daily_consensus_recommendations(
     *,
     signal_date: str | None = None,

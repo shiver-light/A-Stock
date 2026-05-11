@@ -6,6 +6,7 @@ import argparse
 import json
 
 from research import (
+    archive_consensus_recommendation_csv,
     archive_daily_consensus_recommendations,
     generate_daily_consensus_recommendations,
     generate_daily_recommendations_from_run,
@@ -91,6 +92,26 @@ def build_parser() -> argparse.ArgumentParser:
         default="text",
         help="Output text report or JSON payload.",
     )
+    consensus_parser.add_argument(
+        "--write-csv",
+        action="store_true",
+        help="Also write a recommendation CSV to the daily archive directory.",
+    )
+    consensus_parser.add_argument(
+        "--archive-dir",
+        default=None,
+        help="CSV archive root directory. Defaults to ~/Documents/A-Stock/daily_recommendations.",
+    )
+    consensus_parser.add_argument(
+        "--csv-date",
+        default=None,
+        help="CSV date folder. Defaults to --as-of-date; set this to the next trading day if needed.",
+    )
+    consensus_parser.add_argument(
+        "--csv-universe-name",
+        default=None,
+        help="Optional CSV universe filename prefix. Defaults to the selected models' universe name.",
+    )
 
     archive_parser = subparsers.add_parser(
         "archive-daily-consensus",
@@ -149,10 +170,21 @@ def main() -> int:
             confirm_model_names=args.confirm_models,
             watch_model_names=args.watch_models,
         )
+        if args.write_csv:
+            recommendation["csv_archive"] = archive_consensus_recommendation_csv(
+                recommendation,
+                universe_name=args.csv_universe_name,
+                archive_dir=args.archive_dir,
+                archive_date=args.csv_date,
+            )
         if args.output == "json":
             print(json.dumps(recommendation, ensure_ascii=False, indent=2, default=str))
         else:
             print(render_consensus_recommendation_text(recommendation))
+            if args.write_csv:
+                csv_archive = recommendation["csv_archive"]
+                print("")
+                print(f"csv_path: {csv_archive['csv_path']}")
     elif args.command == "archive-daily-consensus":
         result = archive_daily_consensus_recommendations(
             signal_date=args.signal_date,

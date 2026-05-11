@@ -9,7 +9,11 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from research.daily_archive import archive_daily_consensus_recommendations, resolve_next_trading_day
+from research.daily_archive import (
+    archive_consensus_recommendation_csv,
+    archive_daily_consensus_recommendations,
+    resolve_next_trading_day,
+)
 
 
 class FakeCalendarService:
@@ -147,6 +151,44 @@ class DailyArchiveTestCase(unittest.TestCase):
 
             self.assertEqual(result["status"], "skipped")
             self.assertFalse(any(Path(tmp_dir).iterdir()))
+
+    def test_archive_consensus_recommendation_csv_writes_as_of_date_folder(self) -> None:
+        report = {
+            "run_dir": "demo_run",
+            "as_of_date": "20260501",
+            "selected_models": [{"name": "demo_model", "universe_name": "zz500"}],
+            "trade_consensus": [],
+            "trade_core": [],
+            "watch_list": [],
+            "all_recommendations": [
+                {
+                    "ts_code": "000002.SZ",
+                    "recommend_level": "B",
+                    "consensus_count": 1,
+                    "source_models": ["demo_model"],
+                    "best_rank": 3,
+                    "avg_rank": 3.0,
+                    "avg_score": 0.8,
+                    "in_core_model": True,
+                    "in_confirm_model": False,
+                    "in_watch_model": False,
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result = archive_consensus_recommendation_csv(report, archive_dir=tmp_dir)
+
+            csv_path = Path(result["csv_path"])
+            self.assertEqual(result["archive_date"], "20260501")
+            self.assertEqual(result["universe"], "zz500")
+            self.assertEqual(csv_path, Path(tmp_dir) / "20260501" / "zz500.csv")
+            with csv_path.open(encoding="utf-8", newline="") as file:
+                rows = list(csv.DictReader(file))
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["universe"], "zz500")
+            self.assertEqual(rows[0]["bucket"], "trade_core")
+            self.assertEqual(rows[0]["ts_code"], "000002.SZ")
 
 
 if __name__ == "__main__":
