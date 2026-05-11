@@ -20,10 +20,10 @@ DEFAULT_DAILY_CONSENSUS_PROFILES = {
         "mode": "trade",
     },
     "zz500": {
-        "run_dir": "research_runs/zz500_stage2_min300k",
-        "core_models": ["s2_m01_zz500_turnover_top10"],
-        "confirm_models": ["s2_m04_zz500_ep_ttm_top10"],
-        "watch_models": [],
+        "run_dir": "research_runs/zz500_value_stage3",
+        "core_models": ["zz5v3_01_ep_ttm_top10"],
+        "confirm_models": ["zz5v3_11_ep50_bp20_ret60_30_top20"],
+        "watch_models": ["zz5v3_02_ep_ttm_top20"],
         "mode": "trade",
     },
     "zz1000": {

@@ -161,24 +161,26 @@ python3 -m research recommend-consensus \
 
 ### ZZ500 示例
 
-基于 [research_runs/zz500_stage2_min300k](/Users/raymond/src/A-Stock/research_runs/zz500_stage2_min300k)：
+基于 [research_runs/zz500_value_stage3](/Users/raymond/src/A-Stock/research_runs/zz500_value_stage3)：
 
 ```bash
 python3 -m research recommend-consensus \
-  --run-dir research_runs/zz500_stage2_min300k \
+  --run-dir research_runs/zz500_value_stage3 \
   --as-of-date 20260501 \
-  --core-models s2_m01_zz500_turnover_top10 \
-  --confirm-models s2_m04_zz500_ep_ttm_top10
+  --core-models zz5v3_01_ep_ttm_top10 \
+  --confirm-models zz5v3_11_ep50_bp20_ret60_30_top20 \
+  --watch-models zz5v3_02_ep_ttm_top20
 ```
 
 如果要 JSON：
 
 ```bash
 python3 -m research recommend-consensus \
-  --run-dir research_runs/zz500_stage2_min300k \
+  --run-dir research_runs/zz500_value_stage3 \
   --as-of-date 20260501 \
-  --core-models s2_m01_zz500_turnover_top10 \
-  --confirm-models s2_m04_zz500_ep_ttm_top10 \
+  --core-models zz5v3_01_ep_ttm_top10 \
+  --confirm-models zz5v3_11_ep50_bp20_ret60_30_top20 \
+  --watch-models zz5v3_02_ep_ttm_top20 \
   --output json
 ```
 
@@ -189,8 +191,9 @@ python3 -m research recommend-consensus \
   - 确认模型 `hstm2_02_hs300_turnover60_ret60_30_rev5_10_top15`
   - 观察模型 `hstm2_07_hs300_turnover40_ret60_40_rev5_20_top10`
 - `ZZ500` 当前建议：
-  - 主模型 `s2_m01_zz500_turnover_top10`
-  - 确认模型 `s2_m04_zz500_ep_ttm_top10`
+  - 主模型 `zz5v3_01_ep_ttm_top10`
+  - 确认模型 `zz5v3_11_ep50_bp20_ret60_30_top20`
+  - 观察模型 `zz5v3_02_ep_ttm_top20`
 - 如果不传 `--watch-models`，当前不会自动补旧模型名。
 
 ### ZZ1000 观察示例
