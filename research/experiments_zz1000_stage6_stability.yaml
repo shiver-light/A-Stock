@@ -1,0 +1,124 @@
+global:
+  # Stage 6 for zz1000 stability validation:
+  # keep the strongest stage5 structure as the anchor and only test a compact
+  # robustness matrix across concentration, tradability, and mild factor weights.
+  start_date: "20230101"
+  end_date: "20260331"
+  benchmark_code: "000300.SH"
+  top_n: 50
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 800000.0
+
+experiments:
+  # Baselines from stage5 for direct comparison.
+  - name: "z6_01_zz1000_close_high_vol_contract_top50_amt800k"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "z6_02_zz1000_close_high_safety_top50_amt800k"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.7
+      position_safety_60d: 0.3
+
+  - name: "z6_03_zz1000_position_safety_top50_amt800k"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      position_safety_60d: 1.0
+
+  # Concentration check: avoid picking a parameter only because top50 happened to fit.
+  - name: "z6_04_zz1000_close_high_vol_contract_top30_amt800k"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "z6_05_zz1000_close_high_vol_contract_top80_amt800k"
+    universe_name: "zz1000"
+    top_n: 80
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  # Tradability check: stricter amount filters should not destroy the result.
+  - name: "z6_06_zz1000_close_high_vol_contract_top50_amt1200k"
+    universe_name: "zz1000"
+    top_n: 50
+    backtest_config:
+      min_amount: 1200000.0
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "z6_07_zz1000_close_high_vol_contract_top50_amt1500k"
+    universe_name: "zz1000"
+    top_n: 50
+    backtest_config:
+      min_amount: 1500000.0
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  # Weight sensitivity around the stage5 winner.
+  - name: "z6_08_zz1000_close_high_bias_top50_amt800k"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.5
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+
+  - name: "z6_09_zz1000_vol_contract_bias_top50_amt800k"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.3
+      volatility_contraction_20d: 0.4
+      position_safety_60d: 0.3
+
+  - name: "z6_10_zz1000_safety_bias_top50_amt800k"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.35
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.4
+
+  # Distribution-risk should act as a mild filter, not dominate the model.
+  - name: "z6_11_zz1000_close_high_vol_contract_no_distribution_top50_amt800k"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.35
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+      distribution_risk_20d_negative: 0.15
+
+  - name: "z6_12_zz1000_close_high_vol_contract_no_distribution_top80_amt800k"
+    universe_name: "zz1000"
+    top_n: 80
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.35
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+      distribution_risk_20d_negative: 0.15
