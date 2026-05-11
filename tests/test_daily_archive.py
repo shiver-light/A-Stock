@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 import tempfile
 import unittest
@@ -107,12 +108,24 @@ class DailyArchiveTestCase(unittest.TestCase):
             self.assertEqual(result["status"], "completed")
             self.assertTrue((target_dir / "hs300.json").exists())
             self.assertTrue((target_dir / "hs300.txt").exists())
+            self.assertTrue((target_dir / "hs300.csv").exists())
+            self.assertTrue((target_dir / "all_consensus.csv").exists())
             self.assertTrue((target_dir / "manifest.json").exists())
             self.assertTrue((target_dir / "summary.txt").exists())
             manifest = json.loads((target_dir / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["signal_date"], "20260507")
             self.assertEqual(manifest["target_trade_date"], "20260508")
             self.assertEqual(manifest["universes"]["hs300"]["trade_consensus_count"], 1)
+            self.assertEqual(manifest["universes"]["hs300"]["csv_path"], "hs300.csv")
+            with (target_dir / "hs300.csv").open(encoding="utf-8", newline="") as file:
+                rows = list(csv.DictReader(file))
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["signal_date"], "20260507")
+            self.assertEqual(rows[0]["target_trade_date"], "20260508")
+            self.assertEqual(rows[0]["universe"], "hs300")
+            self.assertEqual(rows[0]["bucket"], "trade_consensus")
+            self.assertEqual(rows[0]["ts_code"], "000001.SZ")
+            self.assertEqual(rows[0]["source_models"], "core|confirm")
 
     def test_archive_daily_consensus_recommendations_skips_closed_signal_date(self) -> None:
         calendar = pd.DataFrame(

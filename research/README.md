@@ -243,9 +243,10 @@ python3 -m research recommend-consensus \
 
 每个日期目录包含：
 
-- `hs300.json` / `hs300.txt`
-- `zz500.json` / `zz500.txt`
-- `zz1000.json` / `zz1000.txt`
+- `hs300.json` / `hs300.txt` / `hs300.csv`
+- `zz500.json` / `zz500.txt` / `zz500.csv`
+- `zz1000.json` / `zz1000.txt` / `zz1000.csv`
+- `all_consensus.csv`
 - `manifest.json`
 - `summary.txt`
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -34,6 +35,26 @@ DEFAULT_DAILY_CONSENSUS_PROFILES = {
         "mode": "watch-only",
     },
 }
+
+
+RECOMMENDATION_CSV_COLUMNS = [
+    "signal_date",
+    "target_trade_date",
+    "universe",
+    "archive_mode",
+    "bucket",
+    "recommend_level",
+    "ts_code",
+    "consensus_count",
+    "source_model_count",
+    "source_models",
+    "best_rank",
+    "avg_rank",
+    "avg_score",
+    "in_core_model",
+    "in_confirm_model",
+    "in_watch_model",
+]
 
 
 def default_archive_dir() -> Path:
@@ -72,6 +93,90 @@ def resolve_next_trading_day(
     return later[0]
 
 
+def _bucket_from_level(recommend_level: object) -> str:
+    if recommend_level == "A":
+        return "trade_consensus"
+    if recommend_level == "B":
+        return "trade_core"
+    if recommend_level == "C":
+        return "watch_list"
+    return ""
+
+
+def _csv_value(value: object) -> object:
+    if isinstance(value, list):
+        return "|".join(str(item) for item in value)
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if value is None:
+        return ""
+    return value
+
+
+def _fallback_recommendations_from_buckets(report: dict[str, object]) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    seen: set[tuple[object, object]] = set()
+    for bucket_name in ["trade_consensus", "trade_core", "watch_list"]:
+        for item in report.get(bucket_name, []):
+            if not isinstance(item, dict):
+                continue
+            key = (item.get("ts_code"), item.get("recommend_level"))
+            if key in seen:
+                continue
+            seen.add(key)
+            row = dict(item)
+            row["bucket"] = bucket_name
+            rows.append(row)
+    return rows
+
+
+def build_recommendation_csv_rows(universe_name: str, report: dict[str, object]) -> list[dict[str, object]]:
+    """Build flat CSV rows from a consensus recommendation report."""
+
+    recommendations = report.get("all_recommendations", [])
+    if not recommendations:
+        recommendations = _fallback_recommendations_from_buckets(report)
+
+    rows: list[dict[str, object]] = []
+    for item in recommendations:
+        if not isinstance(item, dict):
+            continue
+        source_models = item.get("source_models", [])
+        source_model_count = item.get("source_model_count")
+        if source_model_count is None and isinstance(source_models, list):
+            source_model_count = len(source_models)
+
+        row = {
+            "signal_date": report.get("signal_date"),
+            "target_trade_date": report.get("target_trade_date"),
+            "universe": universe_name,
+            "archive_mode": report.get("archive_mode"),
+            "bucket": item.get("bucket") or _bucket_from_level(item.get("recommend_level")),
+            "recommend_level": item.get("recommend_level"),
+            "ts_code": item.get("ts_code"),
+            "consensus_count": item.get("consensus_count"),
+            "source_model_count": source_model_count,
+            "source_models": source_models,
+            "best_rank": item.get("best_rank"),
+            "avg_rank": item.get("avg_rank"),
+            "avg_score": item.get("avg_score"),
+            "in_core_model": item.get("in_core_model"),
+            "in_confirm_model": item.get("in_confirm_model"),
+            "in_watch_model": item.get("in_watch_model"),
+        }
+        rows.append({column: _csv_value(row.get(column)) for column in RECOMMENDATION_CSV_COLUMNS})
+    return rows
+
+
+def write_recommendation_csv(path: Path, rows: list[dict[str, object]]) -> None:
+    """Write recommendation rows with a stable header, even when empty."""
+
+    with path.open("w", encoding="utf-8", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=RECOMMENDATION_CSV_COLUMNS)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
 def archive_daily_consensus_recommendations(
     *,
     signal_date: str | None = None,
@@ -106,6 +211,7 @@ def archive_daily_consensus_recommendations(
 
     active_profiles = profiles or DEFAULT_DAILY_CONSENSUS_PROFILES
     universe_reports: dict[str, dict[str, object]] = {}
+    all_csv_rows: list[dict[str, object]] = []
     for universe_name, profile in active_profiles.items():
         report = generate_daily_consensus_recommendations(
             profile["run_dir"],
@@ -127,18 +233,25 @@ def archive_daily_consensus_recommendations(
             render_consensus_recommendation_text(report),
             encoding="utf-8",
         )
+        csv_rows = build_recommendation_csv_rows(universe_name, report)
+        write_recommendation_csv(target_dir / f"{universe_name}.csv", csv_rows)
+        all_csv_rows.extend(csv_rows)
+
+    write_recommendation_csv(target_dir / "all_consensus.csv", all_csv_rows)
 
     manifest = {
         "status": "completed",
         "signal_date": resolved_signal_date,
         "target_trade_date": target_trade_date,
         "archive_path": str(target_dir),
+        "combined_csv_path": "all_consensus.csv",
         "universes": {
             name: {
                 "mode": report.get("archive_mode"),
                 "trade_consensus_count": len(report.get("trade_consensus", [])),
                 "trade_core_count": len(report.get("trade_core", [])),
                 "watch_list_count": len(report.get("watch_list", [])),
+                "csv_path": f"{name}.csv",
             }
             for name, report in universe_reports.items()
         },
