@@ -5,7 +5,14 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from pipeline.main import _apply_signal_filters, build_factor_panel, run_minimal_pipeline, run_recommendation_pipeline
+from pipeline.main import (
+    _apply_market_regime_filter,
+    _apply_signal_filters,
+    _build_market_regime_flags,
+    build_factor_panel,
+    run_minimal_pipeline,
+    run_recommendation_pipeline,
+)
 
 
 class PipelineMainTestCase(unittest.TestCase):
@@ -72,6 +79,40 @@ class PipelineMainTestCase(unittest.TestCase):
                 factor_panel,
                 [{"factor": "accumulation_score", "op": "bad_op", "value": 0.6}],
             )
+
+    def test_build_market_regime_flags_uses_historical_benchmark_returns(self) -> None:
+        benchmark = pd.DataFrame(
+            {
+                "trade_date": ["20240101", "20240102", "20240103", "20240104"],
+                "close": [100.0, 101.0, 102.0, 101.0],
+            }
+        )
+
+        result = _build_market_regime_flags(benchmark, {"min_return_2d": 0.0})
+
+        self.assertEqual(result["market_regime_allowed"].tolist(), [False, False, True, True])
+
+    def test_apply_market_regime_filter_sets_blocked_dates_to_unselected(self) -> None:
+        selection = pd.DataFrame(
+            {
+                "trade_date": ["20240103", "20240104"],
+                "ts_code": ["000001.SZ", "000001.SZ"],
+                "score": [1.0, 1.0],
+                "rank": [1, 1],
+                "selected": [True, True],
+            }
+        )
+        benchmark = pd.DataFrame(
+            {
+                "trade_date": ["20240101", "20240102", "20240103", "20240104"],
+                "close": [100.0, 101.0, 102.0, 99.0],
+            }
+        )
+
+        result, flags = _apply_market_regime_filter(selection, benchmark, {"min_return_2d": 0.0})
+
+        self.assertEqual(flags["market_regime_allowed"].tolist(), [False, False, True, False])
+        self.assertEqual(result["selected"].tolist(), [True, False])
 
     @patch(
         "pipeline.main.format_latest_selection",

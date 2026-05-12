@@ -256,6 +256,7 @@ def run_backtest(
     block_limit_up_buy: bool = False,
     block_limit_down_sell: bool = False,
     min_amount: float | None = None,
+    cash_on_empty_signal: bool = False,
     date_col: str = "trade_date",
     asset_col: str = "ts_code",
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -267,6 +268,9 @@ def run_backtest(
     for that rule instead of failing.
     """
     market = _prepare_market_data(market_data).rename(columns={"trade_date": date_col, "ts_code": asset_col})
+    signal_data = _prepare_signals(signals).rename(
+        columns={"trade_date": date_col, "ts_code": asset_col, "selected": "selected"}
+    )
     weights = generate_weights(signals, market.rename(columns={date_col: "trade_date", asset_col: "ts_code"}))
 
     trade_dates = market[date_col].drop_duplicates().sort_values().tolist()
@@ -277,6 +281,16 @@ def run_backtest(
     weight_by_exec = {}
     for exec_date, group in weights.groupby("trade_date"):
         weight_by_exec[exec_date] = dict(zip(group["ts_code"], group["target_weight"]))
+    if cash_on_empty_signal:
+        schedule = _execution_schedule(trade_dates)
+        selected_by_date = (
+            signal_data.groupby(date_col)["selected"].any()
+            if not signal_data.empty
+            else pd.Series(dtype=bool)
+        )
+        for row in schedule.itertuples(index=False):
+            if row.signal_date in selected_by_date.index and not bool(selected_by_date.loc[row.signal_date]):
+                weight_by_exec[row.execution_date] = {}
 
     previous_close_weights: dict[str, float] = {}
     records: list[dict[str, float | str]] = []

@@ -166,6 +166,37 @@ class ResearchRunnerTestCase(unittest.TestCase):
             _, kwargs = mock_pipeline.call_args
             self.assertEqual(kwargs["signal_filters"], signal_filters)
 
+    @patch("research.runner.run_minimal_pipeline")
+    def test_run_experiments_passes_market_regime_filter(self, mock_pipeline) -> None:
+        mock_pipeline.return_value = {
+            "performance": {"cumulative_return": 0.1},
+            "latest_selection": {"top_stocks": []},
+            "report": {"backtest_summary": {"cumulative_return": 0.1}},
+            "report_text": "strategy report",
+        }
+        market_regime_filter = {"min_return_20d": 0.0, "close_above_ma": 60}
+        config = {
+            "global": {
+                "start_date": "20240101",
+                "end_date": "20240131",
+                "market_regime_filter": market_regime_filter,
+            },
+            "experiments": [
+                {
+                    "name": "exp_with_market_regime",
+                    "ts_codes": ["000001.SZ"],
+                    "factor_config": {"position_safety_60d": 1.0},
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            results = run_experiments(config, output_dir=tmp_dir, run_name="demo_run", resume=False)
+
+            self.assertEqual(len(results), 1)
+            _, kwargs = mock_pipeline.call_args
+            self.assertEqual(kwargs["market_regime_filter"], market_regime_filter)
+
 
 if __name__ == "__main__":
     unittest.main()

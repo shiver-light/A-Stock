@@ -129,6 +129,46 @@ class ResearchRecommendTestCase(unittest.TestCase):
             self.assertEqual(result["selected_models"][0]["signal_filters"], signal_filters)
 
     @patch("research.recommend.run_recommendation_pipeline")
+    def test_generate_daily_recommendations_from_run_passes_market_regime_filter(self, mock_pipeline) -> None:
+        mock_pipeline.return_value = {
+            "latest_selection": {
+                "top_stocks": [
+                    {"ts_code": "000001.SZ", "score": 0.9, "rank": 1, "selected": True},
+                ]
+            }
+        }
+        market_regime_filter = {"min_return_20d": 0.0, "close_above_ma": 60}
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            run_dir = Path(tmp_dir) / "market_regime_run"
+            (run_dir / "experiments").mkdir(parents=True, exist_ok=True)
+            self._write_experiment(
+                run_dir,
+                name="regime_model",
+                config={
+                    "start_date": "20240101",
+                    "end_date": "20240131",
+                    "universe_name": "zz1000",
+                    "top_n": 10,
+                    "benchmark_code": "000300.SH",
+                    "factor_config": {"position_safety_60d": 1.0},
+                    "market_regime_filter": market_regime_filter,
+                },
+                metrics={
+                    "sharpe": 0.6,
+                    "excess_cumulative_return": 0.12,
+                    "max_drawdown": -0.2,
+                    "positive_excess_month_ratio": 0.6,
+                },
+            )
+
+            generate_daily_recommendations_from_run(run_dir, as_of_date="20240228")
+
+            _, kwargs = mock_pipeline.call_args
+            self.assertEqual(kwargs["benchmark_code"], "000300.SH")
+            self.assertEqual(kwargs["market_regime_filter"], market_regime_filter)
+
+    @patch("research.recommend.run_recommendation_pipeline")
     def test_generate_daily_recommendations_from_run_builds_consensus(self, mock_pipeline) -> None:
         mock_pipeline.side_effect = [
             {

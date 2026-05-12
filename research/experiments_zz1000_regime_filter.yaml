@@ -1,0 +1,107 @@
+global:
+  # Regime-filter research for zz1000:
+  # this file intentionally switches benchmark_code from 000300.SH to 000852.SH
+  # so benchmark-relative metrics and market regime checks are closer to CSI1000.
+  # The filter uses only benchmark close data available on the signal date.
+  start_date: "20230101"
+  end_date: "20260331"
+  benchmark_code: "000852.SH"
+  top_n: 50
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 800000.0
+
+experiments:
+  # Benchmark-only baseline: no market regime filter.
+  - name: "zr_01_zz1000_close_high_bias_top50_bm852"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.5
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+
+  # Simple CSI1000 trend filters for the current core model.
+  - name: "zr_02_zz1000_close_high_bias_top50_ret20_pos"
+    universe_name: "zz1000"
+    top_n: 50
+    market_regime_filter:
+      min_return_20d: 0.0
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.5
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+
+  - name: "zr_03_zz1000_close_high_bias_top50_ret60_pos"
+    universe_name: "zz1000"
+    top_n: 50
+    market_regime_filter:
+      min_return_60d: 0.0
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.5
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+
+  - name: "zr_04_zz1000_close_high_bias_top50_above_ma60"
+    universe_name: "zz1000"
+    top_n: 50
+    market_regime_filter:
+      close_above_ma: 60
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.5
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+
+  - name: "zr_05_zz1000_close_high_bias_top50_ret20_ma60"
+    universe_name: "zz1000"
+    top_n: 50
+    market_regime_filter:
+      min_return_20d: 0.0
+      close_above_ma: 60
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.5
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+
+  # Apply the same regime rule to confirm/variant structures.
+  - name: "zr_06_zz1000_vol_contract_top50_ret20_ma60"
+    universe_name: "zz1000"
+    top_n: 50
+    market_regime_filter:
+      min_return_20d: 0.0
+      close_above_ma: 60
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "zr_07_zz1000_vol_contract_top30_ret20_ma60"
+    universe_name: "zz1000"
+    top_n: 30
+    market_regime_filter:
+      min_return_20d: 0.0
+      close_above_ma: 60
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "zr_08_zz1000_no_distribution_top50_ret20_ma60"
+    universe_name: "zz1000"
+    top_n: 50
+    market_regime_filter:
+      min_return_20d: 0.0
+      close_above_ma: 60
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.35
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+      distribution_risk_20d_negative: 0.15

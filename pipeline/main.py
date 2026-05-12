@@ -214,6 +214,70 @@ def _apply_signal_filters(
     return result.loc[keep].sort_values([date_col, asset_col]).reset_index(drop=True)
 
 
+def _build_market_regime_flags(
+    benchmark_data: pd.DataFrame,
+    market_regime_filter: dict[str, object] | None,
+    *,
+    date_col: str = "trade_date",
+) -> pd.DataFrame:
+    """Build per-date benchmark regime flags using only historical close data."""
+
+    if not market_regime_filter or market_regime_filter.get("enabled", True) is False:
+        return pd.DataFrame(columns=[date_col, "market_regime_allowed"])
+    if benchmark_data.empty:
+        return pd.DataFrame(columns=[date_col, "market_regime_allowed"])
+    if date_col not in benchmark_data.columns or "close" not in benchmark_data.columns:
+        raise ValueError("market_regime_filter requires benchmark_data with trade_date and close columns.")
+
+    data = benchmark_data.loc[:, [date_col, "close"]].copy()
+    data[date_col] = data[date_col].astype(str)
+    data["close"] = pd.to_numeric(data["close"], errors="coerce")
+    data = data.sort_values(date_col).drop_duplicates(subset=[date_col], keep="last").reset_index(drop=True)
+    allowed = pd.Series(True, index=data.index)
+
+    return_keys = [key for key in market_regime_filter if key.startswith("min_return_") and key.endswith("d")]
+    for key in return_keys:
+        if key not in market_regime_filter:
+            continue
+        window = int(key.removeprefix("min_return_").removesuffix("d"))
+        if window <= 0:
+            raise ValueError(f"market_regime_filter {key} window must be positive.")
+        threshold = float(market_regime_filter[key])
+        returns = data["close"].pct_change(window)
+        allowed = allowed & returns.notna() & (returns >= threshold)
+
+    if "close_above_ma" in market_regime_filter:
+        window = int(market_regime_filter["close_above_ma"])
+        if window <= 0:
+            raise ValueError("market_regime_filter close_above_ma must be positive.")
+        moving_average = data["close"].rolling(window).mean()
+        allowed = allowed & moving_average.notna() & data["close"].notna() & (data["close"] >= moving_average)
+
+    return data.loc[:, [date_col]].assign(market_regime_allowed=allowed.astype(bool))
+
+
+def _apply_market_regime_filter(
+    selection: pd.DataFrame,
+    benchmark_data: pd.DataFrame,
+    market_regime_filter: dict[str, object] | None,
+    *,
+    date_col: str = "trade_date",
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    if not market_regime_filter or market_regime_filter.get("enabled", True) is False:
+        return selection.copy(), pd.DataFrame(columns=[date_col, "market_regime_allowed"])
+    if selection.empty:
+        return selection.copy(), _build_market_regime_flags(benchmark_data, market_regime_filter, date_col=date_col)
+
+    flags = _build_market_regime_flags(benchmark_data, market_regime_filter, date_col=date_col)
+    result = selection.copy()
+    result[date_col] = result[date_col].astype(str)
+    result = result.merge(flags, on=date_col, how="left")
+    result["market_regime_allowed"] = result["market_regime_allowed"].fillna(False).astype(bool)
+    result["selected"] = result["selected"] & result["market_regime_allowed"]
+    result = result.drop(columns=["market_regime_allowed"])
+    return result.sort_values([date_col, "rank", "ts_code"]).reset_index(drop=True), flags
+
+
 def _build_market_panel(
     *,
     ts_codes: list[str],
@@ -246,6 +310,7 @@ def run_minimal_pipeline(
     universe_name: str | None = None,
     factor_config: dict[str, float] | None = None,
     signal_filters: list[dict[str, object]] | None = None,
+    market_regime_filter: dict[str, object] | None = None,
     backtest_config: dict[str, object] | None = None,
     enable_factor_diagnostics: bool = False,
     enable_data_diagnostics: bool = False,
@@ -289,8 +354,11 @@ def run_minimal_pipeline(
     if universe_name and not ts_codes:
         ranked = _filter_ranked_by_universe_history(ranked, universe_name, rebalance_schedule["signal_date"].tolist())
     selected = top_n_selection(ranked, top_n=top_n)
+    selected, market_regime = _apply_market_regime_filter(selected, benchmark_data, market_regime_filter)
 
     market_panel = _build_market_panel(ts_codes=resolved_ts_codes, start_date=start_date, end_date=end_date)
+    if market_regime_filter and market_regime_filter.get("enabled", True) is not False:
+        backtest_config = {**backtest_config, "cash_on_empty_signal": True}
     strategy_returns, holdings = run_backtest(
         signals=selected.loc[:, ["trade_date", "ts_code", "selected"]],
         market_data=market_panel,
@@ -319,6 +387,7 @@ def run_minimal_pipeline(
             "selection_logic": "等权综合因子打分后按日排序取Top N",
             "factor_config": factor_config,
             "signal_filters": signal_filters or [],
+            "market_regime_filter": market_regime_filter or {},
             "backtest_config": backtest_config,
         },
     )
@@ -332,6 +401,7 @@ def run_minimal_pipeline(
         "strategy_returns": strategy_returns,
         "benchmark_returns": benchmark_returns,
         "returns_with_benchmark": returns_with_benchmark,
+        "market_regime": market_regime,
         "holdings": holdings,
         "performance": performance,
         "latest_selection": latest_selection,
@@ -371,6 +441,8 @@ def run_recommendation_pipeline(
     universe_name: str | None = None,
     factor_config: dict[str, float] | None = None,
     signal_filters: list[dict[str, object]] | None = None,
+    benchmark_code: str = "000300.SH",
+    market_regime_filter: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Run a daily recommendation pipeline using the latest available trading date.
 
@@ -406,6 +478,14 @@ def run_recommendation_pipeline(
     )
     ranked = rank_signal(scored, score_col="score")
     selected = top_n_selection(ranked, top_n=top_n)
+    market_regime = pd.DataFrame(columns=["trade_date", "market_regime_allowed"])
+    if market_regime_filter and market_regime_filter.get("enabled", True) is not False:
+        benchmark_data = get_a_share_index_daily(
+            ts_code=benchmark_code,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        selected, market_regime = _apply_market_regime_filter(selected, benchmark_data, market_regime_filter)
 
     latest_date = None
     if not selected.empty:
@@ -418,6 +498,7 @@ def run_recommendation_pipeline(
         "scored_signals": scored,
         "ranked_signals": ranked,
         "selected_signals": selected,
+        "market_regime": market_regime,
         "latest_selection": latest_selection,
     }
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -32,6 +33,12 @@ SUMMARY_METRIC_COLUMNS = (
 )
 
 
+def _json_summary_field(value: object) -> str:
+    if value in (None, {}, []):
+        return ""
+    return json.dumps(value, ensure_ascii=False, sort_keys=True)
+
+
 def build_research_summary(results: list[dict[str, object]]) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
     for item in results:
@@ -44,6 +51,7 @@ def build_research_summary(results: list[dict[str, object]]) -> pd.DataFrame:
             "benchmark_code": config.get("benchmark_code", "000300.SH"),
             "factor_config": config.get("factor_config"),
             "signal_filters": config.get("signal_filters", []),
+            "market_regime_filter": _json_summary_field(config.get("market_regime_filter")),
         }
         for metric_name in SUMMARY_METRIC_COLUMNS:
             row[metric_name] = performance.get(metric_name)

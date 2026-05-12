@@ -20,6 +20,7 @@ def _config_signature(config: dict[str, object]) -> str:
         "benchmark_code": config.get("benchmark_code", "000300.SH"),
         "factor_config": config.get("factor_config", {}),
         "signal_filters": config.get("signal_filters", []),
+        "market_regime_filter": config.get("market_regime_filter", {}),
     }
     return json.dumps(signature_payload, ensure_ascii=False, sort_keys=True)
 
@@ -302,6 +303,8 @@ def generate_daily_recommendations_from_run(
             top_n=int(config.get("top_n", 20)),
             factor_config=config.get("factor_config"),
             signal_filters=config.get("signal_filters"),
+            benchmark_code=config.get("benchmark_code", "000300.SH"),
+            market_regime_filter=config.get("market_regime_filter"),
         )
 
         model_outputs.append(
@@ -378,6 +381,8 @@ def generate_daily_consensus_recommendations(
             top_n=int(config.get("top_n", 20)),
             factor_config=config.get("factor_config"),
             signal_filters=config.get("signal_filters"),
+            benchmark_code=config.get("benchmark_code", "000300.SH"),
+            market_regime_filter=config.get("market_regime_filter"),
         )
         model_outputs.append(
             {

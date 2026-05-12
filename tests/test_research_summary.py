@@ -19,6 +19,7 @@ class ResearchSummaryTestCase(unittest.TestCase):
                         "top_n": 10,
                         "benchmark_code": "000300.SH",
                         "factor_config": {"turnover_mean_20d": 1.0},
+                        "market_regime_filter": {"min_return_20d": 0.0},
                     },
                     "performance": {
                         "cumulative_return": 0.1,
@@ -39,6 +40,7 @@ class ResearchSummaryTestCase(unittest.TestCase):
         self.assertEqual(row["mean_rebalance_turnover"], 0.7)
         self.assertEqual(row["worst_rolling_5m_excess_return"], -0.1)
         self.assertEqual(row["signal_filters"], [])
+        self.assertEqual(row["market_regime_filter"], '{"min_return_20d": 0.0}')
 
     def test_rebuild_summary_from_disk_reads_extended_metrics(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

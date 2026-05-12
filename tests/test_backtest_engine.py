@@ -300,6 +300,30 @@ class BacktestEngineTestCase(unittest.TestCase):
         self.assertEqual(weights.columns.tolist(), ["trade_date", "ts_code", "target_weight", "signal_date"])
         self.assertTrue(weights.empty)
 
+    def test_run_backtest_cash_on_empty_signal_exits_position(self) -> None:
+        signals = pd.DataFrame(
+            {
+                "trade_date": ["20240131", "20240229"],
+                "ts_code": ["A", "A"],
+                "selected": [True, False],
+            }
+        )
+        market_data = pd.DataFrame(
+            {
+                "trade_date": ["20240131", "20240201", "20240229", "20240301"],
+                "ts_code": ["A", "A", "A", "A"],
+                "open": [10.0, 10.0, 11.0, 11.0],
+                "close": [10.0, 11.0, 11.0, 12.0],
+            }
+        )
+
+        returns, holdings = run_backtest(signals, market_data, fee_bps=0.0, cash_on_empty_signal=True)
+
+        cash_day = returns.loc[returns["trade_date"] == "20240301"].iloc[0]
+        self.assertAlmostEqual(cash_day["turnover"], 1.0)
+        self.assertAlmostEqual(cash_day["strategy_return"], 0.0)
+        self.assertTrue(holdings.loc[holdings["trade_date"] == "20240301"].empty)
+
 
 if __name__ == "__main__":
     unittest.main()
