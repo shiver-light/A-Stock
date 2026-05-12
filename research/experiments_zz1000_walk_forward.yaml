@@ -1,0 +1,216 @@
+global:
+  # Walk-forward validation for zz1000:
+  # do not introduce new factors here. Re-run the current candidate structures
+  # across separate time windows to check whether the signal is robust rather
+  # than fitted to the full 2023-2026 sample.
+  benchmark_code: "000300.SH"
+  top_n: 50
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 800000.0
+
+experiments:
+  # 2023 single-year window.
+  - name: "wf23_01_zz1000_close_high_bias_top50"
+    universe_name: "zz1000"
+    start_date: "20230101"
+    end_date: "20231231"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.5
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+
+  - name: "wf23_02_zz1000_close_high_vol_contract_top50"
+    universe_name: "zz1000"
+    start_date: "20230101"
+    end_date: "20231231"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "wf23_03_zz1000_close_high_vol_contract_top30"
+    universe_name: "zz1000"
+    start_date: "20230101"
+    end_date: "20231231"
+    top_n: 30
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "wf23_04_zz1000_position_safety_top50"
+    universe_name: "zz1000"
+    start_date: "20230101"
+    end_date: "20231231"
+    top_n: 50
+    factor_config:
+      position_safety_60d: 1.0
+
+  # 2024 single-year window.
+  - name: "wf24_01_zz1000_close_high_bias_top50"
+    universe_name: "zz1000"
+    start_date: "20240101"
+    end_date: "20241231"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.5
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+
+  - name: "wf24_02_zz1000_close_high_vol_contract_top50"
+    universe_name: "zz1000"
+    start_date: "20240101"
+    end_date: "20241231"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "wf24_03_zz1000_close_high_vol_contract_top30"
+    universe_name: "zz1000"
+    start_date: "20240101"
+    end_date: "20241231"
+    top_n: 30
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "wf24_04_zz1000_position_safety_top50"
+    universe_name: "zz1000"
+    start_date: "20240101"
+    end_date: "20241231"
+    top_n: 50
+    factor_config:
+      position_safety_60d: 1.0
+
+  # 2025 single-year validation window.
+  - name: "wf25_01_zz1000_close_high_bias_top50"
+    universe_name: "zz1000"
+    start_date: "20250101"
+    end_date: "20251231"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.5
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+
+  - name: "wf25_02_zz1000_close_high_vol_contract_top50"
+    universe_name: "zz1000"
+    start_date: "20250101"
+    end_date: "20251231"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "wf25_03_zz1000_close_high_vol_contract_top30"
+    universe_name: "zz1000"
+    start_date: "20250101"
+    end_date: "20251231"
+    top_n: 30
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "wf25_04_zz1000_position_safety_top50"
+    universe_name: "zz1000"
+    start_date: "20250101"
+    end_date: "20251231"
+    top_n: 50
+    factor_config:
+      position_safety_60d: 1.0
+
+  # Recent holdout-style window.
+  - name: "wf26_01_zz1000_close_high_bias_top50"
+    universe_name: "zz1000"
+    start_date: "20260101"
+    end_date: "20260501"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.5
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+
+  - name: "wf26_02_zz1000_close_high_vol_contract_top50"
+    universe_name: "zz1000"
+    start_date: "20260101"
+    end_date: "20260501"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "wf26_03_zz1000_close_high_vol_contract_top30"
+    universe_name: "zz1000"
+    start_date: "20260101"
+    end_date: "20260501"
+    top_n: 30
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "wf26_04_zz1000_position_safety_top50"
+    universe_name: "zz1000"
+    start_date: "20260101"
+    end_date: "20260501"
+    top_n: 50
+    factor_config:
+      position_safety_60d: 1.0
+
+  # Rolling two-window validation.
+  - name: "wf231h_01_zz1000_close_high_bias_top50"
+    universe_name: "zz1000"
+    start_date: "20230101"
+    end_date: "20240630"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.5
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+
+  - name: "wf231h_02_zz1000_close_high_vol_contract_top50"
+    universe_name: "zz1000"
+    start_date: "20230101"
+    end_date: "20240630"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "wf242h_01_zz1000_close_high_bias_top50"
+    universe_name: "zz1000"
+    start_date: "20240701"
+    end_date: "20251231"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.5
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+
+  - name: "wf242h_02_zz1000_close_high_vol_contract_top50"
+    universe_name: "zz1000"
+    start_date: "20240701"
+    end_date: "20251231"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
