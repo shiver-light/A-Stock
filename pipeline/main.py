@@ -218,6 +218,7 @@ def _build_market_regime_flags(
     benchmark_data: pd.DataFrame,
     market_regime_filter: dict[str, object] | None,
     *,
+    reference_index_data: dict[str, pd.DataFrame] | None = None,
     date_col: str = "trade_date",
 ) -> pd.DataFrame:
     """Build per-date benchmark regime flags using only historical close data."""
@@ -253,7 +254,83 @@ def _build_market_regime_flags(
         moving_average = data["close"].rolling(window).mean()
         allowed = allowed & moving_average.notna() & data["close"].notna() & (data["close"] >= moving_average)
 
+    relative_rules = market_regime_filter.get("relative_strength")
+    if relative_rules:
+        rules = relative_rules if isinstance(relative_rules, list) else [relative_rules]
+        reference_index_data = reference_index_data or {}
+        for rule in rules:
+            if not isinstance(rule, dict):
+                raise ValueError("market_regime_filter relative_strength entries must be dictionaries.")
+            reference_code = rule.get("reference_code")
+            if not isinstance(reference_code, str) or not reference_code:
+                raise ValueError("market_regime_filter relative_strength requires reference_code.")
+            if reference_code not in reference_index_data:
+                raise ValueError(f"Missing reference index data for relative_strength: {reference_code}")
+            reference_data = reference_index_data[reference_code]
+            if date_col not in reference_data.columns or "close" not in reference_data.columns:
+                raise ValueError("relative_strength reference data must contain trade_date and close columns.")
+            reference = reference_data.loc[:, [date_col, "close"]].copy()
+            reference[date_col] = reference[date_col].astype(str)
+            reference["reference_close"] = pd.to_numeric(reference["close"], errors="coerce")
+            reference = (
+                reference.drop(columns=["close"])
+                .sort_values(date_col)
+                .drop_duplicates(subset=[date_col], keep="last")
+                .reset_index(drop=True)
+            )
+            relative = data.loc[:, [date_col, "close"]].merge(reference, on=date_col, how="left")
+            relative_strength = relative["close"] / relative["reference_close"]
+
+            relative_return_keys = [key for key in rule if key.startswith("min_return_") and key.endswith("d")]
+            for key in relative_return_keys:
+                window = int(key.removeprefix("min_return_").removesuffix("d"))
+                if window <= 0:
+                    raise ValueError(f"relative_strength {key} window must be positive.")
+                threshold = float(rule[key])
+                relative_return = relative_strength.pct_change(window)
+                allowed = allowed & relative_return.notna() & (relative_return >= threshold)
+
+            if "ratio_above_ma" in rule:
+                window = int(rule["ratio_above_ma"])
+                if window <= 0:
+                    raise ValueError("relative_strength ratio_above_ma must be positive.")
+                relative_ma = relative_strength.rolling(window).mean()
+                allowed = allowed & relative_strength.notna() & relative_ma.notna() & (relative_strength >= relative_ma)
+
     return data.loc[:, [date_col]].assign(market_regime_allowed=allowed.astype(bool))
+
+
+def _get_market_regime_reference_codes(market_regime_filter: dict[str, object] | None) -> list[str]:
+    if not market_regime_filter or market_regime_filter.get("enabled", True) is False:
+        return []
+    relative_rules = market_regime_filter.get("relative_strength")
+    if not relative_rules:
+        return []
+    rules = relative_rules if isinstance(relative_rules, list) else [relative_rules]
+    codes: list[str] = []
+    for rule in rules:
+        if not isinstance(rule, dict):
+            continue
+        reference_code = rule.get("reference_code")
+        if isinstance(reference_code, str) and reference_code and reference_code not in codes:
+            codes.append(reference_code)
+    return codes
+
+
+def _load_market_regime_reference_data(
+    market_regime_filter: dict[str, object] | None,
+    *,
+    start_date: str,
+    end_date: str,
+) -> dict[str, pd.DataFrame]:
+    reference_data: dict[str, pd.DataFrame] = {}
+    for reference_code in _get_market_regime_reference_codes(market_regime_filter):
+        reference_data[reference_code] = get_a_share_index_daily(
+            ts_code=reference_code,
+            start_date=start_date,
+            end_date=end_date,
+        )
+    return reference_data
 
 
 def _apply_market_regime_filter(
@@ -261,14 +338,25 @@ def _apply_market_regime_filter(
     benchmark_data: pd.DataFrame,
     market_regime_filter: dict[str, object] | None,
     *,
+    reference_index_data: dict[str, pd.DataFrame] | None = None,
     date_col: str = "trade_date",
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     if not market_regime_filter or market_regime_filter.get("enabled", True) is False:
         return selection.copy(), pd.DataFrame(columns=[date_col, "market_regime_allowed"])
     if selection.empty:
-        return selection.copy(), _build_market_regime_flags(benchmark_data, market_regime_filter, date_col=date_col)
+        return selection.copy(), _build_market_regime_flags(
+            benchmark_data,
+            market_regime_filter,
+            reference_index_data=reference_index_data,
+            date_col=date_col,
+        )
 
-    flags = _build_market_regime_flags(benchmark_data, market_regime_filter, date_col=date_col)
+    flags = _build_market_regime_flags(
+        benchmark_data,
+        market_regime_filter,
+        reference_index_data=reference_index_data,
+        date_col=date_col,
+    )
     result = selection.copy()
     result[date_col] = result[date_col].astype(str)
     result = result.merge(flags, on=date_col, how="left")
@@ -354,7 +442,17 @@ def run_minimal_pipeline(
     if universe_name and not ts_codes:
         ranked = _filter_ranked_by_universe_history(ranked, universe_name, rebalance_schedule["signal_date"].tolist())
     selected = top_n_selection(ranked, top_n=top_n)
-    selected, market_regime = _apply_market_regime_filter(selected, benchmark_data, market_regime_filter)
+    market_regime_reference_data = _load_market_regime_reference_data(
+        market_regime_filter,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    selected, market_regime = _apply_market_regime_filter(
+        selected,
+        benchmark_data,
+        market_regime_filter,
+        reference_index_data=market_regime_reference_data,
+    )
 
     market_panel = _build_market_panel(ts_codes=resolved_ts_codes, start_date=start_date, end_date=end_date)
     if market_regime_filter and market_regime_filter.get("enabled", True) is not False:
@@ -485,7 +583,17 @@ def run_recommendation_pipeline(
             start_date=start_date,
             end_date=end_date,
         )
-        selected, market_regime = _apply_market_regime_filter(selected, benchmark_data, market_regime_filter)
+        market_regime_reference_data = _load_market_regime_reference_data(
+            market_regime_filter,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        selected, market_regime = _apply_market_regime_filter(
+            selected,
+            benchmark_data,
+            market_regime_filter,
+            reference_index_data=market_regime_reference_data,
+        )
 
     latest_date = None
     if not selected.empty:

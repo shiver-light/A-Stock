@@ -114,6 +114,50 @@ class PipelineMainTestCase(unittest.TestCase):
         self.assertEqual(flags["market_regime_allowed"].tolist(), [False, False, True, False])
         self.assertEqual(result["selected"].tolist(), [True, False])
 
+    def test_build_market_regime_flags_supports_relative_strength_returns(self) -> None:
+        benchmark = pd.DataFrame(
+            {
+                "trade_date": ["20240101", "20240102", "20240103", "20240104"],
+                "close": [100.0, 102.0, 104.0, 103.0],
+            }
+        )
+        reference = pd.DataFrame(
+            {
+                "trade_date": ["20240101", "20240102", "20240103", "20240104"],
+                "close": [100.0, 101.0, 100.0, 104.0],
+            }
+        )
+
+        result = _build_market_regime_flags(
+            benchmark,
+            {"relative_strength": {"reference_code": "000300.SH", "min_return_2d": 0.0}},
+            reference_index_data={"000300.SH": reference},
+        )
+
+        self.assertEqual(result["market_regime_allowed"].tolist(), [False, False, True, False])
+
+    def test_build_market_regime_flags_supports_relative_strength_ma(self) -> None:
+        benchmark = pd.DataFrame(
+            {
+                "trade_date": ["20240101", "20240102", "20240103", "20240104"],
+                "close": [100.0, 103.0, 104.0, 105.0],
+            }
+        )
+        reference = pd.DataFrame(
+            {
+                "trade_date": ["20240101", "20240102", "20240103", "20240104"],
+                "close": [100.0, 101.0, 101.0, 110.0],
+            }
+        )
+
+        result = _build_market_regime_flags(
+            benchmark,
+            {"relative_strength": {"reference_code": "000300.SH", "ratio_above_ma": 2}},
+            reference_index_data={"000300.SH": reference},
+        )
+
+        self.assertEqual(result["market_regime_allowed"].tolist(), [False, True, True, False])
+
     @patch(
         "pipeline.main.format_latest_selection",
         return_value={"as_of_date": "20240103", "top_n": 2, "top_stocks": [{"ts_code": "000001.SZ"}]},

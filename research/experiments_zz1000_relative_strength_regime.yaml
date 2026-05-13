@@ -1,0 +1,162 @@
+global:
+  # Relative-strength regime research for zz1000:
+  # use CSI1000 (000852.SH) as the benchmark and only enable stock selection
+  # when small-cap style is stronger than HS300 or CSI500. The relative strength
+  # checks use only index closes available on the signal date.
+  start_date: "20230101"
+  end_date: "20260331"
+  benchmark_code: "000852.SH"
+  top_n: 50
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 800000.0
+
+experiments:
+  # Baselines under the correct zz1000 benchmark.
+  - name: "zrs_01_zz1000_close_high_bias_top50_bm852"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.5
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+
+  - name: "zrs_02_zz1000_vol_contract_top50_bm852"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  # CSI1000 vs HS300 style filters.
+  - name: "zrs_03_zz1000_close_high_bias_top50_rs300_20d"
+    universe_name: "zz1000"
+    top_n: 50
+    market_regime_filter:
+      relative_strength:
+        reference_code: "000300.SH"
+        min_return_20d: 0.0
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.5
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+
+  - name: "zrs_04_zz1000_close_high_bias_top50_rs300_60d"
+    universe_name: "zz1000"
+    top_n: 50
+    market_regime_filter:
+      relative_strength:
+        reference_code: "000300.SH"
+        min_return_60d: 0.0
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.5
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+
+  - name: "zrs_05_zz1000_close_high_bias_top50_rs300_ma60"
+    universe_name: "zz1000"
+    top_n: 50
+    market_regime_filter:
+      relative_strength:
+        reference_code: "000300.SH"
+        ratio_above_ma: 60
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.5
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+
+  # CSI1000 vs CSI500 style filters.
+  - name: "zrs_06_zz1000_close_high_bias_top50_rs500_20d"
+    universe_name: "zz1000"
+    top_n: 50
+    market_regime_filter:
+      relative_strength:
+        reference_code: "000905.SH"
+        min_return_20d: 0.0
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.5
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+
+  - name: "zrs_07_zz1000_close_high_bias_top50_rs500_60d"
+    universe_name: "zz1000"
+    top_n: 50
+    market_regime_filter:
+      relative_strength:
+        reference_code: "000905.SH"
+        min_return_60d: 0.0
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.5
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+
+  - name: "zrs_08_zz1000_close_high_bias_top50_rs500_ma60"
+    universe_name: "zz1000"
+    top_n: 50
+    market_regime_filter:
+      relative_strength:
+        reference_code: "000905.SH"
+        ratio_above_ma: 60
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.5
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+
+  # Apply the most interpretable relative filters to variant structures.
+  - name: "zrs_09_zz1000_vol_contract_top50_rs300_20d"
+    universe_name: "zz1000"
+    top_n: 50
+    market_regime_filter:
+      relative_strength:
+        reference_code: "000300.SH"
+        min_return_20d: 0.0
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "zrs_10_zz1000_vol_contract_top30_rs300_20d"
+    universe_name: "zz1000"
+    top_n: 30
+    market_regime_filter:
+      relative_strength:
+        reference_code: "000300.SH"
+        min_return_20d: 0.0
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "zrs_11_zz1000_no_distribution_top50_rs300_20d"
+    universe_name: "zz1000"
+    top_n: 50
+    market_regime_filter:
+      relative_strength:
+        reference_code: "000300.SH"
+        min_return_20d: 0.0
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.35
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+      distribution_risk_20d_negative: 0.15
+
+  - name: "zrs_12_zz1000_vol_contract_top50_rs500_20d"
+    universe_name: "zz1000"
+    top_n: 50
+    market_regime_filter:
+      relative_strength:
+        reference_code: "000905.SH"
+        min_return_20d: 0.0
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
