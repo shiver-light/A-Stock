@@ -1,0 +1,3 @@
+trade_date,us_risk_on,us_tech_strong,us_smallcap_strong,vix_stress,qqq_return_20d,vix_return_20d
+20240102,1,1,0,0,0.035,-0.120
+20240103,0,0,0,1,-0.018,0.180

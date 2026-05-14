@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pandas as pd
 
 from pipeline.main import (
+    _apply_external_regime_filter,
     _apply_market_regime_filter,
     _apply_signal_filters,
     _build_market_regime_flags,
@@ -113,6 +114,32 @@ class PipelineMainTestCase(unittest.TestCase):
 
         self.assertEqual(flags["market_regime_allowed"].tolist(), [False, False, True, False])
         self.assertEqual(result["selected"].tolist(), [True, False])
+
+    @patch("pipeline.main.load_external_regime_data")
+    def test_apply_external_regime_filter_blocks_missing_or_false_dates(self, mock_load) -> None:
+        mock_load.return_value = pd.DataFrame(
+            {
+                "trade_date": ["20240103", "20240104"],
+                "us_risk_on": [1, 0],
+            }
+        )
+        selection = pd.DataFrame(
+            {
+                "trade_date": ["20240103", "20240104", "20240105"],
+                "ts_code": ["000001.SZ", "000001.SZ", "000001.SZ"],
+                "score": [1.0, 1.0, 1.0],
+                "rank": [1, 1, 1],
+                "selected": [True, True, True],
+            }
+        )
+
+        result, flags = _apply_external_regime_filter(
+            selection,
+            {"path": "research/us_market_regime.csv", "allowed_col": "us_risk_on"},
+        )
+
+        self.assertEqual(flags["external_regime_allowed"].tolist(), [True, False])
+        self.assertEqual(result["selected"].tolist(), [True, False, False])
 
     def test_build_market_regime_flags_supports_relative_strength_returns(self) -> None:
         benchmark = pd.DataFrame(

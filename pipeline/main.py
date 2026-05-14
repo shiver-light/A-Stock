@@ -8,12 +8,14 @@ import pandas as pd
 
 from analysis import (
     build_factor_diagnostics_report,
+    build_external_regime_flags,
     calc_factor_coverage,
     calc_forward_returns,
     calc_ic,
     calc_quantile_returns,
     calc_rank_ic,
     render_factor_report_text,
+    load_external_regime_data,
     summarize_complete_case_count_by_date,
     summarize_factor_coverage,
     summarize_universe_count_by_date,
@@ -366,6 +368,42 @@ def _apply_market_regime_filter(
     return result.sort_values([date_col, "rank", "ts_code"]).reset_index(drop=True), flags
 
 
+def _load_external_regime_flags(
+    external_regime_filter: dict[str, object] | None,
+    *,
+    date_col: str = "trade_date",
+) -> pd.DataFrame:
+    if not external_regime_filter or external_regime_filter.get("enabled", True) is False:
+        return pd.DataFrame(columns=[date_col, "external_regime_allowed"])
+    path = external_regime_filter.get("path")
+    if not isinstance(path, str) or not path:
+        raise ValueError("external_regime_filter requires a non-empty path.")
+    data = load_external_regime_data(path)
+    return build_external_regime_flags(data, external_regime_filter, date_col=date_col)
+
+
+def _apply_external_regime_filter(
+    selection: pd.DataFrame,
+    external_regime_filter: dict[str, object] | None,
+    *,
+    date_col: str = "trade_date",
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    if not external_regime_filter or external_regime_filter.get("enabled", True) is False:
+        return selection.copy(), pd.DataFrame(columns=[date_col, "external_regime_allowed"])
+
+    flags = _load_external_regime_flags(external_regime_filter, date_col=date_col)
+    if selection.empty:
+        return selection.copy(), flags
+
+    result = selection.copy()
+    result[date_col] = result[date_col].astype(str)
+    result = result.merge(flags, on=date_col, how="left")
+    result["external_regime_allowed"] = result["external_regime_allowed"].fillna(False).astype(bool)
+    result["selected"] = result["selected"] & result["external_regime_allowed"]
+    result = result.drop(columns=["external_regime_allowed"])
+    return result.sort_values([date_col, "rank", "ts_code"]).reset_index(drop=True), flags
+
+
 def _build_market_panel(
     *,
     ts_codes: list[str],
@@ -399,6 +437,7 @@ def run_minimal_pipeline(
     factor_config: dict[str, float] | None = None,
     signal_filters: list[dict[str, object]] | None = None,
     market_regime_filter: dict[str, object] | None = None,
+    external_regime_filter: dict[str, object] | None = None,
     backtest_config: dict[str, object] | None = None,
     enable_factor_diagnostics: bool = False,
     enable_data_diagnostics: bool = False,
@@ -453,9 +492,12 @@ def run_minimal_pipeline(
         market_regime_filter,
         reference_index_data=market_regime_reference_data,
     )
+    selected, external_regime = _apply_external_regime_filter(selected, external_regime_filter)
 
     market_panel = _build_market_panel(ts_codes=resolved_ts_codes, start_date=start_date, end_date=end_date)
-    if market_regime_filter and market_regime_filter.get("enabled", True) is not False:
+    has_market_regime = bool(market_regime_filter and market_regime_filter.get("enabled", True) is not False)
+    has_external_regime = bool(external_regime_filter and external_regime_filter.get("enabled", True) is not False)
+    if has_market_regime or has_external_regime:
         backtest_config = {**backtest_config, "cash_on_empty_signal": True}
     strategy_returns, holdings = run_backtest(
         signals=selected.loc[:, ["trade_date", "ts_code", "selected"]],
@@ -486,6 +528,7 @@ def run_minimal_pipeline(
             "factor_config": factor_config,
             "signal_filters": signal_filters or [],
             "market_regime_filter": market_regime_filter or {},
+            "external_regime_filter": external_regime_filter or {},
             "backtest_config": backtest_config,
         },
     )
@@ -500,6 +543,7 @@ def run_minimal_pipeline(
         "benchmark_returns": benchmark_returns,
         "returns_with_benchmark": returns_with_benchmark,
         "market_regime": market_regime,
+        "external_regime": external_regime,
         "holdings": holdings,
         "performance": performance,
         "latest_selection": latest_selection,
@@ -541,6 +585,7 @@ def run_recommendation_pipeline(
     signal_filters: list[dict[str, object]] | None = None,
     benchmark_code: str = "000300.SH",
     market_regime_filter: dict[str, object] | None = None,
+    external_regime_filter: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Run a daily recommendation pipeline using the latest available trading date.
 
@@ -594,6 +639,7 @@ def run_recommendation_pipeline(
             market_regime_filter,
             reference_index_data=market_regime_reference_data,
         )
+    selected, external_regime = _apply_external_regime_filter(selected, external_regime_filter)
 
     latest_date = None
     if not selected.empty:
@@ -607,6 +653,7 @@ def run_recommendation_pipeline(
         "ranked_signals": ranked,
         "selected_signals": selected,
         "market_regime": market_regime,
+        "external_regime": external_regime,
         "latest_selection": latest_selection,
     }
 

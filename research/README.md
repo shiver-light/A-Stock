@@ -32,6 +32,7 @@ tushare_token: "你的token"
 - 支持每个实验独立落盘
 - 支持中断后 resume
 - 支持基于已完成实验生成 partial summary
+- 支持可选外部市场 regime 过滤，例如预先对齐到 A 股信号日的美股风险偏好标签
 
 ## 设计原则
 
@@ -119,6 +120,48 @@ python3 -m research summary \
   --run-dir research_runs/first_batch \
   --sort-by excess_cumulative_return \
   --output json
+```
+
+## 美股 regime research
+
+美股信号只能作为可选外部 regime 使用，不会改变默认 pipeline 行为。外部数据必须先离线整理成 CSV，并按 A 股 `trade_date` 对齐；如果用美股收盘数据，必须确认该信息在对应 A 股信号生成前已经可知，避免未来函数。
+
+CSV 最小字段示例见：
+
+- [research/us_market_regime_template.csv](/Users/raymond/src/A-Stock/research/us_market_regime_template.csv)
+
+建议另存为：
+
+```bash
+cp research/us_market_regime_template.csv research/us_market_regime.csv
+```
+
+然后把完整历史日期补齐。常用字段含义：
+
+- `us_risk_on`
+  - 美股整体风险偏好是否开启
+- `us_tech_strong`
+  - 纳指 / 科技链是否相对强
+- `us_smallcap_strong`
+  - Russell 2000 / 小盘风格是否相对强
+- `vix_stress`
+  - VIX 是否处于压力状态
+
+运行第一轮美股 regime 对 A 股选股的研究：
+
+```bash
+python3 -m research run \
+  --config research/experiments_us_regime_a_share.yaml \
+  --output-dir research_runs \
+  --run-name us_regime_a_share
+```
+
+查看结果：
+
+```bash
+python3 -m research summary \
+  --run-dir research_runs/us_regime_a_share \
+  --sort-by excess_cumulative_return
 ```
 
 ## 共识荐股入口

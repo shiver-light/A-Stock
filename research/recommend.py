@@ -305,6 +305,7 @@ def generate_daily_recommendations_from_run(
             signal_filters=config.get("signal_filters"),
             benchmark_code=config.get("benchmark_code", "000300.SH"),
             market_regime_filter=config.get("market_regime_filter"),
+            external_regime_filter=config.get("external_regime_filter"),
         )
 
         model_outputs.append(
@@ -383,6 +384,7 @@ def generate_daily_consensus_recommendations(
             signal_filters=config.get("signal_filters"),
             benchmark_code=config.get("benchmark_code", "000300.SH"),
             market_regime_filter=config.get("market_regime_filter"),
+            external_regime_filter=config.get("external_regime_filter"),
         )
         model_outputs.append(
             {

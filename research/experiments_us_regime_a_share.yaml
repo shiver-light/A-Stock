@@ -1,0 +1,138 @@
+global:
+  # US-market regime research for A-share stock selection.
+  # The external regime CSV must be pre-aligned to A-share signal dates.
+  # For US closes, do not map a US close to an A-share date unless that
+  # information is already known before the A-share signal is generated.
+  start_date: "20230101"
+  end_date: "20260331"
+  top_n: 30
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 800000.0
+
+experiments:
+  # Baselines without external US regime filters.
+  - name: "usr_01_hs300_turnover_momentum_baseline_top20"
+    universe_name: "hs300"
+    benchmark_code: "000300.SH"
+    top_n: 20
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.4
+      return_5d_negative: 0.1
+
+  - name: "usr_02_zz500_value_momentum_baseline_top20"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    top_n: 20
+    factor_config:
+      ep_ttm: 0.5
+      bp: 0.2
+      return_60d: 0.3
+
+  - name: "usr_03_zz1000_structure_baseline_top50"
+    universe_name: "zz1000"
+    benchmark_code: "000852.SH"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  # Risk-on filter: broad US risk appetite must be positive and VIX stress absent.
+  - name: "usr_04_hs300_turnover_momentum_us_risk_on_top20"
+    universe_name: "hs300"
+    benchmark_code: "000300.SH"
+    top_n: 20
+    external_regime_filter:
+      path: "research/us_market_regime.csv"
+      rules:
+        - column: "us_risk_on"
+          op: "is_true"
+        - column: "vix_stress"
+          op: "is_false"
+    factor_config:
+      turnover_mean_20d: 0.5
+      return_60d: 0.4
+      return_5d_negative: 0.1
+
+  - name: "usr_05_zz500_value_momentum_us_risk_on_top20"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    top_n: 20
+    external_regime_filter:
+      path: "research/us_market_regime.csv"
+      rules:
+        - column: "us_risk_on"
+          op: "is_true"
+        - column: "vix_stress"
+          op: "is_false"
+    factor_config:
+      ep_ttm: 0.5
+      bp: 0.2
+      return_60d: 0.3
+
+  - name: "usr_06_zz1000_structure_us_risk_on_top50"
+    universe_name: "zz1000"
+    benchmark_code: "000852.SH"
+    top_n: 50
+    external_regime_filter:
+      path: "research/us_market_regime.csv"
+      rules:
+        - column: "us_risk_on"
+          op: "is_true"
+        - column: "vix_stress"
+          op: "is_false"
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  # Tech and small-cap style filters: test whether US style strength helps A-share active selection.
+  - name: "usr_07_zz500_value_momentum_us_tech_strong_top20"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    top_n: 20
+    external_regime_filter:
+      path: "research/us_market_regime.csv"
+      allowed_col: "us_tech_strong"
+    factor_config:
+      ep_ttm: 0.4
+      return_60d: 0.4
+      turnover_mean_20d: 0.2
+
+  - name: "usr_08_zz1000_structure_us_smallcap_strong_top50"
+    universe_name: "zz1000"
+    benchmark_code: "000852.SH"
+    top_n: 50
+    external_regime_filter:
+      path: "research/us_market_regime.csv"
+      allowed_col: "us_smallcap_strong"
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "usr_09_zz1000_structure_us_smallcap_risk_on_top50"
+    universe_name: "zz1000"
+    benchmark_code: "000852.SH"
+    top_n: 50
+    external_regime_filter:
+      path: "research/us_market_regime.csv"
+      rules:
+        - column: "us_smallcap_strong"
+          op: "is_true"
+        - column: "vix_stress"
+          op: "is_false"
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3

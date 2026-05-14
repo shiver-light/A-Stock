@@ -52,6 +52,7 @@ def build_research_summary(results: list[dict[str, object]]) -> pd.DataFrame:
             "factor_config": config.get("factor_config"),
             "signal_filters": config.get("signal_filters", []),
             "market_regime_filter": _json_summary_field(config.get("market_regime_filter")),
+            "external_regime_filter": _json_summary_field(config.get("external_regime_filter")),
         }
         for metric_name in SUMMARY_METRIC_COLUMNS:
             row[metric_name] = performance.get(metric_name)
