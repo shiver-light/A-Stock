@@ -147,6 +147,27 @@ cp research/us_market_regime_template.csv research/us_market_regime.csv
 - `vix_stress`
   - VIX 是否处于压力状态
 
+也可以通过 Tushare 美股日线接口自动生成：
+
+```bash
+python3 scripts/build_us_market_regime.py \
+  --start-date 20230101 \
+  --end-date 20260331 \
+  --output research/us_market_regime.csv
+```
+
+默认使用 `SPY / QQQ / IWM / VXX` 作为美股风险、科技、小盘和波动压力代理。如果 Tushare 中对应代码不同，使用参数显式指定：
+
+```bash
+python3 scripts/build_us_market_regime.py \
+  --start-date 20230101 \
+  --end-date 20260331 \
+  --spy-code SPY \
+  --qqq-code QQQ \
+  --iwm-code IWM \
+  --vix-proxy-code VXX
+```
+
 运行第一轮美股 regime 对 A 股选股的研究：
 
 ```bash

@@ -12,6 +12,7 @@ from .stock_universe import (
 )
 from .tushare_client import TushareClient, TushareClientConfig
 from .tushare_specs import TUSHARE_A_STOCK_DAILY_SPECS
+from .us_market import USDailyRequest, USMarketDailyService, build_us_market_regime, get_us_daily_prices
 from .valuation_daily import AShareDailyValuationService, DailyValuationRequest, get_a_share_daily_valuation
 
 __all__ = [
@@ -20,7 +21,9 @@ __all__ = [
     "AShareFundamentalService",
     "AShareIndexDailyService",
     "StockUniverseDataService",
+    "USMarketDailyService",
     "DailyMarketRequest",
+    "USDailyRequest",
     "DailyValuationRequest",
     "IndexDailyRequest",
     "IndexConstituentRequest",
@@ -31,6 +34,8 @@ __all__ = [
     "get_a_share_index_daily",
     "get_stock_basic_history",
     "get_index_constituents",
+    "get_us_daily_prices",
+    "build_us_market_regime",
     "TushareClient",
     "TushareClientConfig",
     "TUSHARE_A_STOCK_DAILY_SPECS",

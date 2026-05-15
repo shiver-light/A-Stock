@@ -196,6 +196,58 @@ class TushareClient:
             fields=fields,
         )
 
+    def us_daily(
+        self,
+        *,
+        ts_code: str | None = None,
+        trade_date: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        fields: str | None = None,
+    ) -> pd.DataFrame:
+        return self._call_with_retry(
+            self._pro.us_daily,
+            ts_code=ts_code,
+            trade_date=trade_date,
+            start_date=start_date,
+            end_date=end_date,
+            fields=fields,
+        )
+
+    def us_basic(
+        self,
+        *,
+        ts_code: str | None = None,
+        classify: str | None = None,
+        offset: str | None = None,
+        limit: str | None = None,
+        fields: str | None = None,
+    ) -> pd.DataFrame:
+        return self._call_with_retry(
+            self._pro.us_basic,
+            ts_code=ts_code,
+            classify=classify,
+            offset=offset,
+            limit=limit,
+            fields=fields,
+        )
+
+    def us_tradecal(
+        self,
+        *,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        is_open: str | None = None,
+        fields: str | None = None,
+    ) -> pd.DataFrame:
+        return self._call_with_retry(
+            self._pro.us_tradecal,
+            start_date=start_date,
+            end_date=end_date,
+            is_open=is_open,
+            fields=fields,
+        )
+
     def stock_basic(
         self,
         *,
