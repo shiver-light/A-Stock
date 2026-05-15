@@ -34,6 +34,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--vix-stress-threshold", type=float, default=0.1)
     parser.add_argument("--tech-relative-threshold", type=float, default=0.0)
     parser.add_argument("--smallcap-relative-threshold", type=float, default=0.0)
+    parser.add_argument(
+        "--theme-code",
+        action="append",
+        default=[],
+        metavar="NAME=CODE",
+        help="Optional theme ETF code, for example semiconductor=SOXX. Can be repeated.",
+    )
+    parser.add_argument("--theme-relative-threshold", type=float, default=0.0)
     parser.add_argument("--refresh", action="store_true", help="Refresh cached Tushare data.")
     return parser.parse_args()
 
@@ -44,7 +52,8 @@ def main() -> int:
 
     fetch_start = _calendar_days_before(args.start_date, max(args.lookback * 4, 90))
     fetch_end = args.end_date
-    codes = [args.spy_code, args.qqq_code, args.iwm_code, args.vix_proxy_code]
+    theme_codes = _parse_theme_codes(args.theme_code)
+    codes = _unique_codes([args.spy_code, args.qqq_code, args.iwm_code, args.vix_proxy_code, *theme_codes.values()])
 
     frames: list[pd.DataFrame] = []
     for code in codes:
@@ -69,6 +78,8 @@ def main() -> int:
         tech_relative_threshold=args.tech_relative_threshold,
         smallcap_relative_threshold=args.smallcap_relative_threshold,
         vix_stress_threshold=args.vix_stress_threshold,
+        theme_codes=theme_codes,
+        theme_relative_threshold=args.theme_relative_threshold,
     )
 
     output_path = Path(args.output)
@@ -83,6 +94,28 @@ def main() -> int:
 def _calendar_days_before(date: str, days: int) -> str:
     timestamp = pd.to_datetime(date, format="%Y%m%d") - pd.Timedelta(days=days)
     return timestamp.strftime("%Y%m%d")
+
+
+def _parse_theme_codes(items: list[str]) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for item in items:
+        if "=" not in item:
+            raise ValueError(f"--theme-code must use NAME=CODE format: {item}")
+        name, code = item.split("=", 1)
+        name = name.strip()
+        code = code.strip()
+        if not name or not code:
+            raise ValueError(f"--theme-code must use non-empty NAME=CODE format: {item}")
+        result[name] = code
+    return result
+
+
+def _unique_codes(codes: list[str]) -> list[str]:
+    result: list[str] = []
+    for code in codes:
+        if code not in result:
+            result.append(code)
+    return result
 
 
 if __name__ == "__main__":

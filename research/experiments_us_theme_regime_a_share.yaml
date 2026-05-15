@@ -1,0 +1,126 @@
+global:
+  # US-theme regime research for A-share stock selection.
+  # This file tests whether narrow US theme strength is more useful than broad
+  # US risk-on. The CSV must be generated with scripts/build_us_market_regime.py
+  # and aligned to A-share signal dates without same-calendar-date US close leakage.
+  start_date: "20230101"
+  end_date: "20260331"
+  top_n: 30
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 800000.0
+
+experiments:
+  # Baselines retained for direct comparison.
+  - name: "ust_01_zz500_value_momentum_baseline_top20"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    top_n: 20
+    factor_config:
+      ep_ttm: 0.5
+      bp: 0.2
+      return_60d: 0.3
+
+  - name: "ust_02_zz1000_structure_baseline_top50"
+    universe_name: "zz1000"
+    benchmark_code: "000852.SH"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  # Semiconductor and technology strength: closer to A-share growth/manufacturing themes.
+  - name: "ust_03_zz500_value_momentum_semiconductor_strong_top20"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    top_n: 20
+    external_regime_filter:
+      path: "research/us_market_regime.csv"
+      allowed_col: "semiconductor_strong"
+    factor_config:
+      ep_ttm: 0.4
+      return_60d: 0.4
+      turnover_mean_20d: 0.2
+
+  - name: "ust_04_zz500_value_momentum_technology_strong_top20"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    top_n: 20
+    external_regime_filter:
+      path: "research/us_market_regime.csv"
+      allowed_col: "technology_strong"
+    factor_config:
+      ep_ttm: 0.4
+      return_60d: 0.4
+      turnover_mean_20d: 0.2
+
+  - name: "ust_05_zz1000_structure_semiconductor_strong_top50"
+    universe_name: "zz1000"
+    benchmark_code: "000852.SH"
+    top_n: 50
+    external_regime_filter:
+      path: "research/us_market_regime.csv"
+      allowed_col: "semiconductor_strong"
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "ust_06_zz1000_structure_technology_strong_top50"
+    universe_name: "zz1000"
+    benchmark_code: "000852.SH"
+    top_n: 50
+    external_regime_filter:
+      path: "research/us_market_regime.csv"
+      allowed_col: "technology_strong"
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  # Higher-beta themes: innovation and biotech. Keep them separate to avoid
+  # treating broad risk appetite as sector alpha.
+  - name: "ust_07_zz500_value_momentum_innovation_strong_top20"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    top_n: 20
+    external_regime_filter:
+      path: "research/us_market_regime.csv"
+      allowed_col: "innovation_strong"
+    factor_config:
+      ep_ttm: 0.4
+      return_60d: 0.4
+      turnover_mean_20d: 0.2
+
+  - name: "ust_08_zz1000_structure_innovation_strong_top50"
+    universe_name: "zz1000"
+    benchmark_code: "000852.SH"
+    top_n: 50
+    external_regime_filter:
+      path: "research/us_market_regime.csv"
+      allowed_col: "innovation_strong"
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "ust_09_zz500_value_momentum_biotech_strong_top20"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    top_n: 20
+    external_regime_filter:
+      path: "research/us_market_regime.csv"
+      allowed_col: "biotech_strong"
+    factor_config:
+      ep_ttm: 0.4
+      return_60d: 0.4
+      turnover_mean_20d: 0.2

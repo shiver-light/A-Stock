@@ -167,6 +167,8 @@ def build_us_market_regime(
     tech_relative_threshold: float = 0.0,
     smallcap_relative_threshold: float = 0.0,
     vix_stress_threshold: float = 0.1,
+    theme_codes: dict[str, str] | None = None,
+    theme_relative_threshold: float = 0.0,
 ) -> pd.DataFrame:
     """Build A-share-date-aligned US market regime from US ETF closes."""
 
@@ -181,7 +183,8 @@ def build_us_market_regime(
         raise ValueError("lookback must be positive.")
 
     wide = _build_close_wide(prices)
-    required_codes = [spy_code, qqq_code, iwm_code, vix_proxy_code]
+    theme_codes = theme_codes or {}
+    required_codes = [spy_code, qqq_code, iwm_code, vix_proxy_code, *theme_codes.values()]
     missing_codes = [code for code in required_codes if code not in wide.columns]
     if missing_codes:
         raise ValueError(f"US prices missing required ts_code data: {missing_codes}")
@@ -210,9 +213,21 @@ def build_us_market_regime(
     us_regime["us_tech_strong"] = us_regime["qqq_spy_relative_20d"] >= tech_relative_threshold
     us_regime["us_smallcap_strong"] = us_regime["iwm_spy_relative_20d"] >= smallcap_relative_threshold
     us_regime["vix_stress"] = us_regime["vix_return_20d"] > vix_stress_threshold
+    theme_metric_cols: list[str] = []
+    theme_flag_cols: list[str] = []
+    for theme_name, theme_code in theme_codes.items():
+        normalized_name = _normalize_theme_name(theme_name)
+        return_col = f"{normalized_name}_return_20d"
+        relative_col = f"{normalized_name}_spy_relative_20d"
+        strong_col = f"{normalized_name}_strong"
+        us_regime[return_col] = wide[theme_code].pct_change(lookback).to_numpy()
+        us_regime[relative_col] = (wide[theme_code] / wide[spy_code]).pct_change(lookback).to_numpy()
+        us_regime[strong_col] = us_regime[relative_col] >= theme_relative_threshold
+        theme_metric_cols.extend([return_col, relative_col])
+        theme_flag_cols.append(strong_col)
 
     aligned = _align_to_a_share_dates(us_regime, a_share_trade_dates)
-    flag_cols = ["us_risk_on", "us_tech_strong", "us_smallcap_strong", "vix_stress"]
+    flag_cols = ["us_risk_on", "us_tech_strong", "us_smallcap_strong", "vix_stress", *theme_flag_cols]
     for column in flag_cols:
         aligned[column] = aligned[column].fillna(False).astype(int)
     return aligned.loc[
@@ -230,6 +245,8 @@ def build_us_market_regime(
             "vix_return_20d",
             "qqq_spy_relative_20d",
             "iwm_spy_relative_20d",
+            *theme_flag_cols,
+            *theme_metric_cols,
         ],
     ].sort_values("trade_date").reset_index(drop=True)
 
@@ -263,6 +280,14 @@ def _build_close_wide(prices: pd.DataFrame) -> pd.DataFrame:
         .reset_index()
         .set_index("trade_date")
     )
+
+
+def _normalize_theme_name(name: str) -> str:
+    normalized = "".join(char.lower() if char.isalnum() else "_" for char in str(name).strip())
+    normalized = "_".join(part for part in normalized.split("_") if part)
+    if not normalized:
+        raise ValueError("theme name must contain at least one alphanumeric character.")
+    return normalized
 
 
 def _align_to_a_share_dates(us_regime: pd.DataFrame, a_share_trade_dates: list[str]) -> pd.DataFrame:

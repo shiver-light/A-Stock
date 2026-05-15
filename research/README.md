@@ -168,6 +168,19 @@ python3 scripts/build_us_market_regime.py \
   --vix-proxy-code VXX
 ```
 
+如果要研究更窄的美股主题强弱，例如半导体、科技、生物科技、创新成长，可以生成扩展列：
+
+```bash
+python3 scripts/build_us_market_regime.py \
+  --start-date 20230101 \
+  --end-date 20260331 \
+  --output research/us_market_regime.csv \
+  --theme-code semiconductor=SOXX \
+  --theme-code technology=XLK \
+  --theme-code biotech=XBI \
+  --theme-code innovation=ARKK
+```
+
 运行第一轮美股 regime 对 A 股选股的研究：
 
 ```bash
@@ -175,6 +188,15 @@ python3 -m research run \
   --config research/experiments_us_regime_a_share.yaml \
   --output-dir research_runs \
   --run-name us_regime_a_share
+```
+
+运行美股主题 regime 对 A 股选股的研究：
+
+```bash
+python3 -m research run \
+  --config research/experiments_us_theme_regime_a_share.yaml \
+  --output-dir research_runs \
+  --run-name us_theme_regime_a_share
 ```
 
 查看结果：

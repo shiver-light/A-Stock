@@ -89,6 +89,29 @@ class USMarketTestCase(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "missing required ts_code"):
             build_us_market_regime(prices, ["20240104"], lookback=1)
 
+    def test_build_us_market_regime_adds_theme_strength_columns(self) -> None:
+        prices = _prices(
+            {
+                "SPY": [100.0, 101.0, 102.0],
+                "QQQ": [100.0, 102.0, 103.0],
+                "IWM": [100.0, 100.0, 101.0],
+                "VXX": [100.0, 95.0, 93.0],
+                "SOXX": [100.0, 106.0, 110.0],
+            },
+            dates=["20240102", "20240103", "20240104"],
+        )
+
+        result = build_us_market_regime(
+            prices,
+            ["20240104", "20240105"],
+            lookback=1,
+            theme_codes={"semiconductor": "SOXX"},
+        )
+
+        self.assertIn("semiconductor_strong", result.columns)
+        self.assertIn("semiconductor_spy_relative_20d", result.columns)
+        self.assertEqual(result["semiconductor_strong"].tolist(), [1, 1])
+
 
 def _prices(values_by_code: dict[str, list[float]], *, dates: list[str]) -> pd.DataFrame:
     rows = []
