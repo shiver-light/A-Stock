@@ -1,0 +1,101 @@
+global:
+  # Recent-window zz1000 research:
+  # focus on 2025-01-01 to 2026-05-01 to evaluate whether the latest market
+  # regime supports the previously selected zz1000 structure factors.
+  # Benchmark is CSI1000 (000852.SH); external US theme filters, when present,
+  # read a CSV already aligned to A-share signal dates without same-date US
+  # close leakage.
+  start_date: "20250101"
+  end_date: "20260501"
+  benchmark_code: "000852.SH"
+  top_n: 50
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 800000.0
+
+experiments:
+  # Core zz1000 structure baselines.
+  - name: "z25_01_zz1000_structure_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "z25_02_zz1000_structure_top30"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "z25_03_zz1000_structure_top80"
+    universe_name: "zz1000"
+    top_n: 80
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  # Mild weight sensitivity around the prior stage6 winner.
+  - name: "z25_04_zz1000_close_high_bias_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.5
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+
+  - name: "z25_05_zz1000_no_distribution_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.35
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+      distribution_risk_20d_negative: 0.15
+
+  # Recent-window US theme filters. These are not sector universes; they only
+  # test whether US theme strength is useful as a risk/regime gate for zz1000.
+  - name: "z25_06_zz1000_structure_semiconductor_strong_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    external_regime_filter:
+      path: "research/us_market_regime.csv"
+      allowed_col: "semiconductor_strong"
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "z25_07_zz1000_structure_technology_strong_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    external_regime_filter:
+      path: "research/us_market_regime.csv"
+      allowed_col: "technology_strong"
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
+
+  - name: "z25_08_zz1000_structure_innovation_strong_top50"
+    universe_name: "zz1000"
+    top_n: 50
+    external_regime_filter:
+      path: "research/us_market_regime.csv"
+      allowed_col: "innovation_strong"
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.4
+      volatility_contraction_20d: 0.3
+      position_safety_60d: 0.3
