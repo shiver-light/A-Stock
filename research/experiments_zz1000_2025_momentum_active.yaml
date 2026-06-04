@@ -1,0 +1,121 @@
+global:
+  # Recent zz1000 momentum/active research.
+  # Window: 2025-01-01 to 2026-04-30.
+  # No external US regime filter is used in this file. The goal is to test
+  # whether stronger beta/momentum/activity exposure can reduce the large
+  # CSI1000-relative underperformance seen in the defensive structure models.
+  start_date: "20250101"
+  end_date: "20260430"
+  benchmark_code: "000852.SH"
+  top_n: 30
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 800000.0
+
+experiments:
+  # Reference from the prior recent-window run.
+  - name: "z25ma_01_structure_no_distribution_top50_amt800k"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      close_near_high_on_high_amount_20d: 0.35
+      volatility_contraction_20d: 0.25
+      position_safety_60d: 0.25
+      distribution_risk_20d_negative: 0.15
+
+  # Momentum and active-trading exposure.
+  - name: "z25ma_02_ret60_close_high_turnover_top30_amt800k"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      return_60d: 0.45
+      close_near_high_on_high_amount_20d: 0.35
+      turnover_mean_20d: 0.20
+
+  - name: "z25ma_03_ret120_ret60_close_high_top30_amt800k"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      return_120d: 0.40
+      return_60d: 0.25
+      close_near_high_on_high_amount_20d: 0.35
+
+  - name: "z25ma_04_ret60_liquidity_close_high_rev5_top30_amt800k"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      return_60d: 0.40
+      liquidity_improvement_20d: 0.25
+      close_near_high_on_high_amount_20d: 0.25
+      return_5d_negative: 0.10
+
+  - name: "z25ma_05_ret60_turnover_close_high_distribution_top30_amt800k"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      return_60d: 0.35
+      turnover_mean_20d: 0.25
+      close_near_high_on_high_amount_20d: 0.25
+      distribution_risk_20d_negative: 0.15
+
+  - name: "z25ma_06_ret20_ret60_amount_close_high_top30_amt800k"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      return_20d: 0.25
+      return_60d: 0.35
+      amount_mean_20d: 0.20
+      close_near_high_on_high_amount_20d: 0.20
+
+  - name: "z25ma_07_ret60_close_high_gap_risk_top30_amt800k"
+    universe_name: "zz1000"
+    top_n: 30
+    factor_config:
+      return_60d: 0.40
+      close_near_high_on_high_amount_20d: 0.40
+      gap_risk_20d_negative: 0.20
+
+  # Concentration and tradability checks around the most direct momentum/active model.
+  - name: "z25ma_08_ret60_close_high_turnover_top20_amt800k"
+    universe_name: "zz1000"
+    top_n: 20
+    factor_config:
+      return_60d: 0.45
+      close_near_high_on_high_amount_20d: 0.35
+      turnover_mean_20d: 0.20
+
+  - name: "z25ma_09_ret60_close_high_turnover_top50_amt800k"
+    universe_name: "zz1000"
+    top_n: 50
+    factor_config:
+      return_60d: 0.45
+      close_near_high_on_high_amount_20d: 0.35
+      turnover_mean_20d: 0.20
+
+  - name: "z25ma_10_ret60_close_high_turnover_top30_amt500k"
+    universe_name: "zz1000"
+    top_n: 30
+    backtest_config:
+      min_amount: 500000.0
+    factor_config:
+      return_60d: 0.45
+      close_near_high_on_high_amount_20d: 0.35
+      turnover_mean_20d: 0.20
+
+  - name: "z25ma_11_ret60_close_high_turnover_top30_amt300k"
+    universe_name: "zz1000"
+    top_n: 30
+    backtest_config:
+      min_amount: 300000.0
+    factor_config:
+      return_60d: 0.45
+      close_near_high_on_high_amount_20d: 0.35
+      turnover_mean_20d: 0.20
