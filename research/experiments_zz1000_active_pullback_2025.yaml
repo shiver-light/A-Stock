@@ -1,0 +1,176 @@
+global:
+  # Active pullback research for zz1000.
+  # Window: 2025-01-01 to 2026-04-30.
+  # This is a short-term active-stock pullback idea, but the current backtest
+  # engine still uses the repository's existing monthly rebalance schedule.
+  # Signal filters first define the active pool; factor_config then ranks
+  # pullback/support quality within that active pool.
+  start_date: "20250101"
+  end_date: "20260430"
+  benchmark_code: "000852.SH"
+  top_n: 30
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 300000.0
+
+experiments:
+  # Baseline: active 20-day winners with high turnover, then buy short-term pullback with support.
+  - name: "z25ap_01_active_ret20_turnover_pullback_top30_amt300k"
+    universe_name: "zz1000"
+    top_n: 30
+    signal_filters:
+      - factor: "return_20d"
+        op: "quantile_gte"
+        value: 0.70
+      - factor: "turnover_mean_20d"
+        op: "quantile_gte"
+        value: 0.70
+    factor_config:
+      pullback_after_trend_60d: 0.45
+      return_5d_negative: 0.25
+      down_day_absorption_20d: 0.20
+      close_to_high_20d: 0.10
+
+  - name: "z25ap_02_active_ret20_strict_turnover_pullback_top30_amt300k"
+    universe_name: "zz1000"
+    top_n: 30
+    signal_filters:
+      - factor: "return_20d"
+        op: "quantile_gte"
+        value: 0.80
+      - factor: "turnover_mean_20d"
+        op: "quantile_gte"
+        value: 0.70
+    factor_config:
+      pullback_after_trend_60d: 0.45
+      return_5d_negative: 0.25
+      down_day_absorption_20d: 0.20
+      close_to_high_20d: 0.10
+
+  - name: "z25ap_03_active_ret20_turnover_amount_pullback_top30_amt300k"
+    universe_name: "zz1000"
+    top_n: 30
+    signal_filters:
+      - factor: "return_20d"
+        op: "quantile_gte"
+        value: 0.70
+      - factor: "turnover_mean_20d"
+        op: "quantile_gte"
+        value: 0.70
+      - factor: "amount_mean_20d"
+        op: "quantile_gte"
+        value: 0.60
+    factor_config:
+      pullback_after_trend_60d: 0.45
+      return_5d_negative: 0.25
+      down_day_absorption_20d: 0.20
+      close_to_high_20d: 0.10
+
+  - name: "z25ap_04_active_ret20_money_flow_pullback_top30_amt300k"
+    universe_name: "zz1000"
+    top_n: 30
+    signal_filters:
+      - factor: "return_20d"
+        op: "quantile_gte"
+        value: 0.70
+      - factor: "money_flow_strength_20d"
+        op: "quantile_gte"
+        value: 0.60
+    factor_config:
+      pullback_after_trend_60d: 0.40
+      return_5d_negative: 0.25
+      down_day_absorption_20d: 0.20
+      close_to_high_20d: 0.15
+
+  # Accumulation-style variants inside the active pool.
+  - name: "z25ap_05_active_stealth_accumulation_pullback_top30_amt300k"
+    universe_name: "zz1000"
+    top_n: 30
+    signal_filters:
+      - factor: "return_20d"
+        op: "quantile_gte"
+        value: 0.70
+      - factor: "turnover_mean_20d"
+        op: "quantile_gte"
+        value: 0.70
+    factor_config:
+      high_turnover_low_range_20d: 0.30
+      small_body_high_turnover_20d: 0.25
+      return_5d_negative: 0.20
+      down_day_absorption_20d: 0.15
+      close_to_high_20d: 0.10
+
+  - name: "z25ap_06_active_pullback_near_high_top30_amt300k"
+    universe_name: "zz1000"
+    top_n: 30
+    signal_filters:
+      - factor: "return_20d"
+        op: "quantile_gte"
+        value: 0.70
+      - factor: "turnover_mean_20d"
+        op: "quantile_gte"
+        value: 0.70
+    factor_config:
+      return_5d_negative: 0.35
+      close_to_high_20d: 0.30
+      down_day_support_20d: 0.20
+      gap_risk_20d_negative: 0.15
+
+  # Concentration and tradability checks.
+  - name: "z25ap_07_active_ret20_turnover_pullback_top20_amt300k"
+    universe_name: "zz1000"
+    top_n: 20
+    signal_filters:
+      - factor: "return_20d"
+        op: "quantile_gte"
+        value: 0.70
+      - factor: "turnover_mean_20d"
+        op: "quantile_gte"
+        value: 0.70
+    factor_config:
+      pullback_after_trend_60d: 0.45
+      return_5d_negative: 0.25
+      down_day_absorption_20d: 0.20
+      close_to_high_20d: 0.10
+
+  - name: "z25ap_08_active_ret20_turnover_pullback_top50_amt300k"
+    universe_name: "zz1000"
+    top_n: 50
+    signal_filters:
+      - factor: "return_20d"
+        op: "quantile_gte"
+        value: 0.70
+      - factor: "turnover_mean_20d"
+        op: "quantile_gte"
+        value: 0.70
+    factor_config:
+      pullback_after_trend_60d: 0.45
+      return_5d_negative: 0.25
+      down_day_absorption_20d: 0.20
+      close_to_high_20d: 0.10
+
+  - name: "z25ap_09_active_ret20_turnover_pullback_top30_amt500k"
+    universe_name: "zz1000"
+    top_n: 30
+    backtest_config:
+      min_amount: 500000.0
+    signal_filters:
+      - factor: "return_20d"
+        op: "quantile_gte"
+        value: 0.70
+      - factor: "turnover_mean_20d"
+        op: "quantile_gte"
+        value: 0.70
+    factor_config:
+      pullback_after_trend_60d: 0.45
+      return_5d_negative: 0.25
+      down_day_absorption_20d: 0.20
+      close_to_high_20d: 0.10
