@@ -8,10 +8,12 @@ import json
 from research import (
     archive_consensus_recommendation_csv,
     archive_daily_consensus_recommendations,
+    generate_active_pullback_recommendations,
     generate_daily_consensus_recommendations,
     generate_daily_recommendations_from_run,
     load_research_config,
     rebuild_summary_from_disk,
+    render_active_pullback_text,
     render_consensus_recommendation_text,
     render_recommendation_text,
     run_experiments,
@@ -55,6 +57,46 @@ def build_parser() -> argparse.ArgumentParser:
     recommend_parser.add_argument("--top-k-models", type=int, default=5, help="Maximum number of stable models to reuse.")
     recommend_parser.add_argument("--top-k-stocks", type=int, default=20, help="Maximum number of consensus recommendations.")
     recommend_parser.add_argument(
+        "--output",
+        choices=["text", "json"],
+        default="text",
+        help="Output text report or JSON payload.",
+    )
+
+    active_pullback_parser = subparsers.add_parser(
+        "active-pullback",
+        help="Find active recent winners that are in short-term pullback.",
+    )
+    active_pullback_parser.add_argument("--as-of-date", required=True, help="Signal end date in YYYYMMDD format.")
+    active_pullback_parser.add_argument("--start-date", default=None, help="Optional data start date in YYYYMMDD format.")
+    active_pullback_parser.add_argument("--universe-name", default="zz1000", help="Universe name, e.g. zz1000.")
+    active_pullback_parser.add_argument("--benchmark-code", default="000852.SH", help="Benchmark index code.")
+    active_pullback_parser.add_argument("--top-n", type=int, default=30, help="Number of selected candidates.")
+    active_pullback_parser.add_argument(
+        "--return-quantile",
+        type=float,
+        default=0.70,
+        help="Minimum same-date quantile for return_20d active-pool filter.",
+    )
+    active_pullback_parser.add_argument(
+        "--turnover-quantile",
+        type=float,
+        default=0.70,
+        help="Minimum same-date quantile for turnover_mean_20d active-pool filter.",
+    )
+    active_pullback_parser.add_argument(
+        "--amount-quantile",
+        type=float,
+        default=None,
+        help="Optional minimum same-date quantile for amount_mean_20d.",
+    )
+    active_pullback_parser.add_argument(
+        "--money-flow-quantile",
+        type=float,
+        default=None,
+        help="Optional minimum same-date quantile for money_flow_strength_20d.",
+    )
+    active_pullback_parser.add_argument(
         "--output",
         choices=["text", "json"],
         default="text",
@@ -161,6 +203,22 @@ def main() -> int:
             print(json.dumps(recommendation, ensure_ascii=False, indent=2, default=str))
         else:
             print(render_recommendation_text(recommendation))
+    elif args.command == "active-pullback":
+        recommendation = generate_active_pullback_recommendations(
+            as_of_date=args.as_of_date,
+            start_date=args.start_date,
+            universe_name=args.universe_name,
+            top_n=args.top_n,
+            benchmark_code=args.benchmark_code,
+            return_quantile=args.return_quantile,
+            turnover_quantile=args.turnover_quantile,
+            amount_quantile=args.amount_quantile,
+            money_flow_quantile=args.money_flow_quantile,
+        )
+        if args.output == "json":
+            print(json.dumps(recommendation, ensure_ascii=False, indent=2, default=str))
+        else:
+            print(render_active_pullback_text(recommendation))
     elif args.command == "recommend-consensus":
         recommendation = generate_daily_consensus_recommendations(
             args.run_dir,

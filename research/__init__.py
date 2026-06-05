@@ -8,6 +8,11 @@ from .daily_archive import (
     default_archive_dir,
     resolve_next_trading_day,
 )
+from .active_pullback import (
+    build_active_pullback_signal_filters,
+    generate_active_pullback_recommendations,
+    render_active_pullback_text,
+)
 from .recommend import (
     build_daily_consensus_output,
     build_recommendation_consensus,
@@ -29,6 +34,9 @@ __all__ = [
     "archive_daily_consensus_recommendations",
     "default_archive_dir",
     "resolve_next_trading_day",
+    "build_active_pullback_signal_filters",
+    "generate_active_pullback_recommendations",
+    "render_active_pullback_text",
     "load_completed_experiment_results",
     "select_recommendation_models",
     "build_daily_consensus_output",
