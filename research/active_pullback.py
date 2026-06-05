@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from pipeline import run_recommendation_pipeline
+from universe import get_universe
 
 
 DEFAULT_ACTIVE_PULLBACK_FACTOR_CONFIG = {
@@ -13,6 +14,8 @@ DEFAULT_ACTIVE_PULLBACK_FACTOR_CONFIG = {
     "down_day_absorption_20d": 0.20,
     "close_to_high_20d": 0.10,
 }
+
+CHINEXT_PREFIXES = ("300", "301")
 
 
 def build_active_pullback_signal_filters(
@@ -51,6 +54,7 @@ def generate_active_pullback_recommendations(
     amount_quantile: float | None = None,
     money_flow_quantile: float | None = None,
     factor_config: dict[str, float] | None = None,
+    exclude_chinext: bool = False,
 ) -> dict[str, object]:
     """Generate active recent-winner pullback candidates using the daily recommendation path.
 
@@ -71,8 +75,13 @@ def generate_active_pullback_recommendations(
         money_flow_quantile=money_flow_quantile,
     )
     factor_config = factor_config or DEFAULT_ACTIVE_PULLBACK_FACTOR_CONFIG
+    ts_codes = None
+    if exclude_chinext:
+        universe = get_universe(universe_name, as_of_date=as_of_date)
+        ts_codes = _exclude_chinext_codes(universe["ts_code"].astype(str).tolist())
 
     pipeline_result = run_recommendation_pipeline(
+        ts_codes=ts_codes,
         universe_name=universe_name,
         start_date=start_date,
         end_date=as_of_date,
@@ -90,6 +99,8 @@ def generate_active_pullback_recommendations(
         "top_n": top_n,
         "signal_filters": signal_filters,
         "factor_config": factor_config,
+        "exclude_chinext": exclude_chinext,
+        "ts_code_count": len(ts_codes) if ts_codes is not None else None,
     }
     return {
         "as_of_date": as_of_date,
@@ -99,6 +110,8 @@ def generate_active_pullback_recommendations(
         "top_n": top_n,
         "signal_filters": signal_filters,
         "factor_config": factor_config,
+        "exclude_chinext": exclude_chinext,
+        "ts_code_count": len(ts_codes) if ts_codes is not None else None,
         "research_experiment": research_experiment,
         "latest_selection": latest_selection,
         "top_stocks": latest_selection.get("top_stocks", []),
@@ -112,6 +125,7 @@ def render_active_pullback_text(report: dict[str, object]) -> str:
         "active pullback candidates:",
         f"universe={report.get('universe_name')} benchmark={report.get('benchmark_code')}",
         f"as_of_date={report.get('as_of_date')} start_date={report.get('start_date')} top_n={report.get('top_n')}",
+        f"exclude_chinext={report.get('exclude_chinext', False)} ts_code_count={report.get('ts_code_count')}",
         "",
         "active pool filters:",
     ]
@@ -158,3 +172,7 @@ def _validate_quantile(value: float, name: str) -> None:
 def _calendar_days_before(date: str, days: int) -> str:
     timestamp = datetime.strptime(date, "%Y%m%d") - timedelta(days=days)
     return timestamp.strftime("%Y%m%d")
+
+
+def _exclude_chinext_codes(ts_codes: list[str]) -> list[str]:
+    return sorted(code for code in set(ts_codes) if not code.startswith(CHINEXT_PREFIXES))

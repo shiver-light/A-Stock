@@ -3,8 +3,11 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
+import pandas as pd
+
 from research.active_pullback import (
     DEFAULT_ACTIVE_PULLBACK_FACTOR_CONFIG,
+    _exclude_chinext_codes,
     build_active_pullback_signal_filters,
     generate_active_pullback_recommendations,
     render_active_pullback_text,
@@ -33,6 +36,11 @@ class ActivePullbackTestCase(unittest.TestCase):
     def test_build_active_pullback_signal_filters_rejects_invalid_quantile(self) -> None:
         with self.assertRaisesRegex(ValueError, "return_quantile"):
             build_active_pullback_signal_filters(return_quantile=1.2)
+
+    def test_exclude_chinext_codes_removes_300_and_301_prefixes(self) -> None:
+        result = _exclude_chinext_codes(["300001.SZ", "301001.SZ", "002001.SZ", "688001.SH", "600001.SH"])
+
+        self.assertEqual(result, ["002001.SZ", "600001.SH", "688001.SH"])
 
     @patch("research.active_pullback.run_recommendation_pipeline")
     def test_generate_active_pullback_recommendations_reuses_recommendation_pipeline(self, mock_pipeline) -> None:
@@ -63,6 +71,32 @@ class ActivePullbackTestCase(unittest.TestCase):
         self.assertIn({"factor": "amount_mean_20d", "op": "quantile_gte", "value": 0.60}, kwargs["signal_filters"])
         self.assertEqual(result["top_stocks"][0]["ts_code"], "000001.SZ")
         self.assertEqual(result["research_experiment"]["signal_filters"], kwargs["signal_filters"])
+
+    @patch("research.active_pullback.get_universe")
+    @patch("research.active_pullback.run_recommendation_pipeline")
+    def test_generate_active_pullback_recommendations_can_exclude_chinext(self, mock_pipeline, mock_get_universe) -> None:
+        mock_get_universe.return_value = pd.DataFrame(
+            {
+                "as_of_date": ["20260430"] * 4,
+                "ts_code": ["300001.SZ", "301001.SZ", "002001.SZ", "688001.SH"],
+                "universe_name": ["zz1000"] * 4,
+                "in_universe": [True] * 4,
+            }
+        )
+        mock_pipeline.return_value = {"latest_selection": {"top_stocks": []}}
+
+        result = generate_active_pullback_recommendations(
+            as_of_date="20260430",
+            start_date="20250101",
+            universe_name="zz1000",
+            exclude_chinext=True,
+        )
+
+        _, kwargs = mock_pipeline.call_args
+        self.assertEqual(kwargs["ts_codes"], ["002001.SZ", "688001.SH"])
+        self.assertTrue(result["exclude_chinext"])
+        self.assertEqual(result["ts_code_count"], 2)
+        self.assertEqual(result["research_experiment"]["ts_code_count"], 2)
 
     @patch("research.active_pullback.run_recommendation_pipeline")
     def test_generate_active_pullback_recommendations_defaults_start_date(self, mock_pipeline) -> None:

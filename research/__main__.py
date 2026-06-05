@@ -97,6 +97,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional minimum same-date quantile for money_flow_strength_20d.",
     )
     active_pullback_parser.add_argument(
+        "--exclude-chinext",
+        action="store_true",
+        help="Exclude ChiNext stocks, identified by 300/301 ts_code prefixes, before factor calculation.",
+    )
+    active_pullback_parser.add_argument(
         "--output",
         choices=["text", "json"],
         default="text",
@@ -214,6 +219,7 @@ def main() -> int:
             turnover_quantile=args.turnover_quantile,
             amount_quantile=args.amount_quantile,
             money_flow_quantile=args.money_flow_quantile,
+            exclude_chinext=args.exclude_chinext,
         )
         if args.output == "json":
             print(json.dumps(recommendation, ensure_ascii=False, indent=2, default=str))
