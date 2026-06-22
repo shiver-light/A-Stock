@@ -10,8 +10,12 @@ import yaml
 
 from research.theme_research import (
     build_and_write_technology_theme_research,
+    build_and_write_taxonomy_theme_research,
     build_technology_theme_research_config,
+    build_theme_pool_from_tags,
     build_theme_stock_pool,
+    build_theme_tags,
+    filter_theme_tags,
     intersect_theme_with_universe,
 )
 
@@ -58,6 +62,69 @@ class ThemeResearchTestCase(unittest.TestCase):
 
         self.assertEqual(result["universe_name"].tolist(), ["zz500"])
         self.assertEqual(result["ts_code"].tolist(), ["000002.SZ"])
+
+    def test_build_theme_tags_outputs_json_friendly_tag_rows(self) -> None:
+        stock_basic = pd.DataFrame(
+            {
+                "ts_code": ["000001.SZ", "000002.SZ"],
+                "name": ["光模块A", "银行B"],
+                "industry": ["通信设备", "银行"],
+                "market": ["主板", "主板"],
+                "exchange": ["SZSE", "SZSE"],
+                "list_date": ["20200101", "20200101"],
+                "delist_date": ["", ""],
+            }
+        )
+        taxonomy = {
+            "themes": [
+                {
+                    "name": "AI算力",
+                    "sub_themes": [
+                        {
+                            "name": "CPO/光模块",
+                            "confidence": 0.8,
+                            "industry_keywords": ["通信设备"],
+                            "name_keywords": ["光模块"],
+                        }
+                    ],
+                }
+            ]
+        }
+
+        result = build_theme_tags(stock_basic, taxonomy, as_of_date="20250101")
+
+        self.assertEqual(result["ts_code"].tolist(), ["000001.SZ"])
+        self.assertEqual(result.iloc[0]["theme"], "AI算力")
+        self.assertEqual(result.iloc[0]["sub_theme"], "CPO/光模块")
+        self.assertEqual(result.iloc[0]["source"], "stock_basic_keyword")
+        self.assertIn("industry:通信设备", result.iloc[0]["evidence"])
+        self.assertIn("name:光模块", result.iloc[0]["evidence"])
+
+    def test_filter_theme_tags_and_build_pool(self) -> None:
+        tags = pd.DataFrame(
+            {
+                "as_of_date": ["20250101", "20250101", "20250101"],
+                "ts_code": ["000001.SZ", "000001.SZ", "000002.SZ"],
+                "name": ["A", "A", "B"],
+                "industry": ["通信设备", "通信设备", "银行"],
+                "market": ["主板", "主板", "主板"],
+                "exchange": ["SZSE", "SZSE", "SZSE"],
+                "theme": ["AI算力", "AI算力", "金融"],
+                "sub_theme": ["CPO/光模块", "PCB/服务器/高速连接", "银行"],
+                "source": ["stock_basic_keyword"] * 3,
+                "confidence": [0.8, 0.7, 0.9],
+                "evidence": ["industry:通信设备", "industry:通信设备", "industry:银行"],
+                "valid_from": ["20250101"] * 3,
+                "valid_to": [""] * 3,
+            }
+        )
+
+        filtered = filter_theme_tags(tags, themes=["AI算力"], min_confidence=0.75)
+        pool = build_theme_pool_from_tags(filtered)
+
+        self.assertEqual(filtered["sub_theme"].tolist(), ["CPO/光模块"])
+        self.assertEqual(pool["ts_code"].tolist(), ["000001.SZ"])
+        self.assertEqual(pool.iloc[0]["match_reason"], "CPO/光模块")
 
     def test_build_technology_theme_research_config_uses_static_ts_codes(self) -> None:
         config = build_technology_theme_research_config(
@@ -116,6 +183,87 @@ class ThemeResearchTestCase(unittest.TestCase):
             self.assertEqual(len(config["experiments"]), 18)
             pool = pd.read_csv(pool_path)
             self.assertEqual(set(pool["ts_code"].astype(str)), {"000001.SZ", "000003.SZ"})
+
+    @patch("research.theme_research.get_universe")
+    @patch("research.theme_research.get_stock_basic_history")
+    def test_build_and_write_taxonomy_theme_research_writes_tags_pool_and_config(
+        self,
+        mock_stock_basic,
+        mock_get_universe,
+    ) -> None:
+        mock_stock_basic.return_value = pd.DataFrame(
+            {
+                "ts_code": ["000001.SZ", "000002.SZ", "000003.SZ"],
+                "name": ["光模块A", "银行B", "芯片C"],
+                "industry": ["通信设备", "银行", "半导体"],
+                "market": ["主板", "主板", "主板"],
+                "exchange": ["SZSE", "SZSE", "SZSE"],
+                "list_date": ["20200101", "20200101", "20200101"],
+                "delist_date": ["", "", ""],
+            }
+        )
+        mock_get_universe.side_effect = [
+            pd.DataFrame({"ts_code": ["000001.SZ", "000002.SZ"]}),
+            pd.DataFrame({"ts_code": ["000003.SZ"]}),
+        ]
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            taxonomy_path = Path(tmp_dir) / "taxonomy.yaml"
+            taxonomy_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "themes": [
+                            {
+                                "name": "AI算力",
+                                "sub_themes": [
+                                    {
+                                        "name": "CPO/光模块",
+                                        "confidence": 0.8,
+                                        "industry_keywords": ["通信设备"],
+                                        "name_keywords": ["光模块"],
+                                    }
+                                ],
+                            },
+                            {
+                                "name": "半导体国产替代",
+                                "sub_themes": [
+                                    {
+                                        "name": "芯片设计/功率半导体",
+                                        "confidence": 0.8,
+                                        "industry_keywords": ["半导体"],
+                                        "name_keywords": ["芯片"],
+                                    }
+                                ],
+                            },
+                        ]
+                    },
+                    allow_unicode=True,
+                    sort_keys=False,
+                ),
+                encoding="utf-8",
+            )
+
+            config_path = Path(tmp_dir) / "theme.yaml"
+            pool_path = Path(tmp_dir) / "pool.csv"
+            tags_path = Path(tmp_dir) / "tags.csv"
+            result = build_and_write_taxonomy_theme_research(
+                taxonomy_path=taxonomy_path,
+                start_date="20250101",
+                end_date="20260608",
+                output_config_path=config_path,
+                output_pool_path=pool_path,
+                output_tags_path=tags_path,
+                themes=["AI算力"],
+                min_confidence=0.7,
+            )
+
+            self.assertEqual(result["tag_count"], 1)
+            self.assertEqual(result["pool_counts"], {"hs300": 1, "zz500": 0})
+            tags = pd.read_csv(tags_path)
+            self.assertEqual(tags["theme"].tolist(), ["AI算力"])
+            config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+            self.assertEqual(config["global"]["selected_themes"], ["AI算力"])
+            self.assertEqual(config["global"]["theme_tags_csv"], str(tags_path))
 
 
 if __name__ == "__main__":

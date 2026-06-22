@@ -1,0 +1,88 @@
+# Technology and advanced-manufacturing theme taxonomy.
+#
+# This file is intentionally a research taxonomy, not a claim of exact concept
+# membership. The first implementation tags stocks from local stock_basic
+# industry/name fields. Concept-constituent or web evidence can later be added
+# as stronger sources with higher confidence.
+
+themes:
+  - name: "AI算力"
+    sub_themes:
+      - name: "CPO/光模块"
+        confidence: 0.75
+        industry_keywords: ["通信设备", "元器件"]
+        name_keywords: ["光模块", "CPO", "光迅", "新易盛", "中际", "天孚", "源杰", "光库"]
+      - name: "PCB/服务器/高速连接"
+        confidence: 0.70
+        industry_keywords: ["元器件", "IT设备", "通信设备"]
+        name_keywords: ["PCB", "电路", "沪电", "深南", "胜宏", "鹏鼎", "服务器", "浪潮", "连接"]
+      - name: "液冷/电源/数据中心"
+        confidence: 0.65
+        industry_keywords: ["电气设备", "电器仪表", "通信设备", "IT设备"]
+        name_keywords: ["液冷", "电源", "数据", "机柜", "温控", "曙光", "科华", "英维克"]
+      - name: "云计算/AI应用"
+        confidence: 0.65
+        industry_keywords: ["软件服务", "互联网", "IT设备"]
+        name_keywords: ["云", "智能", "AI", "科大讯飞", "金山", "用友", "浪潮"]
+
+  - name: "半导体国产替代"
+    sub_themes:
+      - name: "半导体设备/材料"
+        confidence: 0.75
+        industry_keywords: ["半导体", "化工原料", "专用机械"]
+        name_keywords: ["北方华创", "中微", "华海", "晶瑞", "雅克", "鼎龙", "芯源"]
+      - name: "芯片设计/功率半导体"
+        confidence: 0.75
+        industry_keywords: ["半导体", "元器件"]
+        name_keywords: ["芯", "微", "晶", "韦尔", "兆易", "国微", "思瑞浦", "澜起"]
+      - name: "存储/HBM/先进封装"
+        confidence: 0.70
+        industry_keywords: ["半导体", "IT设备", "元器件"]
+        name_keywords: ["存储", "封装", "长电", "通富", "华天", "佰维", "深科技"]
+
+  - name: "机器人/具身智能"
+    sub_themes:
+      - name: "机器人本体/工业自动化"
+        confidence: 0.70
+        industry_keywords: ["专用机械", "电器仪表", "机械基件", "机床制造"]
+        name_keywords: ["机器人", "埃斯顿", "汇川", "绿的", "鸣志", "拓斯达"]
+      - name: "传感器/执行器/机器视觉"
+        confidence: 0.65
+        industry_keywords: ["电器仪表", "元器件", "IT设备", "软件服务"]
+        name_keywords: ["传感", "视觉", "伺服", "减速", "丝杠", "奥普特", "柯力"]
+
+  - name: "低空经济"
+    sub_themes:
+      - name: "无人机/eVTOL/航空电子"
+        confidence: 0.65
+        industry_keywords: ["航空", "通信设备", "运输设备", "元器件"]
+        name_keywords: ["无人机", "航", "飞", "雷达", "北斗", "导航", "纵横"]
+      - name: "低空通信/导航/空管"
+        confidence: 0.60
+        industry_keywords: ["通信设备", "软件服务", "IT设备"]
+        name_keywords: ["空管", "北斗", "导航", "通信", "雷达", "星"]
+
+  - name: "端侧AI"
+    sub_themes:
+      - name: "AI手机/AI PC/智能眼镜"
+        confidence: 0.65
+        industry_keywords: ["元器件", "IT设备", "家用电器", "通信设备"]
+        name_keywords: ["消费电子", "眼镜", "光学", "立讯", "歌尔", "蓝思", "水晶"]
+      - name: "端侧芯片/传感器"
+        confidence: 0.65
+        industry_keywords: ["半导体", "元器件", "电器仪表"]
+        name_keywords: ["NPU", "SoC", "传感", "芯片", "韦尔", "思特威"]
+
+  - name: "卫星互联网/商业航天/6G"
+    sub_themes:
+      - name: "卫星通信/北斗/射频"
+        confidence: 0.65
+        industry_keywords: ["通信设备", "航空", "元器件", "软件服务"]
+        name_keywords: ["卫星", "北斗", "射频", "导航", "天线", "海格", "华测"]
+
+  - name: "未来硬科技"
+    sub_themes:
+      - name: "量子/新材料/可控核聚变"
+        confidence: 0.55
+        industry_keywords: ["半导体", "矿物制品", "化工原料", "小金属", "电气设备"]
+        name_keywords: ["量子", "超导", "核", "材料", "碳纤维", "陶瓷"]

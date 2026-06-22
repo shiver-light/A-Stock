@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Iterable
 
 import pandas as pd
+import yaml
 
 from data import INDEX_CODE_MAP, get_stock_basic_history
 from research.storage import write_yaml
@@ -45,6 +46,22 @@ DEFAULT_TECH_BACKTEST_CONFIG = {
     "min_amount": 500000.0,
 }
 
+THEME_TAG_COLUMNS = [
+    "as_of_date",
+    "ts_code",
+    "name",
+    "industry",
+    "market",
+    "exchange",
+    "theme",
+    "sub_theme",
+    "source",
+    "confidence",
+    "evidence",
+    "valid_from",
+    "valid_to",
+]
+
 
 def build_theme_stock_pool(
     stock_basic: pd.DataFrame,
@@ -81,6 +98,113 @@ def build_theme_stock_pool(
     )
     result = active.loc[active["match_reason"].ne(""), ["ts_code", "name", "industry", "market", "exchange", "match_reason"]]
     return result.sort_values("ts_code").drop_duplicates(subset=["ts_code"], keep="last").reset_index(drop=True)
+
+
+def load_theme_taxonomy(path: str | Path) -> dict[str, object]:
+    """Load a theme taxonomy YAML file."""
+
+    with Path(path).open("r", encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle) or {}
+    themes = payload.get("themes")
+    if not isinstance(themes, list):
+        raise ValueError("Theme taxonomy must contain a 'themes' list.")
+    return payload
+
+
+def build_theme_tags(
+    stock_basic: pd.DataFrame,
+    taxonomy: dict[str, object],
+    *,
+    as_of_date: str,
+    source: str = "stock_basic_keyword",
+) -> pd.DataFrame:
+    """Tag active stocks with theme/sub-theme labels from a taxonomy."""
+
+    if stock_basic.empty:
+        return pd.DataFrame(columns=THEME_TAG_COLUMNS)
+
+    data = _normalize_stock_basic_for_theme(stock_basic, as_of_date)
+    rows: list[dict[str, object]] = []
+    for _, stock in data.iterrows():
+        for theme in taxonomy.get("themes", []):
+            theme_name = str(theme.get("name", "")).strip()
+            for sub_theme in theme.get("sub_themes", []) or []:
+                sub_theme_name = str(sub_theme.get("name", "")).strip()
+                evidence = _match_taxonomy_rule(
+                    name=str(stock["name"]),
+                    industry=str(stock["industry"]),
+                    industry_keywords=tuple(sub_theme.get("industry_keywords", []) or []),
+                    name_keywords=tuple(sub_theme.get("name_keywords", []) or []),
+                )
+                if not theme_name or not sub_theme_name or not evidence:
+                    continue
+                rows.append(
+                    {
+                        "as_of_date": as_of_date,
+                        "ts_code": stock["ts_code"],
+                        "name": stock["name"],
+                        "industry": stock["industry"],
+                        "market": stock["market"],
+                        "exchange": stock["exchange"],
+                        "theme": theme_name,
+                        "sub_theme": sub_theme_name,
+                        "source": source,
+                        "confidence": float(sub_theme.get("confidence", 0.5)),
+                        "evidence": ";".join(evidence),
+                        "valid_from": as_of_date,
+                        "valid_to": "",
+                    }
+                )
+
+    if not rows:
+        return pd.DataFrame(columns=THEME_TAG_COLUMNS)
+    return (
+        pd.DataFrame(rows)
+        .loc[:, THEME_TAG_COLUMNS]
+        .sort_values(["theme", "sub_theme", "ts_code"])
+        .drop_duplicates(subset=["as_of_date", "ts_code", "theme", "sub_theme", "source"], keep="last")
+        .reset_index(drop=True)
+    )
+
+
+def filter_theme_tags(
+    tags: pd.DataFrame,
+    *,
+    themes: Iterable[str] | None = None,
+    sub_themes: Iterable[str] | None = None,
+    min_confidence: float = 0.0,
+) -> pd.DataFrame:
+    """Filter theme tags by theme, sub-theme, and confidence."""
+
+    if tags.empty:
+        return pd.DataFrame(columns=THEME_TAG_COLUMNS)
+    result = tags.copy()
+    if themes:
+        result = result.loc[result["theme"].isin(set(themes))]
+    if sub_themes:
+        result = result.loc[result["sub_theme"].isin(set(sub_themes))]
+    result = result.loc[pd.to_numeric(result["confidence"], errors="coerce").fillna(0.0) >= float(min_confidence)]
+    return result.sort_values(["theme", "sub_theme", "ts_code"]).reset_index(drop=True)
+
+
+def build_theme_pool_from_tags(tags: pd.DataFrame) -> pd.DataFrame:
+    """Collapse tag rows into one stock-level theme pool with evidence summaries."""
+
+    if tags.empty:
+        return pd.DataFrame(columns=["ts_code", "name", "industry", "market", "exchange", "match_reason"])
+
+    grouped = (
+        tags.groupby("ts_code", sort=True)
+        .agg(
+            name=("name", "last"),
+            industry=("industry", "last"),
+            market=("market", "last"),
+            exchange=("exchange", "last"),
+            match_reason=("sub_theme", lambda values: ";".join(sorted(set(map(str, values))))),
+        )
+        .reset_index()
+    )
+    return grouped.loc[:, ["ts_code", "name", "industry", "market", "exchange", "match_reason"]]
 
 
 def intersect_theme_with_universe(theme_pool: pd.DataFrame, universe: pd.DataFrame, universe_name: str) -> pd.DataFrame:
@@ -195,6 +319,83 @@ def build_and_write_technology_theme_research(
     }
 
 
+def build_and_write_taxonomy_theme_research(
+    *,
+    taxonomy_path: str | Path,
+    start_date: str,
+    end_date: str,
+    output_config_path: str | Path,
+    output_pool_path: str | Path,
+    output_tags_path: str | Path,
+    universe_names: tuple[str, ...] = ("hs300", "zz500"),
+    themes: Iterable[str] | None = None,
+    sub_themes: Iterable[str] | None = None,
+    min_confidence: float = 0.6,
+    tag_as_of_date: str | None = None,
+    pool_as_of_date: str | None = None,
+    refresh: bool = False,
+) -> dict[str, object]:
+    """Build theme tags, stock pools, and research YAML from a taxonomy."""
+
+    tag_as_of_date = tag_as_of_date or start_date
+    pool_as_of_date = pool_as_of_date or start_date
+    taxonomy = load_theme_taxonomy(taxonomy_path)
+    stock_basic = get_stock_basic_history(refresh=refresh)
+    tags = build_theme_tags(stock_basic, taxonomy, as_of_date=tag_as_of_date)
+    filtered_tags = filter_theme_tags(tags, themes=themes, sub_themes=sub_themes, min_confidence=min_confidence)
+
+    tags_path = Path(output_tags_path)
+    tags_path.parent.mkdir(parents=True, exist_ok=True)
+    filtered_tags.to_csv(tags_path, index=False)
+
+    theme_pool = build_theme_pool_from_tags(filtered_tags)
+    pool_frames: list[pd.DataFrame] = []
+    pools_by_universe: dict[str, list[str]] = {}
+    for universe_name in universe_names:
+        universe = get_universe(universe_name, as_of_date=pool_as_of_date, refresh=refresh)
+        pool = intersect_theme_with_universe(theme_pool, universe, universe_name)
+        pool_frames.append(pool)
+        pools_by_universe[universe_name] = pool["ts_code"].astype(str).tolist()
+
+    pool_output = (
+        pd.concat(pool_frames, ignore_index=True)
+        if pool_frames
+        else pd.DataFrame(columns=["universe_name", "ts_code", "name", "industry", "market", "exchange", "match_reason"])
+    )
+    pool_output.insert(0, "pool_as_of_date", pool_as_of_date)
+    pool_output.insert(0, "tag_as_of_date", tag_as_of_date)
+    pool_path = Path(output_pool_path)
+    pool_path.parent.mkdir(parents=True, exist_ok=True)
+    pool_output.to_csv(pool_path, index=False)
+
+    config = build_technology_theme_research_config(
+        pools_by_universe=pools_by_universe,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    config["global"]["pool_as_of_date"] = pool_as_of_date
+    config["global"]["tag_as_of_date"] = tag_as_of_date
+    config["global"]["theme_taxonomy"] = str(taxonomy_path)
+    config["global"]["theme_tags_csv"] = str(tags_path)
+    config["global"]["theme_pool_csv"] = str(pool_path)
+    config["global"]["selected_themes"] = sorted(set(themes or []))
+    config["global"]["selected_sub_themes"] = sorted(set(sub_themes or []))
+    config["global"]["min_theme_confidence"] = float(min_confidence)
+    config["global"]["research_notes"].insert(
+        0,
+        "Theme labels are taxonomy keyword tags from local stock_basic fields; they are weaker than verified concept constituents.",
+    )
+    write_yaml(output_config_path, config)
+    return {
+        "config_path": str(output_config_path),
+        "pool_path": str(pool_path),
+        "tags_path": str(tags_path),
+        "tag_count": int(len(filtered_tags)),
+        "pool_counts": {name: len(codes) for name, codes in pools_by_universe.items()},
+        "experiment_count": len(config["experiments"]),
+    }
+
+
 def _build_universe_experiments(universe_name: str, ts_codes: list[str], top_n: int) -> list[dict[str, object]]:
     prefix = "hstech" if universe_name == "hs300" else f"{universe_name}tech"
     return [
@@ -264,3 +465,32 @@ def _build_match_reason(
         if keyword in name:
             matches.append(f"name:{keyword}")
     return ";".join(matches)
+
+
+def _normalize_stock_basic_for_theme(stock_basic: pd.DataFrame, as_of_date: str) -> pd.DataFrame:
+    data = stock_basic.copy()
+    for column in ["ts_code", "name", "industry", "market", "exchange", "list_date", "delist_date"]:
+        if column not in data.columns:
+            data[column] = ""
+        data[column] = data[column].fillna("").astype(str)
+
+    listed = data["list_date"].ne("") & (data["list_date"] <= as_of_date)
+    not_delisted = data["delist_date"].eq("") | (data["delist_date"] > as_of_date)
+    return data.loc[listed & not_delisted].sort_values("ts_code").drop_duplicates(subset=["ts_code"], keep="last")
+
+
+def _match_taxonomy_rule(
+    *,
+    name: str,
+    industry: str,
+    industry_keywords: tuple[str, ...],
+    name_keywords: tuple[str, ...],
+) -> list[str]:
+    evidence: list[str] = []
+    for keyword in industry_keywords:
+        if keyword and keyword in industry:
+            evidence.append(f"industry:{keyword}")
+    for keyword in name_keywords:
+        if keyword and keyword in name:
+            evidence.append(f"name:{keyword}")
+    return evidence
