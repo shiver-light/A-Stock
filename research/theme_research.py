@@ -273,6 +273,7 @@ def build_technology_theme_research_config(
     benchmark_by_universe = benchmark_by_universe or {
         "hs300": "000300.SH",
         "zz500": "000905.SH",
+        "zz1000": "000852.SH",
     }
     experiments: list[dict[str, object]] = []
     for universe_name, ts_codes in pools_by_universe.items():

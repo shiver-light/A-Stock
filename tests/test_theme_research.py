@@ -135,17 +135,20 @@ class ThemeResearchTestCase(unittest.TestCase):
             pools_by_universe={
                 "hs300": ["000001.SZ", "000002.SZ"],
                 "zz500": ["000003.SZ"],
+                "zz1000": ["000004.SZ"],
             },
             start_date="20250101",
             end_date="20260608",
             top_ns=(10,),
         )
 
-        self.assertEqual(len(config["experiments"]), 6)
+        self.assertEqual(len(config["experiments"]), 9)
         first = config["experiments"][0]
         self.assertEqual(first["benchmark_code"], "000300.SH")
         self.assertEqual(first["ts_codes"], ["000001.SZ", "000002.SZ"])
         self.assertIn("signal_filters", first)
+        zz1000_experiment = next(item for item in config["experiments"] if item["universe_name"] == "zz1000")
+        self.assertEqual(zz1000_experiment["benchmark_code"], "000852.SH")
 
     @patch("research.theme_research.get_universe")
     @patch("research.theme_research.get_stock_basic_history")
@@ -268,6 +271,72 @@ class ThemeResearchTestCase(unittest.TestCase):
             config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
             self.assertEqual(config["global"]["selected_themes"], ["AI算力"])
             self.assertEqual(config["global"]["theme_tags_csv"], str(tags_path))
+
+    @patch("research.theme_research.get_universe")
+    @patch("research.theme_research.get_stock_basic_history")
+    def test_build_and_write_taxonomy_theme_research_supports_zz1000(
+        self,
+        mock_stock_basic,
+        mock_get_universe,
+    ) -> None:
+        mock_stock_basic.return_value = pd.DataFrame(
+            {
+                "ts_code": ["000001.SZ", "000002.SZ"],
+                "name": ["芯片A", "银行B"],
+                "industry": ["半导体", "银行"],
+                "market": ["主板", "主板"],
+                "exchange": ["SZSE", "SZSE"],
+                "list_date": ["20200101", "20200101"],
+                "delist_date": ["", ""],
+            }
+        )
+        mock_get_universe.return_value = pd.DataFrame({"ts_code": ["000001.SZ", "000002.SZ"]})
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            taxonomy_path = Path(tmp_dir) / "taxonomy.yaml"
+            taxonomy_path.write_text(
+                yaml.safe_dump(
+                    {
+                        "themes": [
+                            {
+                                "name": "半导体国产替代",
+                                "sub_themes": [
+                                    {
+                                        "name": "芯片设计/功率半导体",
+                                        "confidence": 0.8,
+                                        "industry_keywords": ["半导体"],
+                                        "name_keywords": ["芯片"],
+                                    }
+                                ],
+                            }
+                        ]
+                    },
+                    allow_unicode=True,
+                    sort_keys=False,
+                ),
+                encoding="utf-8",
+            )
+
+            config_path = Path(tmp_dir) / "theme.yaml"
+            pool_path = Path(tmp_dir) / "pool.csv"
+            tags_path = Path(tmp_dir) / "tags.csv"
+            result = build_and_write_taxonomy_theme_research(
+                taxonomy_path=taxonomy_path,
+                start_date="20250101",
+                end_date="20260608",
+                output_config_path=config_path,
+                output_pool_path=pool_path,
+                output_tags_path=tags_path,
+                universe_names=("zz1000",),
+                themes=["半导体国产替代"],
+                min_confidence=0.7,
+            )
+
+            self.assertEqual(result["pool_counts"], {"zz1000": 1})
+            config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+            self.assertTrue(config["experiments"])
+            self.assertEqual(config["experiments"][0]["universe_name"], "zz1000")
+            self.assertEqual(config["experiments"][0]["benchmark_code"], "000852.SH")
 
     def test_build_theme_validation_config_clones_selected_models_across_windows(self) -> None:
         base_config = {

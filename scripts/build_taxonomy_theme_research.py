@@ -32,7 +32,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--universe-name",
         action="append",
-        choices=["hs300", "zz500"],
+        choices=["hs300", "zz500", "zz1000"],
         dest="universe_names",
         help="Universe to include. Can be repeated. Defaults to hs300 and zz500.",
     )
