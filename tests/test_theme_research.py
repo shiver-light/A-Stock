@@ -11,8 +11,10 @@ import yaml
 from research.theme_research import (
     build_and_write_technology_theme_research,
     build_and_write_taxonomy_theme_research,
+    build_and_write_theme_stage2_config,
     build_and_write_theme_validation_config,
     build_technology_theme_research_config,
+    build_theme_stage2_config,
     build_theme_validation_config,
     build_theme_pool_from_tags,
     build_theme_stock_pool,
@@ -344,6 +346,93 @@ class ThemeResearchTestCase(unittest.TestCase):
             self.assertEqual(result["experiment_count"], 1)
             config = yaml.safe_load(output_path.read_text(encoding="utf-8"))
             self.assertEqual(config["experiments"][0]["name"], "model_a_w1")
+
+    def test_build_theme_stage2_config_creates_factor_ablation_variants(self) -> None:
+        base_config = {
+            "global": {
+                "start_date": "20250101",
+                "end_date": "20260608",
+                "backtest_config": {"slippage_bps": 15.0},
+            },
+            "experiments": [
+                {
+                    "name": "model_a",
+                    "universe_name": "hs300",
+                    "benchmark_code": "000300.SH",
+                    "ts_codes": ["000001.SZ", "000002.SZ"],
+                    "top_n": 10,
+                    "signal_filters": [{"factor": "amount_mean_20d", "op": "quantile_gte", "value": 0.5}],
+                    "factor_config": {"return_60d": 0.35, "volatility_60d_negative": 0.2},
+                }
+            ],
+        }
+
+        result = build_theme_stage2_config(
+            base_config,
+            selected_model_names=["model_a"],
+            variants=[
+                {
+                    "suffix": "trend_liquidity",
+                    "signal_filters": [{"factor": "amount_mean_20d", "op": "quantile_gte", "value": 0.5}],
+                    "factor_config": {"return_60d": 0.6, "amount_mean_20d": 0.4},
+                },
+                {
+                    "suffix": "trend_flow",
+                    "signal_filters": [{"factor": "amount_mean_20d", "op": "quantile_gte", "value": 0.5}],
+                    "factor_config": {"return_60d": 0.5, "money_flow_strength_20d": 0.5},
+                },
+            ],
+        )
+
+        self.assertEqual(len(result["experiments"]), 2)
+        self.assertEqual(result["global"]["stage2_base_models"], ["model_a"])
+        self.assertEqual(result["experiments"][0]["name"], "model_a_trend_liquidity")
+        self.assertEqual(result["experiments"][0]["ts_codes"], ["000001.SZ", "000002.SZ"])
+        self.assertEqual(result["experiments"][0]["benchmark_code"], "000300.SH")
+        self.assertEqual(result["experiments"][0]["factor_config"], {"return_60d": 0.6, "amount_mean_20d": 0.4})
+        self.assertEqual(result["experiments"][0]["stage2_base_model"], "model_a")
+
+    def test_build_theme_stage2_config_rejects_missing_model(self) -> None:
+        with self.assertRaisesRegex(ValueError, "not found"):
+            build_theme_stage2_config(
+                {"global": {}, "experiments": [{"name": "model_a"}]},
+                selected_model_names=["missing"],
+            )
+
+    def test_build_and_write_theme_stage2_config_writes_yaml(self) -> None:
+        base_config = {
+            "global": {"start_date": "20250101", "end_date": "20260608"},
+            "experiments": [
+                {
+                    "name": "model_a",
+                    "universe_name": "hs300",
+                    "ts_codes": ["000001.SZ"],
+                    "top_n": 10,
+                    "factor_config": {"return_60d": 1.0},
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            base_path = Path(tmp_dir) / "base.yaml"
+            output_path = Path(tmp_dir) / "stage2.yaml"
+            base_path.write_text(yaml.safe_dump(base_config, sort_keys=False), encoding="utf-8")
+            result = build_and_write_theme_stage2_config(
+                base_config_path=base_path,
+                output_config_path=output_path,
+                selected_model_names=["model_a"],
+                variants=[
+                    {
+                        "suffix": "trend_liquidity",
+                        "signal_filters": [],
+                        "factor_config": {"return_60d": 0.6, "amount_mean_20d": 0.4},
+                    }
+                ],
+            )
+
+            self.assertEqual(result["experiment_count"], 1)
+            config = yaml.safe_load(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(config["experiments"][0]["name"], "model_a_trend_liquidity")
 
 
 if __name__ == "__main__":
