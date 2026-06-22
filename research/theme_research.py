@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 from typing import Iterable
 
@@ -61,6 +62,18 @@ THEME_TAG_COLUMNS = [
     "valid_from",
     "valid_to",
 ]
+
+DEFAULT_THEME_VALIDATION_MODELS = (
+    "hstech_momentum_quality_top10",
+    "zz500tech_momentum_quality_top10",
+    "zz500tech_momentum_quality_top20",
+)
+
+DEFAULT_THEME_VALIDATION_WINDOWS = (
+    {"name": "2025h1", "start_date": "20250101", "end_date": "20250630"},
+    {"name": "2025h2", "start_date": "20250701", "end_date": "20251231"},
+    {"name": "2026ytd", "start_date": "20260101", "end_date": "20260608"},
+)
 
 
 def build_theme_stock_pool(
@@ -396,6 +409,86 @@ def build_and_write_taxonomy_theme_research(
     }
 
 
+def build_theme_validation_config(
+    base_config: dict[str, object],
+    *,
+    selected_model_names: Iterable[str] = DEFAULT_THEME_VALIDATION_MODELS,
+    windows: Iterable[dict[str, str]] = DEFAULT_THEME_VALIDATION_WINDOWS,
+) -> dict[str, object]:
+    """Build time-split validation experiments from selected theme models."""
+
+    experiments = base_config.get("experiments")
+    if not isinstance(experiments, list):
+        raise ValueError("base_config must contain an experiments list.")
+
+    model_names = list(selected_model_names)
+    experiments_by_name = {
+        str(experiment.get("name")): experiment
+        for experiment in experiments
+        if isinstance(experiment, dict) and experiment.get("name")
+    }
+    missing = [name for name in model_names if name not in experiments_by_name]
+    if missing:
+        raise ValueError(f"Selected model(s) not found in base config: {', '.join(missing)}")
+
+    validation_windows = [_normalize_validation_window(window) for window in windows]
+    base_global = copy.deepcopy(base_config.get("global", {}))
+    if not isinstance(base_global, dict):
+        base_global = {}
+    result_global = {
+        key: value
+        for key, value in base_global.items()
+        if key not in {"start_date", "end_date"}
+    }
+    result_global["validation_windows"] = validation_windows
+    result_global["selected_validation_models"] = model_names
+    result_global["research_notes"] = list(result_global.get("research_notes", [])) + [
+        "This config validates selected theme models across fixed time windows; it does not search new parameters.",
+    ]
+
+    validation_experiments: list[dict[str, object]] = []
+    for model_name in model_names:
+        base_experiment = experiments_by_name[model_name]
+        for window in validation_windows:
+            experiment = copy.deepcopy(base_experiment)
+            experiment["name"] = f"{model_name}_{window['name']}"
+            experiment["start_date"] = window["start_date"]
+            experiment["end_date"] = window["end_date"]
+            experiment["validation_base_model"] = model_name
+            experiment["validation_window"] = window["name"]
+            validation_experiments.append(experiment)
+
+    return {
+        "global": result_global,
+        "experiments": validation_experiments,
+    }
+
+
+def build_and_write_theme_validation_config(
+    *,
+    base_config_path: str | Path,
+    output_config_path: str | Path,
+    selected_model_names: Iterable[str] = DEFAULT_THEME_VALIDATION_MODELS,
+    windows: Iterable[dict[str, str]] = DEFAULT_THEME_VALIDATION_WINDOWS,
+) -> dict[str, object]:
+    """Read a theme research config and write a time-split validation config."""
+
+    with Path(base_config_path).open("r", encoding="utf-8") as handle:
+        base_config = yaml.safe_load(handle) or {}
+    config = build_theme_validation_config(
+        base_config,
+        selected_model_names=selected_model_names,
+        windows=windows,
+    )
+    write_yaml(output_config_path, config)
+    return {
+        "config_path": str(output_config_path),
+        "experiment_count": len(config["experiments"]),
+        "selected_models": list(selected_model_names),
+        "windows": list(config["global"]["validation_windows"]),
+    }
+
+
 def _build_universe_experiments(universe_name: str, ts_codes: list[str], top_n: int) -> list[dict[str, object]]:
     prefix = "hstech" if universe_name == "hs300" else f"{universe_name}tech"
     return [
@@ -465,6 +558,17 @@ def _build_match_reason(
         if keyword in name:
             matches.append(f"name:{keyword}")
     return ";".join(matches)
+
+
+def _normalize_validation_window(window: dict[str, str]) -> dict[str, str]:
+    name = str(window.get("name", "")).strip()
+    start_date = str(window.get("start_date", "")).strip()
+    end_date = str(window.get("end_date", "")).strip()
+    if not name or not start_date or not end_date:
+        raise ValueError("Each validation window must contain name, start_date, and end_date.")
+    if start_date > end_date:
+        raise ValueError(f"Validation window start_date must be <= end_date: {name}")
+    return {"name": name, "start_date": start_date, "end_date": end_date}
 
 
 def _normalize_stock_basic_for_theme(stock_basic: pd.DataFrame, as_of_date: str) -> pd.DataFrame:

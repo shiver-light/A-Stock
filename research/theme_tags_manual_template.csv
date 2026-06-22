@@ -1,0 +1,6 @@
+as_of_date,ts_code,name,theme,sub_theme,source,confidence,evidence,valid_from,valid_to
+20250101,300308.SZ,中际旭创,AI算力,CPO/光模块,manual,0.98,manual review: optical module core candidate,20250101,
+20250101,300394.SZ,天孚通信,AI算力,CPO/光模块,manual,0.98,manual review: optical component core candidate,20250101,
+20250101,002463.SZ,沪电股份,AI算力,PCB/服务器/高速连接,manual,0.95,manual review: AI server PCB candidate,20250101,
+20250101,002916.SZ,深南电路,AI算力,PCB/服务器/高速连接,manual,0.95,manual review: PCB/package substrate candidate,20250101,
+20250101,688041.SH,海光信息,半导体国产替代,芯片设计/功率半导体,manual,0.95,manual review: domestic CPU/GPU chain candidate,20250101,

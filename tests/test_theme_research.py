@@ -11,7 +11,9 @@ import yaml
 from research.theme_research import (
     build_and_write_technology_theme_research,
     build_and_write_taxonomy_theme_research,
+    build_and_write_theme_validation_config,
     build_technology_theme_research_config,
+    build_theme_validation_config,
     build_theme_pool_from_tags,
     build_theme_stock_pool,
     build_theme_tags,
@@ -264,6 +266,84 @@ class ThemeResearchTestCase(unittest.TestCase):
             config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
             self.assertEqual(config["global"]["selected_themes"], ["AI算力"])
             self.assertEqual(config["global"]["theme_tags_csv"], str(tags_path))
+
+    def test_build_theme_validation_config_clones_selected_models_across_windows(self) -> None:
+        base_config = {
+            "global": {
+                "start_date": "20250101",
+                "end_date": "20260608",
+                "backtest_config": {"slippage_bps": 15.0},
+            },
+            "experiments": [
+                {
+                    "name": "model_a",
+                    "universe_name": "hs300",
+                    "ts_codes": ["000001.SZ"],
+                    "top_n": 10,
+                    "factor_config": {"return_60d": 1.0},
+                },
+                {
+                    "name": "model_b",
+                    "universe_name": "zz500",
+                    "ts_codes": ["000002.SZ"],
+                    "top_n": 20,
+                    "factor_config": {"amount_mean_20d": 1.0},
+                },
+            ],
+        }
+
+        result = build_theme_validation_config(
+            base_config,
+            selected_model_names=["model_a", "model_b"],
+            windows=[
+                {"name": "w1", "start_date": "20250101", "end_date": "20250630"},
+                {"name": "w2", "start_date": "20250701", "end_date": "20251231"},
+            ],
+        )
+
+        self.assertEqual(len(result["experiments"]), 4)
+        self.assertEqual(result["global"]["selected_validation_models"], ["model_a", "model_b"])
+        self.assertEqual(result["experiments"][0]["name"], "model_a_w1")
+        self.assertEqual(result["experiments"][0]["start_date"], "20250101")
+        self.assertEqual(result["experiments"][0]["end_date"], "20250630")
+        self.assertEqual(result["experiments"][0]["validation_base_model"], "model_a")
+        self.assertEqual(result["experiments"][0]["factor_config"], {"return_60d": 1.0})
+
+    def test_build_theme_validation_config_rejects_missing_model(self) -> None:
+        with self.assertRaisesRegex(ValueError, "not found"):
+            build_theme_validation_config(
+                {"global": {}, "experiments": [{"name": "model_a"}]},
+                selected_model_names=["missing"],
+            )
+
+    def test_build_and_write_theme_validation_config_writes_yaml(self) -> None:
+        base_config = {
+            "global": {"start_date": "20250101", "end_date": "20260608"},
+            "experiments": [
+                {
+                    "name": "model_a",
+                    "universe_name": "hs300",
+                    "ts_codes": ["000001.SZ"],
+                    "top_n": 10,
+                    "factor_config": {"return_60d": 1.0},
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            base_path = Path(tmp_dir) / "base.yaml"
+            output_path = Path(tmp_dir) / "validation.yaml"
+            base_path.write_text(yaml.safe_dump(base_config, sort_keys=False), encoding="utf-8")
+            result = build_and_write_theme_validation_config(
+                base_config_path=base_path,
+                output_config_path=output_path,
+                selected_model_names=["model_a"],
+                windows=[{"name": "w1", "start_date": "20250101", "end_date": "20250630"}],
+            )
+
+            self.assertEqual(result["experiment_count"], 1)
+            config = yaml.safe_load(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(config["experiments"][0]["name"], "model_a_w1")
 
 
 if __name__ == "__main__":
