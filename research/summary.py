@@ -30,6 +30,18 @@ SUMMARY_METRIC_COLUMNS = (
     "latest_rolling_5m_sharpe",
     "mean_rolling_5m_sharpe",
     "worst_rolling_5m_sharpe",
+    "latest_forward_1d_max_gain",
+    "mean_forward_1d_max_gain",
+    "best_forward_1d_max_gain",
+    "latest_forward_3d_max_gain",
+    "mean_forward_3d_max_gain",
+    "best_forward_3d_max_gain",
+    "latest_forward_7d_max_gain",
+    "mean_forward_7d_max_gain",
+    "best_forward_7d_max_gain",
+    "latest_forward_1w_max_gain",
+    "mean_forward_1w_max_gain",
+    "best_forward_1w_max_gain",
 )
 
 

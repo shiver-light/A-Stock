@@ -28,6 +28,8 @@ class ResearchSummaryTestCase(unittest.TestCase):
                         "positive_excess_month_ratio": 0.6,
                         "mean_rebalance_turnover": 0.7,
                         "worst_rolling_5m_excess_return": -0.1,
+                        "latest_forward_3d_max_gain": 0.04,
+                        "best_forward_1w_max_gain": 0.08,
                     },
                 }
             ]
@@ -39,6 +41,8 @@ class ResearchSummaryTestCase(unittest.TestCase):
         self.assertEqual(row["positive_excess_month_ratio"], 0.6)
         self.assertEqual(row["mean_rebalance_turnover"], 0.7)
         self.assertEqual(row["worst_rolling_5m_excess_return"], -0.1)
+        self.assertEqual(row["latest_forward_3d_max_gain"], 0.04)
+        self.assertEqual(row["best_forward_1w_max_gain"], 0.08)
         self.assertEqual(row["signal_filters"], [])
         self.assertEqual(row["market_regime_filter"], '{"min_return_20d": 0.0}')
 
@@ -68,6 +72,7 @@ class ResearchSummaryTestCase(unittest.TestCase):
                     "positive_excess_month_ratio": 0.55,
                     "mean_rebalance_turnover": 1.1,
                     "worst_rolling_5m_sharpe": -1.3,
+                    "mean_forward_7d_max_gain": 0.03,
                 },
             )
 
@@ -78,6 +83,7 @@ class ResearchSummaryTestCase(unittest.TestCase):
             self.assertEqual(row["positive_excess_month_ratio"], 0.55)
             self.assertEqual(row["mean_rebalance_turnover"], 1.1)
             self.assertEqual(row["worst_rolling_5m_sharpe"], -1.3)
+            self.assertEqual(row["mean_forward_7d_max_gain"], 0.03)
 
 
 if __name__ == "__main__":

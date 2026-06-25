@@ -7,6 +7,14 @@ import math
 import pandas as pd
 
 
+FORWARD_MAX_GAIN_WINDOWS = {
+    "1d": 1,
+    "3d": 3,
+    "7d": 7,
+    "1w": 5,
+}
+
+
 def _monthly_compounded_returns(
     data: pd.DataFrame,
     *,
@@ -78,6 +86,69 @@ def _summarize_rolling_metric(
     }
 
 
+def _build_forward_max_gain_metrics(
+    data: pd.DataFrame,
+    *,
+    date_col: str,
+    return_col: str,
+) -> pd.DataFrame:
+    """Build ex-post forward max gain diagnostics from strategy returns."""
+    columns = ["trade_date"] + [
+        f"forward_{label}_max_gain"
+        for label in FORWARD_MAX_GAIN_WINDOWS
+    ]
+    if data.empty:
+        return pd.DataFrame(columns=columns)
+
+    returns = data[return_col].fillna(0.0).reset_index(drop=True)
+    dates = data[date_col].astype(str).reset_index(drop=True)
+    rows: list[dict[str, float | str]] = []
+
+    for idx, trade_date in dates.items():
+        row: dict[str, float | str] = {"trade_date": trade_date}
+        for label, window in FORWARD_MAX_GAIN_WINDOWS.items():
+            future_returns = returns.iloc[idx + 1 : idx + window + 1]
+            value = math.nan
+            if len(future_returns) == window:
+                cumulative_returns = [
+                    float((1.0 + future_returns.iloc[: step]).prod() - 1.0)
+                    for step in range(1, window + 1)
+                ]
+                value = max(cumulative_returns)
+            row[f"forward_{label}_max_gain"] = value
+        rows.append(row)
+
+    return pd.DataFrame(rows, columns=columns)
+
+
+def _summarize_forward_max_gain(forward_metrics: pd.DataFrame) -> dict[str, float]:
+    summary: dict[str, float] = {}
+    for label in FORWARD_MAX_GAIN_WINDOWS:
+        col = f"forward_{label}_max_gain"
+        values = forward_metrics[col].dropna() if col in forward_metrics.columns else pd.Series(dtype="float64")
+        if values.empty:
+            summary[f"latest_{col}"] = 0.0
+            summary[f"mean_{col}"] = 0.0
+            summary[f"best_{col}"] = 0.0
+            continue
+        summary[f"latest_{col}"] = float(values.iloc[-1])
+        summary[f"mean_{col}"] = float(values.mean())
+        summary[f"best_{col}"] = float(values.max())
+    return summary
+
+
+def _records_with_none_for_nan(data: pd.DataFrame) -> list[dict[str, object]]:
+    records: list[dict[str, object]] = []
+    for record in data.to_dict(orient="records"):
+        records.append(
+            {
+                key: None if pd.isna(value) else value
+                for key, value in record.items()
+            }
+        )
+    return records
+
+
 def calc_performance(
     strategy_returns: pd.DataFrame,
     *,
@@ -95,6 +166,8 @@ def calc_performance(
             "median_rebalance_turnover": 0.0,
             "max_rebalance_turnover": 0.0,
             "positive_month_ratio": 0.0,
+            "forward_max_gain": [],
+            **_summarize_forward_max_gain(pd.DataFrame()),
         }
 
     data = strategy_returns.loc[:, [date_col, return_col]].copy()
@@ -127,6 +200,12 @@ def calc_performance(
     if not monthly_returns.empty:
         positive_month_ratio = float((monthly_returns[return_col] > 0).mean())
 
+    forward_max_gain = _build_forward_max_gain_metrics(
+        data,
+        date_col=date_col,
+        return_col=return_col,
+    )
+
     return {
         "cumulative_return": cumulative_return,
         "annual_return": annual_return,
@@ -137,6 +216,8 @@ def calc_performance(
         "median_rebalance_turnover": float(rebalance_turnover.median()) if not rebalance_turnover.empty else 0.0,
         "max_rebalance_turnover": float(rebalance_turnover.max()) if not rebalance_turnover.empty else 0.0,
         "positive_month_ratio": positive_month_ratio,
+        "forward_max_gain": _records_with_none_for_nan(forward_max_gain),
+        **_summarize_forward_max_gain(forward_max_gain),
     }
 
 

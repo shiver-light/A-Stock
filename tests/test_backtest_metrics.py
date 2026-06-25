@@ -34,6 +34,48 @@ class BacktestMetricsTestCase(unittest.TestCase):
         self.assertAlmostEqual(result["max_rebalance_turnover"], 1.0)
         self.assertAlmostEqual(result["positive_month_ratio"], 4.0 / 6.0)
 
+    def test_calc_performance_includes_forward_max_gain_diagnostics(self) -> None:
+        returns = pd.DataFrame(
+            {
+                "trade_date": [
+                    "20240102",
+                    "20240103",
+                    "20240104",
+                    "20240105",
+                    "20240108",
+                    "20240109",
+                    "20240110",
+                    "20240111",
+                    "20240112",
+                    "20240115",
+                ],
+                "strategy_return": [0.00, 0.02, -0.01, 0.03, -0.02, 0.01, 0.04, -0.01, 0.02, 0.01],
+            }
+        )
+
+        result = calc_performance(returns)
+        forward_metrics = result["forward_max_gain"]
+
+        expected_first_3d = max(
+            0.02,
+            (1.02 * 0.99) - 1.0,
+            (1.02 * 0.99 * 1.03) - 1.0,
+        )
+        expected_latest_1d = 0.01
+        expected_latest_1w = max(
+            0.01,
+            (1.01 * 1.04) - 1.0,
+            (1.01 * 1.04 * 0.99) - 1.0,
+            (1.01 * 1.04 * 0.99 * 1.02) - 1.0,
+            (1.01 * 1.04 * 0.99 * 1.02 * 1.01) - 1.0,
+        )
+
+        self.assertEqual(len(forward_metrics), 10)
+        self.assertAlmostEqual(forward_metrics[0]["forward_3d_max_gain"], expected_first_3d)
+        self.assertAlmostEqual(result["latest_forward_1d_max_gain"], expected_latest_1d)
+        self.assertAlmostEqual(result["latest_forward_1w_max_gain"], expected_latest_1w)
+        self.assertGreater(result["best_forward_7d_max_gain"], 0.0)
+
     def test_calc_relative_performance_includes_monthly_and_rolling_metrics(self) -> None:
         returns = self._returns_with_benchmark()
         result = calc_relative_performance(returns)
@@ -82,9 +124,11 @@ class BacktestMetricsTestCase(unittest.TestCase):
         self.assertIn("mean_daily_turnover", report["backtest_summary"])
         self.assertIn("positive_excess_month_ratio", report["benchmark"])
         self.assertIn("rolling_5m_excess_return", report["robustness"])
+        self.assertIn("latest_forward_3d_max_gain", report["forward_max_gain"])
         self.assertIn("mean daily turnover", report_text)
         self.assertIn("positive excess month ratio", report_text)
         self.assertIn("latest rolling 5m excess return", report_text)
+        self.assertIn("latest forward 3d max gain", report_text)
 
 
 if __name__ == "__main__":

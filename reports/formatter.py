@@ -71,6 +71,21 @@ def format_strategy_report(
             "mean_rolling_5m_sharpe": performance.get("mean_rolling_5m_sharpe", 0.0),
             "worst_rolling_5m_sharpe": performance.get("worst_rolling_5m_sharpe", 0.0),
         },
+        "forward_max_gain": {
+            "series": performance.get("forward_max_gain", []),
+            "latest_forward_1d_max_gain": performance.get("latest_forward_1d_max_gain", 0.0),
+            "mean_forward_1d_max_gain": performance.get("mean_forward_1d_max_gain", 0.0),
+            "best_forward_1d_max_gain": performance.get("best_forward_1d_max_gain", 0.0),
+            "latest_forward_3d_max_gain": performance.get("latest_forward_3d_max_gain", 0.0),
+            "mean_forward_3d_max_gain": performance.get("mean_forward_3d_max_gain", 0.0),
+            "best_forward_3d_max_gain": performance.get("best_forward_3d_max_gain", 0.0),
+            "latest_forward_7d_max_gain": performance.get("latest_forward_7d_max_gain", 0.0),
+            "mean_forward_7d_max_gain": performance.get("mean_forward_7d_max_gain", 0.0),
+            "best_forward_7d_max_gain": performance.get("best_forward_7d_max_gain", 0.0),
+            "latest_forward_1w_max_gain": performance.get("latest_forward_1w_max_gain", 0.0),
+            "mean_forward_1w_max_gain": performance.get("mean_forward_1w_max_gain", 0.0),
+            "best_forward_1w_max_gain": performance.get("best_forward_1w_max_gain", 0.0),
+        },
         "risk": [
             "基于历史数据，不保证未来收益。",
             "可能存在回撤和风格失效风险。",
@@ -88,6 +103,7 @@ def render_strategy_report_text(report: dict[str, object]) -> str:
     backtest_summary = report.get("backtest_summary", {})
     benchmark = report.get("benchmark", {})
     robustness = report.get("robustness", {})
+    forward_max_gain = report.get("forward_max_gain", {})
     risks = report.get("risk", [])
 
     factor_lines = [
@@ -144,6 +160,21 @@ def render_strategy_report_text(report: dict[str, object]) -> str:
             f"latest rolling 5m sharpe: {robustness.get('latest_rolling_5m_sharpe', 0.0):.6f}",
             f"mean rolling 5m sharpe: {robustness.get('mean_rolling_5m_sharpe', 0.0):.6f}",
             f"worst rolling 5m sharpe: {robustness.get('worst_rolling_5m_sharpe', 0.0):.6f}",
+            "",
+            "forward max gain summary:",
+            "ex-post diagnostics only; not used for signal generation.",
+            f"latest forward 1d max gain: {forward_max_gain.get('latest_forward_1d_max_gain', 0.0):.6f}",
+            f"mean forward 1d max gain: {forward_max_gain.get('mean_forward_1d_max_gain', 0.0):.6f}",
+            f"best forward 1d max gain: {forward_max_gain.get('best_forward_1d_max_gain', 0.0):.6f}",
+            f"latest forward 3d max gain: {forward_max_gain.get('latest_forward_3d_max_gain', 0.0):.6f}",
+            f"mean forward 3d max gain: {forward_max_gain.get('mean_forward_3d_max_gain', 0.0):.6f}",
+            f"best forward 3d max gain: {forward_max_gain.get('best_forward_3d_max_gain', 0.0):.6f}",
+            f"latest forward 7d max gain: {forward_max_gain.get('latest_forward_7d_max_gain', 0.0):.6f}",
+            f"mean forward 7d max gain: {forward_max_gain.get('mean_forward_7d_max_gain', 0.0):.6f}",
+            f"best forward 7d max gain: {forward_max_gain.get('best_forward_7d_max_gain', 0.0):.6f}",
+            f"latest forward 1w max gain: {forward_max_gain.get('latest_forward_1w_max_gain', 0.0):.6f}",
+            f"mean forward 1w max gain: {forward_max_gain.get('mean_forward_1w_max_gain', 0.0):.6f}",
+            f"best forward 1w max gain: {forward_max_gain.get('best_forward_1w_max_gain', 0.0):.6f}",
             "",
             "risk:",
         ]
