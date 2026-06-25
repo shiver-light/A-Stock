@@ -167,6 +167,36 @@ class ResearchRunnerTestCase(unittest.TestCase):
             self.assertEqual(kwargs["signal_filters"], signal_filters)
 
     @patch("research.runner.run_minimal_pipeline")
+    def test_run_experiments_passes_rebalance_frequency(self, mock_pipeline) -> None:
+        mock_pipeline.return_value = {
+            "performance": {"cumulative_return": 0.1},
+            "latest_selection": {"top_stocks": []},
+            "report": {"backtest_summary": {"cumulative_return": 0.1}},
+            "report_text": "strategy report",
+        }
+        config = {
+            "global": {
+                "start_date": "20240101",
+                "end_date": "20240131",
+                "rebalance_frequency": "weekly",
+            },
+            "experiments": [
+                {
+                    "name": "exp_with_rebalance_frequency",
+                    "ts_codes": ["000001.SZ"],
+                    "factor_config": {"kdj_j_turn_up": 1.0},
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            results = run_experiments(config, output_dir=tmp_dir, run_name="demo_run", resume=False)
+
+            self.assertEqual(len(results), 1)
+            _, kwargs = mock_pipeline.call_args
+            self.assertEqual(kwargs["rebalance_frequency"], "weekly")
+
+    @patch("research.runner.run_minimal_pipeline")
     def test_run_experiments_passes_market_regime_filter(self, mock_pipeline) -> None:
         mock_pipeline.return_value = {
             "performance": {"cumulative_return": 0.1},

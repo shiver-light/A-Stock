@@ -438,6 +438,7 @@ def run_minimal_pipeline(
     signal_filters: list[dict[str, object]] | None = None,
     market_regime_filter: dict[str, object] | None = None,
     external_regime_filter: dict[str, object] | None = None,
+    rebalance_frequency: str = "monthly",
     backtest_config: dict[str, object] | None = None,
     enable_factor_diagnostics: bool = False,
     enable_data_diagnostics: bool = False,
@@ -448,8 +449,11 @@ def run_minimal_pipeline(
         start_date=start_date,
         end_date=end_date,
     )
+    backtest_config = dict(backtest_config or {})
+    if "rebalance_frequency" in backtest_config:
+        rebalance_frequency = str(backtest_config.pop("rebalance_frequency"))
     trade_dates = benchmark_data["trade_date"].astype(str).drop_duplicates().sort_values().tolist()
-    rebalance_schedule = get_rebalance_schedule(trade_dates)
+    rebalance_schedule = get_rebalance_schedule(trade_dates, rebalance_frequency=rebalance_frequency)
 
     factor_config = factor_config or {
         "return_20d": 1.0,
@@ -457,7 +461,6 @@ def run_minimal_pipeline(
         "turnover_mean_20d": 1.0,
     }
     panel_factor_config = _merge_factor_configs(factor_config, signal_filters)
-    backtest_config = backtest_config or {}
     resolved_ts_codes = _resolve_ts_codes(
         ts_codes=ts_codes,
         universe_name=universe_name,
@@ -502,6 +505,7 @@ def run_minimal_pipeline(
     strategy_returns, holdings = run_backtest(
         signals=selected.loc[:, ["trade_date", "ts_code", "selected"]],
         market_data=market_panel,
+        rebalance_frequency=rebalance_frequency,
         **backtest_config,
     )
     benchmark_returns = calc_benchmark_returns(
@@ -529,6 +533,7 @@ def run_minimal_pipeline(
             "signal_filters": signal_filters or [],
             "market_regime_filter": market_regime_filter or {},
             "external_regime_filter": external_regime_filter or {},
+            "rebalance_frequency": rebalance_frequency,
             "backtest_config": backtest_config,
         },
     )

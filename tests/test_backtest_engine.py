@@ -4,10 +4,25 @@ import unittest
 
 import pandas as pd
 
-from backtest.engine import calc_benchmark_returns, generate_weights, run_backtest
+from backtest.engine import calc_benchmark_returns, generate_weights, get_rebalance_schedule, run_backtest
 
 
 class BacktestEngineTestCase(unittest.TestCase):
+    def test_get_rebalance_schedule_supports_daily_frequency(self) -> None:
+        result = get_rebalance_schedule(["20240102", "20240103", "20240104"], rebalance_frequency="daily")
+
+        self.assertEqual(result["signal_date"].tolist(), ["20240102", "20240103"])
+        self.assertEqual(result["execution_date"].tolist(), ["20240103", "20240104"])
+
+    def test_get_rebalance_schedule_supports_weekly_frequency(self) -> None:
+        result = get_rebalance_schedule(
+            ["20240105", "20240108", "20240109", "20240115"],
+            rebalance_frequency="weekly",
+        )
+
+        self.assertEqual(result["signal_date"].tolist(), ["20240105", "20240109"])
+        self.assertEqual(result["execution_date"].tolist(), ["20240108", "20240115"])
+
     def test_calc_benchmark_returns_empty_input(self) -> None:
         benchmark_data = pd.DataFrame(columns=["trade_date", "open", "close", "pre_close"])
 
@@ -72,6 +87,36 @@ class BacktestEngineTestCase(unittest.TestCase):
             12.0 / 11.0 - 1.0,
         )
         self.assertEqual(holdings.loc[holdings["trade_date"] == "20240201", "ts_code"].tolist(), ["A"])
+
+    def test_run_backtest_daily_rebalance_uses_previous_day_signal(self) -> None:
+        signals = pd.DataFrame(
+            {
+                "trade_date": ["20240102", "20240103"],
+                "ts_code": ["A", "B"],
+                "selected": [True, True],
+            }
+        )
+        market_data = pd.DataFrame(
+            {
+                "trade_date": ["20240102", "20240102", "20240103", "20240103", "20240104", "20240104"],
+                "ts_code": ["A", "B", "A", "B", "A", "B"],
+                "open": [10.0, 20.0, 10.0, 20.0, 11.0, 20.0],
+                "close": [10.0, 20.0, 11.0, 20.0, 11.0, 22.0],
+            }
+        )
+
+        returns, holdings = run_backtest(
+            signals,
+            market_data,
+            fee_bps=0.0,
+            rebalance_frequency="daily",
+        )
+
+        self.assertAlmostEqual(
+            returns.loc[returns["trade_date"] == "20240103", "strategy_return"].iloc[0],
+            0.1,
+        )
+        self.assertEqual(holdings.loc[holdings["trade_date"] == "20240104", "ts_code"].tolist(), ["B"])
 
     def test_run_backtest_exec_day_weights_drift_to_close(self) -> None:
         signals = pd.DataFrame(

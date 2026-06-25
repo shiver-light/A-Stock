@@ -47,11 +47,29 @@ def _monthly_first_trade_dates(trade_dates: list[str]) -> list[str]:
     return series.groupby(months).first().tolist()
 
 
-def _execution_schedule(trade_dates: list[str]) -> pd.DataFrame:
-    monthly_exec_dates = _monthly_first_trade_dates(trade_dates)
+def _weekly_first_trade_dates(trade_dates: list[str]) -> list[str]:
+    series = pd.Series(sorted(trade_dates), name="trade_date")
+    parsed_dates = pd.to_datetime(series, format="%Y%m%d")
+    weeks = parsed_dates.dt.strftime("%G%V")
+    return series.groupby(weeks).first().tolist()
+
+
+def _execution_dates(trade_dates: list[str], rebalance_frequency: str) -> list[str]:
+    sorted_dates = sorted(trade_dates)
+    if rebalance_frequency == "monthly":
+        return _monthly_first_trade_dates(sorted_dates)
+    if rebalance_frequency == "weekly":
+        return _weekly_first_trade_dates(sorted_dates)
+    if rebalance_frequency == "daily":
+        return sorted_dates
+    raise ValueError(f"Unsupported rebalance_frequency: {rebalance_frequency}")
+
+
+def _execution_schedule(trade_dates: list[str], rebalance_frequency: str = "monthly") -> pd.DataFrame:
+    exec_dates = _execution_dates(trade_dates, rebalance_frequency)
     order_map = {trade_date: index for index, trade_date in enumerate(sorted(trade_dates))}
     schedule_rows: list[dict[str, str]] = []
-    for exec_date in monthly_exec_dates:
+    for exec_date in exec_dates:
         exec_index = order_map[exec_date]
         if exec_index == 0:
             continue
@@ -60,9 +78,10 @@ def _execution_schedule(trade_dates: list[str]) -> pd.DataFrame:
     return pd.DataFrame(schedule_rows)
 
 
-def get_rebalance_schedule(trade_dates: list[str]) -> pd.DataFrame:
-    """Return the monthly execution schedule under the current backtest assumptions."""
-    return _execution_schedule(trade_dates)
+def get_rebalance_schedule(trade_dates: list[str], rebalance_frequency: str = "monthly") -> pd.DataFrame:
+    """Return execution schedule for the requested rebalance frequency."""
+
+    return _execution_schedule(trade_dates, rebalance_frequency=rebalance_frequency)
 
 
 def _market_row(market_indexed: pd.DataFrame, trade_date: str, asset: str) -> pd.Series | None:
@@ -214,6 +233,7 @@ def generate_weights(
     signals: pd.DataFrame,
     market_data: pd.DataFrame,
     *,
+    rebalance_frequency: str = "monthly",
     date_col: str = "trade_date",
     asset_col: str = "ts_code",
     selected_col: str = "selected",
@@ -221,7 +241,7 @@ def generate_weights(
     market = _prepare_market_data(market_data).rename(columns={"trade_date": date_col, "ts_code": asset_col})
     signal_data = _prepare_signals(signals).rename(columns={"trade_date": date_col, "ts_code": asset_col, "selected": selected_col})
     trade_dates = market[date_col].drop_duplicates().sort_values().tolist()
-    schedule = _execution_schedule(trade_dates)
+    schedule = _execution_schedule(trade_dates, rebalance_frequency=rebalance_frequency)
     if schedule.empty:
         return pd.DataFrame(columns=["trade_date", "ts_code", "target_weight", "signal_date"])
 
@@ -250,6 +270,7 @@ def run_backtest(
     signals: pd.DataFrame,
     market_data: pd.DataFrame,
     *,
+    rebalance_frequency: str = "monthly",
     fee_bps: float = 10.0,
     slippage_bps: float = 0.0,
     block_suspended: bool = False,
@@ -260,7 +281,7 @@ def run_backtest(
     date_col: str = "trade_date",
     asset_col: str = "ts_code",
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Run the current monthly-rebalance backtest with optional execution constraints.
+    """Run the current backtest with optional execution constraints.
 
     Constraint flags only take effect when the required market_data columns are present.
     When optional fields such as ``amount`` / ``up_limit`` / ``down_limit`` /
@@ -271,7 +292,11 @@ def run_backtest(
     signal_data = _prepare_signals(signals).rename(
         columns={"trade_date": date_col, "ts_code": asset_col, "selected": "selected"}
     )
-    weights = generate_weights(signals, market.rename(columns={date_col: "trade_date", asset_col: "ts_code"}))
+    weights = generate_weights(
+        signals,
+        market.rename(columns={date_col: "trade_date", asset_col: "ts_code"}),
+        rebalance_frequency=rebalance_frequency,
+    )
 
     trade_dates = market[date_col].drop_duplicates().sort_values().tolist()
     close_wide = market.pivot(index=date_col, columns=asset_col, values="close").sort_index()
@@ -282,7 +307,7 @@ def run_backtest(
     for exec_date, group in weights.groupby("trade_date"):
         weight_by_exec[exec_date] = dict(zip(group["ts_code"], group["target_weight"]))
     if cash_on_empty_signal:
-        schedule = _execution_schedule(trade_dates)
+        schedule = _execution_schedule(trade_dates, rebalance_frequency=rebalance_frequency)
         selected_by_date = (
             signal_data.groupby(date_col)["selected"].any()
             if not signal_data.empty

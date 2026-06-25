@@ -108,6 +108,7 @@ def run_experiments(
                 signal_filters=experiment_config.get("signal_filters"),
                 market_regime_filter=experiment_config.get("market_regime_filter"),
                 external_regime_filter=experiment_config.get("external_regime_filter"),
+                rebalance_frequency=str(experiment_config.get("rebalance_frequency", "monthly")),
                 backtest_config=experiment_config.get("backtest_config"),
                 enable_factor_diagnostics=bool(experiment_config.get("enable_factor_diagnostics", False)),
                 analysis_horizons=tuple(experiment_config.get("analysis_horizons", (5, 10, 20))),
