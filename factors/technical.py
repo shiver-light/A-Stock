@@ -312,6 +312,145 @@ def amount_mean_20d_factor(*, ts_code: str, start_date: str, end_date: str, refr
     return build_factor_output(data, "amount_mean_20d", "amount_mean_20d")
 
 
+def price_new_low_20d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
+    """Closeness to a 20-day closing low, where larger values mean closer to a stage low."""
+
+    data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=45)
+    validate_factor_input(data, ["trade_date", "ts_code", "close"])
+    data = data.sort_values(["ts_code", "trade_date"]).reset_index(drop=True)
+    rolling_low = data.groupby("ts_code")["close"].rolling(20).min().reset_index(level=0, drop=True)
+    data["price_new_low_20d"] = np.where(data["close"] == 0, np.nan, rolling_low / data["close"])
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "price_new_low_20d", "price_new_low_20d")
+
+
+def kdj_bullish_divergence_20d_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """KDJ bullish divergence near a 20-day low.
+
+    Larger values indicate price is at/near a 20-day low while J is above its
+    own recent low. This uses only same-day and historical OHLC data.
+    """
+
+    data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=70,
+        fields=("high", "low", "close"),
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "high", "low", "close"])
+    data = _append_kdj_columns(data)
+    grouped = data.groupby("ts_code")
+    rolling_close_low = grouped["close"].rolling(20).min().reset_index(level=0, drop=True)
+    rolling_j_low = grouped["kdj_j"].rolling(20).min().reset_index(level=0, drop=True)
+    price_near_low = np.where(data["close"] == 0, np.nan, rolling_close_low / data["close"])
+    j_divergence = (data["kdj_j"] - rolling_j_low) / 100.0
+    data["kdj_bullish_divergence_20d"] = np.where(price_near_low >= 0.98, price_near_low + j_divergence, np.nan)
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "kdj_bullish_divergence_20d", "kdj_bullish_divergence_20d")
+
+
+def kdj_j_turn_up_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
+    """J value turning up from a low zone, where larger values mean stronger low-level rebound."""
+
+    data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=45,
+        fields=("high", "low", "close"),
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "high", "low", "close"])
+    data = _append_kdj_columns(data)
+    previous_j = data.groupby("ts_code")["kdj_j"].shift(1)
+    j_delta = data["kdj_j"] - previous_j
+    data["kdj_j_turn_up"] = np.where((previous_j <= 30.0) & (j_delta > 0), j_delta / 100.0, np.nan)
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "kdj_j_turn_up", "kdj_j_turn_up")
+
+
+def kdj_golden_cross_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
+    """KDJ K crossing above D on the current day, represented as 1.0 when true."""
+
+    data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=45,
+        fields=("high", "low", "close"),
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "high", "low", "close"])
+    data = _append_kdj_columns(data)
+    previous_k = data.groupby("ts_code")["kdj_k"].shift(1)
+    previous_d = data.groupby("ts_code")["kdj_d"].shift(1)
+    cross = (previous_k <= previous_d) & (data["kdj_k"] > data["kdj_d"])
+    data["kdj_golden_cross"] = np.where(cross, 1.0, np.nan)
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "kdj_golden_cross", "kdj_golden_cross")
+
+
+def amount_mild_expansion_5d_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """Mild amount expansion: highest near 5-day amount at 1.1-1.8x the 20-day mean."""
+
+    data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=45,
+        fields=("amount",),
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "amount"])
+    data = data.sort_values(["ts_code", "trade_date"]).reset_index(drop=True)
+    amount = pd.to_numeric(data["amount"], errors="coerce")
+    grouped = data["ts_code"]
+    amount_5d = amount.groupby(grouped).rolling(5).mean().reset_index(level=0, drop=True)
+    amount_20d = amount.groupby(grouped).rolling(20).mean().reset_index(level=0, drop=True)
+    ratio = np.where(amount_20d == 0, np.nan, amount_5d / amount_20d)
+    data["amount_mild_expansion_5d"] = np.where(
+        (ratio >= 1.0) & (ratio <= 2.2),
+        1.0 - (np.abs(ratio - 1.4) / 1.4),
+        np.nan,
+    )
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "amount_mild_expansion_5d", "amount_mild_expansion_5d")
+
+
+def ma5_ma10_breakout_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
+    """Close above both 5-day and 10-day moving averages, scaled by the smaller distance."""
+
+    data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=30)
+    validate_factor_input(data, ["trade_date", "ts_code", "close"])
+    data = data.sort_values(["ts_code", "trade_date"]).reset_index(drop=True)
+    grouped_close = data.groupby("ts_code")["close"]
+    ma5 = grouped_close.rolling(5).mean().reset_index(level=0, drop=True)
+    ma10 = grouped_close.rolling(10).mean().reset_index(level=0, drop=True)
+    distance5 = np.where(ma5 == 0, np.nan, (data["close"] / ma5) - 1.0)
+    distance10 = np.where(ma10 == 0, np.nan, (data["close"] / ma10) - 1.0)
+    data["ma5_ma10_breakout"] = np.where(
+        (distance5 > 0) & (distance10 > 0),
+        np.minimum(distance5, distance10),
+        np.nan,
+    )
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "ma5_ma10_breakout", "ma5_ma10_breakout")
+
+
 def gap_risk_20d_negative_factor(
     *,
     ts_code: str,
@@ -691,6 +830,19 @@ def close_to_high_20d_factor(*, ts_code: str, start_date: str, end_date: str, re
     data["close_to_high_20d"] = np.where(rolling_high == 0, np.nan, data["close"] / rolling_high)
     data = _clip_dates(data, start_date, end_date)
     return build_factor_output(data, "close_to_high_20d", "close_to_high_20d")
+
+
+def _append_kdj_columns(data: pd.DataFrame) -> pd.DataFrame:
+    result = data.sort_values(["ts_code", "trade_date"]).reset_index(drop=True).copy()
+    grouped = result.groupby("ts_code", group_keys=False)
+    low_9 = grouped["low"].rolling(9).min().reset_index(level=0, drop=True)
+    high_9 = grouped["high"].rolling(9).max().reset_index(level=0, drop=True)
+    denominator = high_9 - low_9
+    result["kdj_rsv"] = np.where(denominator == 0, 50.0, ((result["close"] - low_9) / denominator) * 100.0)
+    result["kdj_k"] = grouped["kdj_rsv"].transform(lambda series: series.ewm(alpha=1.0 / 3.0, adjust=False).mean())
+    result["kdj_d"] = grouped["kdj_k"].transform(lambda series: series.ewm(alpha=1.0 / 3.0, adjust=False).mean())
+    result["kdj_j"] = (3.0 * result["kdj_k"]) - (2.0 * result["kdj_d"])
+    return result
 
 
 def pullback_after_trend_60d_factor(

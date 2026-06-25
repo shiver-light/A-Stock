@@ -1,0 +1,207 @@
+global:
+  # KDJ bottom-reversal research:
+  # Conditions map to daily factors only using same-day and historical OHLCV.
+  # Signals follow the repository default assumption: T close signal, next
+  # rebalance execution through the existing pipeline/backtest path.
+  start_date: "20250101"
+  end_date: "20260608"
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 10.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 300000.0
+
+experiments:
+  - name: "kdj_hs300_strict_reversal_top10"
+    universe_name: "hs300"
+    benchmark_code: "000300.SH"
+    top_n: 10
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.70
+      - factor: "kdj_j_turn_up"
+        op: "quantile_gte"
+        value: 0.50
+    factor_config:
+      kdj_bullish_divergence_20d: 0.35
+      kdj_j_turn_up: 0.25
+      kdj_golden_cross: 0.20
+      amount_mild_expansion_5d: 0.10
+      ma5_ma10_breakout: 0.10
+
+  - name: "kdj_hs300_confirmed_reversal_top10"
+    universe_name: "hs300"
+    benchmark_code: "000300.SH"
+    top_n: 10
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.60
+    factor_config:
+      kdj_bullish_divergence_20d: 0.25
+      kdj_j_turn_up: 0.20
+      kdj_golden_cross: 0.20
+      amount_mild_expansion_5d: 0.15
+      ma5_ma10_breakout: 0.20
+
+  - name: "kdj_hs300_volume_breakout_top10"
+    universe_name: "hs300"
+    benchmark_code: "000300.SH"
+    top_n: 10
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.50
+    factor_config:
+      kdj_j_turn_up: 0.20
+      kdj_golden_cross: 0.25
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout: 0.30
+
+  - name: "kdj_hs300_strict_reversal_top20"
+    universe_name: "hs300"
+    benchmark_code: "000300.SH"
+    top_n: 20
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.70
+      - factor: "kdj_j_turn_up"
+        op: "quantile_gte"
+        value: 0.50
+    factor_config:
+      kdj_bullish_divergence_20d: 0.35
+      kdj_j_turn_up: 0.25
+      kdj_golden_cross: 0.20
+      amount_mild_expansion_5d: 0.10
+      ma5_ma10_breakout: 0.10
+
+  - name: "kdj_hs300_confirmed_reversal_top20"
+    universe_name: "hs300"
+    benchmark_code: "000300.SH"
+    top_n: 20
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.60
+    factor_config:
+      kdj_bullish_divergence_20d: 0.25
+      kdj_j_turn_up: 0.20
+      kdj_golden_cross: 0.20
+      amount_mild_expansion_5d: 0.15
+      ma5_ma10_breakout: 0.20
+
+  - name: "kdj_hs300_volume_breakout_top20"
+    universe_name: "hs300"
+    benchmark_code: "000300.SH"
+    top_n: 20
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.50
+    factor_config:
+      kdj_j_turn_up: 0.20
+      kdj_golden_cross: 0.25
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout: 0.30
+
+  - name: "kdj_zz500_strict_reversal_top10"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    top_n: 10
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.70
+      - factor: "kdj_j_turn_up"
+        op: "quantile_gte"
+        value: 0.50
+    factor_config:
+      kdj_bullish_divergence_20d: 0.35
+      kdj_j_turn_up: 0.25
+      kdj_golden_cross: 0.20
+      amount_mild_expansion_5d: 0.10
+      ma5_ma10_breakout: 0.10
+
+  - name: "kdj_zz500_confirmed_reversal_top10"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    top_n: 10
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.60
+    factor_config:
+      kdj_bullish_divergence_20d: 0.25
+      kdj_j_turn_up: 0.20
+      kdj_golden_cross: 0.20
+      amount_mild_expansion_5d: 0.15
+      ma5_ma10_breakout: 0.20
+
+  - name: "kdj_zz500_volume_breakout_top10"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    top_n: 10
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.50
+    factor_config:
+      kdj_j_turn_up: 0.20
+      kdj_golden_cross: 0.25
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout: 0.30
+
+  - name: "kdj_zz500_strict_reversal_top20"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    top_n: 20
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.70
+      - factor: "kdj_j_turn_up"
+        op: "quantile_gte"
+        value: 0.50
+    factor_config:
+      kdj_bullish_divergence_20d: 0.35
+      kdj_j_turn_up: 0.25
+      kdj_golden_cross: 0.20
+      amount_mild_expansion_5d: 0.10
+      ma5_ma10_breakout: 0.10
+
+  - name: "kdj_zz500_confirmed_reversal_top20"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    top_n: 20
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.60
+    factor_config:
+      kdj_bullish_divergence_20d: 0.25
+      kdj_j_turn_up: 0.20
+      kdj_golden_cross: 0.20
+      amount_mild_expansion_5d: 0.15
+      ma5_ma10_breakout: 0.20
+
+  - name: "kdj_zz500_volume_breakout_top20"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    top_n: 20
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.50
+    factor_config:
+      kdj_j_turn_up: 0.20
+      kdj_golden_cross: 0.25
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout: 0.30

@@ -10,6 +10,7 @@ from factors.fundamental import bp_factor, ep_ttm_factor, roe_ttm_factor
 from factors.library import get_factor_function
 from factors.technical import (
     amount_mean_20d_factor,
+    amount_mild_expansion_5d_factor,
     amplitude_20d_factor,
     close_to_high_20d_factor,
     close_near_high_on_high_amount_20d_factor,
@@ -18,10 +19,15 @@ from factors.technical import (
     down_day_support_20d_factor,
     high_turnover_low_range_20d_factor,
     illiq_negative_factor,
+    kdj_bullish_divergence_20d_factor,
+    kdj_golden_cross_factor,
+    kdj_j_turn_up_factor,
     liquidity_improvement_20d_factor,
     max_drawdown_60d_negative_factor,
+    ma5_ma10_breakout_factor,
     momentum_60d_factor,
     money_flow_strength_20d_factor,
+    price_new_low_20d_factor,
     position_safety_60d_factor,
     return_120d_factor,
     return_5d_negative_factor,
@@ -335,6 +341,138 @@ class TechnicalFactorsTestCase(unittest.TestCase):
 
         self.assertEqual(result.iloc[-1]["factor_name"], "amount_mean_20d")
         self.assertAlmostEqual(result.iloc[-1]["factor_value"], 100.0)
+
+    @patch("factors.technical._load_qfq_daily")
+    def test_price_new_low_20d_factor(self, mock_load_qfq_daily) -> None:
+        dates = self._date_range(25)
+        closes = [100.0 - index for index in range(25)]
+        mock_load_qfq_daily.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * 25,
+                "close": closes,
+            }
+        )
+
+        result = price_new_low_20d_factor(
+            ts_code="000001.SZ",
+            start_date=dates[20],
+            end_date=dates[-1],
+        )
+
+        self.assertEqual(result.iloc[-1]["factor_name"], "price_new_low_20d")
+        self.assertAlmostEqual(result.iloc[-1]["factor_value"], 1.0)
+
+    @patch("factors.technical._load_qfq_market_data")
+    def test_amount_mild_expansion_5d_factor(self, mock_load_qfq_market_data) -> None:
+        dates = self._date_range(25)
+        amounts = [100.0] * 20 + [160.0] * 5
+        mock_load_qfq_market_data.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * 25,
+                "amount": amounts,
+            }
+        )
+
+        result = amount_mild_expansion_5d_factor(
+            ts_code="000001.SZ",
+            start_date=dates[20],
+            end_date=dates[-1],
+        )
+
+        self.assertEqual(result.iloc[-1]["factor_name"], "amount_mild_expansion_5d")
+        self.assertGreater(result.iloc[-1]["factor_value"], 0.0)
+
+    @patch("factors.technical._load_qfq_daily")
+    def test_ma5_ma10_breakout_factor(self, mock_load_qfq_daily) -> None:
+        dates = self._date_range(15)
+        closes = [10.0] * 10 + [10.2, 10.4, 10.6, 10.8, 11.0]
+        mock_load_qfq_daily.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * 15,
+                "close": closes,
+            }
+        )
+
+        result = ma5_ma10_breakout_factor(
+            ts_code="000001.SZ",
+            start_date=dates[10],
+            end_date=dates[-1],
+        )
+
+        self.assertEqual(result.iloc[-1]["factor_name"], "ma5_ma10_breakout")
+        self.assertGreater(result.iloc[-1]["factor_value"], 0.0)
+
+    @patch("factors.technical._load_qfq_market_data")
+    def test_kdj_j_turn_up_factor(self, mock_load_qfq_market_data) -> None:
+        dates = self._date_range(25)
+        closes = [10.0] * 10 + [9.0, 8.0, 7.0, 6.0, 5.0, 5.2, 5.4, 5.6, 5.8, 6.0, 6.2, 6.4, 6.6, 6.8, 7.0]
+        mock_load_qfq_market_data.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * 25,
+                "high": [value + 0.5 for value in closes],
+                "low": [value - 0.5 for value in closes],
+                "close": closes,
+            }
+        )
+
+        result = kdj_j_turn_up_factor(
+            ts_code="000001.SZ",
+            start_date=dates[15],
+            end_date=dates[-1],
+        )
+
+        self.assertEqual(result.iloc[-1]["factor_name"], "kdj_j_turn_up")
+        self.assertTrue(result["factor_value"].notna().any())
+
+    @patch("factors.technical._load_qfq_market_data")
+    def test_kdj_golden_cross_factor_preserves_schema(self, mock_load_qfq_market_data) -> None:
+        dates = self._date_range(25)
+        closes = [10.0] * 10 + [9.0, 8.0, 7.0, 6.0, 5.0, 5.2, 5.4, 5.6, 5.8, 6.0, 6.2, 6.4, 6.6, 6.8, 7.0]
+        mock_load_qfq_market_data.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * 25,
+                "high": [value + 0.5 for value in closes],
+                "low": [value - 0.5 for value in closes],
+                "close": closes,
+            }
+        )
+
+        result = kdj_golden_cross_factor(
+            ts_code="000001.SZ",
+            start_date=dates[15],
+            end_date=dates[-1],
+        )
+
+        self.assertEqual(result.columns.tolist(), ["trade_date", "ts_code", "factor_name", "factor_value"])
+        self.assertEqual(result.iloc[-1]["factor_name"], "kdj_golden_cross")
+
+    @patch("factors.technical._load_qfq_market_data")
+    def test_kdj_bullish_divergence_20d_factor_preserves_schema(self, mock_load_qfq_market_data) -> None:
+        dates = self._date_range(35)
+        closes = [10.0] * 10 + [9.5, 9.0, 8.5, 8.0, 7.5, 7.0, 6.5, 6.0, 5.5, 5.0] + [5.2] * 10 + [4.9] * 5
+        mock_load_qfq_market_data.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * 35,
+                "high": [value + 0.8 for value in closes],
+                "low": [value - 0.8 for value in closes],
+                "close": closes,
+            }
+        )
+
+        result = kdj_bullish_divergence_20d_factor(
+            ts_code="000001.SZ",
+            start_date=dates[20],
+            end_date=dates[-1],
+        )
+
+        self.assertEqual(result.columns.tolist(), ["trade_date", "ts_code", "factor_name", "factor_value"])
+        self.assertEqual(result.iloc[-1]["factor_name"], "kdj_bullish_divergence_20d")
 
     @patch("factors.technical._load_qfq_market_data")
     def test_illiq_negative_factor(self, mock_load_qfq_market_data) -> None:
@@ -843,8 +981,14 @@ class TechnicalFactorsTestCase(unittest.TestCase):
         self.assertIs(get_factor_function("max_drawdown_60d_negative"), max_drawdown_60d_negative_factor)
         self.assertIs(get_factor_function("turnover_volatility_20d"), turnover_volatility_20d_factor)
         self.assertIs(get_factor_function("amount_mean_20d"), amount_mean_20d_factor)
+        self.assertIs(get_factor_function("amount_mild_expansion_5d"), amount_mild_expansion_5d_factor)
         self.assertIs(get_factor_function("illiq_negative"), illiq_negative_factor)
         self.assertIs(get_factor_function("money_flow_strength_20d"), money_flow_strength_20d_factor)
+        self.assertIs(get_factor_function("price_new_low_20d"), price_new_low_20d_factor)
+        self.assertIs(get_factor_function("kdj_bullish_divergence_20d"), kdj_bullish_divergence_20d_factor)
+        self.assertIs(get_factor_function("kdj_j_turn_up"), kdj_j_turn_up_factor)
+        self.assertIs(get_factor_function("kdj_golden_cross"), kdj_golden_cross_factor)
+        self.assertIs(get_factor_function("ma5_ma10_breakout"), ma5_ma10_breakout_factor)
         self.assertIs(get_factor_function("high_turnover_low_range_20d"), high_turnover_low_range_20d_factor)
         self.assertIs(get_factor_function("price_suppression_20d"), price_suppression_20d_factor)
         self.assertIs(get_factor_function("down_day_support_20d"), down_day_support_20d_factor)
