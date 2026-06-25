@@ -1,0 +1,139 @@
+global:
+  # KDJ short-cycle stage2:
+  # Strict event signals are converted to trailing 3-day recency-decay factors.
+  # For date T, the 3-day value only uses T/T-1/T-2 observations, never future
+  # confirmation. Rebalance frequency remains explicit per experiment.
+  start_date: "20250101"
+  end_date: "20260608"
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 10.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 300000.0
+
+experiments:
+  - name: "kdjsc2_01_hs300_weekly_3d_reversal_top10"
+    universe_name: "hs300"
+    benchmark_code: "000300.SH"
+    rebalance_frequency: "weekly"
+    top_n: 10
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.25
+    factor_config:
+      kdj_j_turn_up_3d: 0.35
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout_3d: 0.25
+      kdj_bullish_divergence_20d: 0.15
+
+  - name: "kdjsc2_02_hs300_weekly_3d_cross_watch_top10"
+    universe_name: "hs300"
+    benchmark_code: "000300.SH"
+    rebalance_frequency: "weekly"
+    top_n: 10
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.20
+    factor_config:
+      kdj_j_turn_up_3d: 0.30
+      kdj_golden_cross_3d: 0.20
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout_3d: 0.25
+
+  - name: "kdjsc2_03_hs300_daily_3d_reversal_top5"
+    universe_name: "hs300"
+    benchmark_code: "000300.SH"
+    rebalance_frequency: "daily"
+    top_n: 5
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.25
+    factor_config:
+      kdj_j_turn_up_3d: 0.35
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout_3d: 0.25
+      kdj_bullish_divergence_20d: 0.15
+
+  - name: "kdjsc2_04_hs300_daily_3d_cross_watch_top5"
+    universe_name: "hs300"
+    benchmark_code: "000300.SH"
+    rebalance_frequency: "daily"
+    top_n: 5
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.20
+    factor_config:
+      kdj_j_turn_up_3d: 0.30
+      kdj_golden_cross_3d: 0.20
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout_3d: 0.25
+
+  - name: "kdjsc2_05_zz500_weekly_3d_reversal_top10"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    rebalance_frequency: "weekly"
+    top_n: 10
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.25
+    factor_config:
+      kdj_j_turn_up_3d: 0.35
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout_3d: 0.25
+      kdj_bullish_divergence_20d: 0.15
+
+  - name: "kdjsc2_06_zz500_weekly_3d_cross_watch_top10"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    rebalance_frequency: "weekly"
+    top_n: 10
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.20
+    factor_config:
+      kdj_j_turn_up_3d: 0.30
+      kdj_golden_cross_3d: 0.20
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout_3d: 0.25
+
+  - name: "kdjsc2_07_zz500_daily_3d_reversal_top5"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    rebalance_frequency: "daily"
+    top_n: 5
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.25
+    factor_config:
+      kdj_j_turn_up_3d: 0.35
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout_3d: 0.25
+      kdj_bullish_divergence_20d: 0.15
+
+  - name: "kdjsc2_08_zz500_daily_3d_cross_watch_top5"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    rebalance_frequency: "daily"
+    top_n: 5
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.20
+    factor_config:
+      kdj_j_turn_up_3d: 0.30
+      kdj_golden_cross_3d: 0.20
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout_3d: 0.25

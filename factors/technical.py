@@ -377,6 +377,31 @@ def kdj_j_turn_up_factor(*, ts_code: str, start_date: str, end_date: str, refres
     return build_factor_output(data, "kdj_j_turn_up", "kdj_j_turn_up")
 
 
+def kdj_j_turn_up_3d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
+    """Trailing 3-day low-zone J turn-up signal with recency decay and no look-ahead."""
+
+    data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=45,
+        fields=("high", "low", "close"),
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "high", "low", "close"])
+    data = _append_kdj_columns(data)
+    previous_j = data.groupby("ts_code")["kdj_j"].shift(1)
+    j_delta = data["kdj_j"] - previous_j
+    raw_signal = pd.Series(
+        np.where((previous_j <= 30.0) & (j_delta > 0), j_delta / 100.0, np.nan),
+        index=data.index,
+        dtype="float64",
+    )
+    data["kdj_j_turn_up_3d"] = _trailing_decay_max(raw_signal, data["ts_code"])
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "kdj_j_turn_up_3d", "kdj_j_turn_up_3d")
+
+
 def kdj_golden_cross_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
     """KDJ K crossing above D on the current day, represented as 1.0 when true."""
 
@@ -396,6 +421,28 @@ def kdj_golden_cross_factor(*, ts_code: str, start_date: str, end_date: str, ref
     data["kdj_golden_cross"] = np.where(cross, 1.0, np.nan)
     data = _clip_dates(data, start_date, end_date)
     return build_factor_output(data, "kdj_golden_cross", "kdj_golden_cross")
+
+
+def kdj_golden_cross_3d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
+    """Trailing 3-day KDJ golden-cross event with recency decay and no look-ahead."""
+
+    data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=45,
+        fields=("high", "low", "close"),
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "high", "low", "close"])
+    data = _append_kdj_columns(data)
+    previous_k = data.groupby("ts_code")["kdj_k"].shift(1)
+    previous_d = data.groupby("ts_code")["kdj_d"].shift(1)
+    cross = (previous_k <= previous_d) & (data["kdj_k"] > data["kdj_d"])
+    raw_signal = pd.Series(np.where(cross, 1.0, np.nan), index=data.index, dtype="float64")
+    data["kdj_golden_cross_3d"] = _trailing_decay_max(raw_signal, data["ts_code"])
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "kdj_golden_cross_3d", "kdj_golden_cross_3d")
 
 
 def amount_mild_expansion_5d_factor(
@@ -449,6 +496,27 @@ def ma5_ma10_breakout_factor(*, ts_code: str, start_date: str, end_date: str, re
     )
     data = _clip_dates(data, start_date, end_date)
     return build_factor_output(data, "ma5_ma10_breakout", "ma5_ma10_breakout")
+
+
+def ma5_ma10_breakout_3d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
+    """Trailing 3-day close-above-MA5/MA10 signal with recency decay and no look-ahead."""
+
+    data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=30)
+    validate_factor_input(data, ["trade_date", "ts_code", "close"])
+    data = data.sort_values(["ts_code", "trade_date"]).reset_index(drop=True)
+    grouped_close = data.groupby("ts_code")["close"]
+    ma5 = grouped_close.rolling(5).mean().reset_index(level=0, drop=True)
+    ma10 = grouped_close.rolling(10).mean().reset_index(level=0, drop=True)
+    distance5 = np.where(ma5 == 0, np.nan, (data["close"] / ma5) - 1.0)
+    distance10 = np.where(ma10 == 0, np.nan, (data["close"] / ma10) - 1.0)
+    raw_signal = pd.Series(
+        np.where((distance5 > 0) & (distance10 > 0), np.minimum(distance5, distance10), np.nan),
+        index=data.index,
+        dtype="float64",
+    )
+    data["ma5_ma10_breakout_3d"] = _trailing_decay_max(raw_signal, data["ts_code"])
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "ma5_ma10_breakout_3d", "ma5_ma10_breakout_3d")
 
 
 def gap_risk_20d_negative_factor(
@@ -843,6 +911,20 @@ def _append_kdj_columns(data: pd.DataFrame) -> pd.DataFrame:
     result["kdj_d"] = grouped["kdj_k"].transform(lambda series: series.ewm(alpha=1.0 / 3.0, adjust=False).mean())
     result["kdj_j"] = (3.0 * result["kdj_k"]) - (2.0 * result["kdj_d"])
     return result
+
+
+def _trailing_decay_max(
+    values: pd.Series,
+    group_keys: pd.Series,
+    *,
+    decay_weights: tuple[float, ...] = (1.0, 0.7, 0.4),
+) -> pd.Series:
+    weighted_signals = []
+    grouped = values.groupby(group_keys)
+    for offset, weight in enumerate(decay_weights):
+        weighted_signals.append(grouped.shift(offset) * weight)
+    combined = pd.concat(weighted_signals, axis=1)
+    return combined.max(axis=1, skipna=True)
 
 
 def pullback_after_trend_60d_factor(
