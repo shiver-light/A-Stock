@@ -1,0 +1,104 @@
+global:
+  # ZZ1000 KDJ short-cycle stage2 research.
+  # This reuses the existing trailing 3-day KDJ event factors. For date T,
+  # trailing factors only use T/T-1/T-2 observations and never future
+  # confirmation. Forward max gain metrics are ex-post diagnostics only.
+  start_date: "20250101"
+  end_date: "20260608"
+  benchmark_code: "000852.SH"
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 300000.0
+
+experiments:
+  - name: "z1kdj2_01_weekly_3d_reversal_top20"
+    universe_name: "zz1000"
+    rebalance_frequency: "weekly"
+    top_n: 20
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.25
+    factor_config:
+      kdj_j_turn_up_3d: 0.35
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout_3d: 0.25
+      kdj_bullish_divergence_20d: 0.15
+
+  - name: "z1kdj2_02_weekly_3d_cross_watch_top20"
+    universe_name: "zz1000"
+    rebalance_frequency: "weekly"
+    top_n: 20
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.20
+    factor_config:
+      kdj_j_turn_up_3d: 0.30
+      kdj_golden_cross_3d: 0.20
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout_3d: 0.25
+
+  - name: "z1kdj2_03_weekly_3d_reversal_top30"
+    universe_name: "zz1000"
+    rebalance_frequency: "weekly"
+    top_n: 30
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.25
+    factor_config:
+      kdj_j_turn_up_3d: 0.35
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout_3d: 0.25
+      kdj_bullish_divergence_20d: 0.15
+
+  - name: "z1kdj2_04_weekly_3d_cross_watch_top30"
+    universe_name: "zz1000"
+    rebalance_frequency: "weekly"
+    top_n: 30
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.20
+    factor_config:
+      kdj_j_turn_up_3d: 0.30
+      kdj_golden_cross_3d: 0.20
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout_3d: 0.25
+
+  - name: "z1kdj2_05_daily_3d_reversal_top20"
+    universe_name: "zz1000"
+    rebalance_frequency: "daily"
+    top_n: 20
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.25
+    factor_config:
+      kdj_j_turn_up_3d: 0.35
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout_3d: 0.25
+      kdj_bullish_divergence_20d: 0.15
+
+  - name: "z1kdj2_06_daily_3d_cross_watch_top20"
+    universe_name: "zz1000"
+    rebalance_frequency: "daily"
+    top_n: 20
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.20
+    factor_config:
+      kdj_j_turn_up_3d: 0.30
+      kdj_golden_cross_3d: 0.20
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout_3d: 0.25
