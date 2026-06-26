@@ -19,6 +19,7 @@ from research import (
     run_experiments,
     sort_research_summary,
 )
+from research.summary import SUMMARY_METRIC_COLUMNS
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -40,7 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
     summary_parser.add_argument(
         "--sort-by",
         default="sharpe",
-        choices=["sharpe", "excess_cumulative_return", "max_drawdown"],
+        choices=SUMMARY_METRIC_COLUMNS,
         help="Column to sort the summary by.",
     )
     summary_parser.add_argument(
