@@ -1,0 +1,107 @@
+global:
+  # ZZ2000 ex-BJ KDJ short-cycle stage2 research.
+  # This remains an approximation of zz2000 because current data coverage for
+  # some BJ constituents is incomplete. Trailing 3-day KDJ event factors only
+  # use T/T-1/T-2 observations and never future confirmation.
+  # Forward max gain metrics are ex-post diagnostics only.
+  start_date: "20250101"
+  end_date: "20260608"
+  benchmark_code: "000300.SH"
+  # Disabled for the first ZZ2000 KDJ pass because the large ex-BJ universe
+  # makes per-factor diagnostics much slower than strategy evaluation.
+  enable_factor_diagnostics: false
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 20.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 1200000.0
+
+experiments:
+  - name: "z20xkdj2_01_weekly_3d_reversal_top80"
+    universe_name: "zz2000_ex_bj"
+    rebalance_frequency: "weekly"
+    top_n: 80
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.25
+    factor_config:
+      kdj_j_turn_up_3d: 0.35
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout_3d: 0.25
+      kdj_bullish_divergence_20d: 0.15
+
+  - name: "z20xkdj2_02_weekly_3d_cross_watch_top80"
+    universe_name: "zz2000_ex_bj"
+    rebalance_frequency: "weekly"
+    top_n: 80
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.20
+    factor_config:
+      kdj_j_turn_up_3d: 0.30
+      kdj_golden_cross_3d: 0.20
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout_3d: 0.25
+
+  - name: "z20xkdj2_03_weekly_3d_reversal_top120"
+    universe_name: "zz2000_ex_bj"
+    rebalance_frequency: "weekly"
+    top_n: 120
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.25
+    factor_config:
+      kdj_j_turn_up_3d: 0.35
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout_3d: 0.25
+      kdj_bullish_divergence_20d: 0.15
+
+  - name: "z20xkdj2_04_weekly_3d_cross_watch_top120"
+    universe_name: "zz2000_ex_bj"
+    rebalance_frequency: "weekly"
+    top_n: 120
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.20
+    factor_config:
+      kdj_j_turn_up_3d: 0.30
+      kdj_golden_cross_3d: 0.20
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout_3d: 0.25
+
+  - name: "z20xkdj2_05_daily_3d_reversal_top80"
+    universe_name: "zz2000_ex_bj"
+    rebalance_frequency: "daily"
+    top_n: 80
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.25
+    factor_config:
+      kdj_j_turn_up_3d: 0.35
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout_3d: 0.25
+      kdj_bullish_divergence_20d: 0.15
+
+  - name: "z20xkdj2_06_daily_3d_cross_watch_top80"
+    universe_name: "zz2000_ex_bj"
+    rebalance_frequency: "daily"
+    top_n: 80
+    signal_filters:
+      - factor: "price_new_low_20d"
+        op: "quantile_gte"
+        value: 0.20
+    factor_config:
+      kdj_j_turn_up_3d: 0.30
+      kdj_golden_cross_3d: 0.20
+      amount_mild_expansion_5d: 0.25
+      ma5_ma10_breakout_3d: 0.25
