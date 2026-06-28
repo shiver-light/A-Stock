@@ -1,0 +1,159 @@
+global:
+  # KDJ/MACD quality research for non-HS300/ZZ500 universes.
+  # This matrix only covers zz1000 and zz2000_ex_bj. It studies cross quality,
+  # post-cross pullback, momentum improvement, and false-breakout risk without
+  # changing the repository's signal/execution assumptions.
+  start_date: "20250101"
+  end_date: "20260608"
+  enable_factor_diagnostics: false
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 300000.0
+
+experiments:
+  - name: "qkm_01_zz1000_macd_momentum_quality_top30"
+    universe_name: "zz1000"
+    benchmark_code: "000852.SH"
+    rebalance_frequency: "daily"
+    top_n: 30
+    signal_filters:
+      - factor: "daily_macd_golden_cross_2d"
+        op: "quantile_gte"
+        value: 0.5
+    factor_config:
+      daily_macd_golden_cross_2d: 0.25
+      macd_hist_slope_5d: 0.25
+      macd_zero_axis_strength: 0.20
+      amount_mild_expansion_5d: 0.15
+      false_breakout_risk_negative: 0.15
+
+  - name: "qkm_02_zz1000_kdj_low_reversal_top30"
+    universe_name: "zz1000"
+    benchmark_code: "000852.SH"
+    rebalance_frequency: "daily"
+    top_n: 30
+    signal_filters:
+      - factor: "kdj_golden_cross_3d"
+        op: "quantile_gte"
+        value: 0.5
+    factor_config:
+      kdj_golden_cross_3d: 0.25
+      kdj_low_zone_cross: 0.25
+      return_5d_negative: 0.20
+      position_safety_60d: 0.20
+      false_breakout_risk_negative: 0.10
+
+  - name: "qkm_03_zz1000_post_cross_pullback_top30"
+    universe_name: "zz1000"
+    benchmark_code: "000852.SH"
+    rebalance_frequency: "daily"
+    top_n: 30
+    signal_filters:
+      - factor: "daily_macd_golden_cross_2d"
+        op: "quantile_gte"
+        value: 0.5
+    factor_config:
+      daily_macd_golden_cross_2d: 0.20
+      kdj_golden_cross_3d: 0.20
+      post_cross_pullback: 0.25
+      down_day_absorption_20d: 0.20
+      false_breakout_risk_negative: 0.15
+
+  - name: "qkm_04_zz1000_weekly_daily_quality_top30"
+    universe_name: "zz1000"
+    benchmark_code: "000852.SH"
+    rebalance_frequency: "daily"
+    top_n: 30
+    signal_filters:
+      - factor: "weekly_macd_golden_cross_2d"
+        op: "quantile_gte"
+        value: 0.5
+    factor_config:
+      weekly_macd_golden_cross_2d: 0.25
+      weekly_kdj_golden_cross_2d: 0.20
+      macd_hist_slope_5d: 0.20
+      amount_mean_20d: 0.15
+      false_breakout_risk_negative: 0.20
+
+  - name: "qkm_05_zz2000_ex_bj_macd_momentum_quality_top80"
+    universe_name: "zz2000_ex_bj"
+    benchmark_code: "000300.SH"
+    rebalance_frequency: "daily"
+    top_n: 80
+    backtest_config:
+      slippage_bps: 20.0
+      min_amount: 1200000.0
+    signal_filters:
+      - factor: "daily_macd_golden_cross_2d"
+        op: "quantile_gte"
+        value: 0.5
+    factor_config:
+      daily_macd_golden_cross_2d: 0.25
+      macd_hist_slope_5d: 0.25
+      macd_zero_axis_strength: 0.20
+      amount_mild_expansion_5d: 0.15
+      false_breakout_risk_negative: 0.15
+
+  - name: "qkm_06_zz2000_ex_bj_kdj_low_reversal_top80"
+    universe_name: "zz2000_ex_bj"
+    benchmark_code: "000300.SH"
+    rebalance_frequency: "daily"
+    top_n: 80
+    backtest_config:
+      slippage_bps: 20.0
+      min_amount: 1200000.0
+    signal_filters:
+      - factor: "kdj_golden_cross_3d"
+        op: "quantile_gte"
+        value: 0.5
+    factor_config:
+      kdj_golden_cross_3d: 0.25
+      kdj_low_zone_cross: 0.25
+      return_5d_negative: 0.20
+      position_safety_60d: 0.20
+      false_breakout_risk_negative: 0.10
+
+  - name: "qkm_07_zz2000_ex_bj_post_cross_pullback_top80"
+    universe_name: "zz2000_ex_bj"
+    benchmark_code: "000300.SH"
+    rebalance_frequency: "daily"
+    top_n: 80
+    backtest_config:
+      slippage_bps: 20.0
+      min_amount: 1200000.0
+    signal_filters:
+      - factor: "daily_macd_golden_cross_2d"
+        op: "quantile_gte"
+        value: 0.5
+    factor_config:
+      daily_macd_golden_cross_2d: 0.20
+      kdj_golden_cross_3d: 0.20
+      post_cross_pullback: 0.25
+      down_day_absorption_20d: 0.20
+      false_breakout_risk_negative: 0.15
+
+  - name: "qkm_08_zz2000_ex_bj_weekly_daily_quality_top80"
+    universe_name: "zz2000_ex_bj"
+    benchmark_code: "000300.SH"
+    rebalance_frequency: "daily"
+    top_n: 80
+    backtest_config:
+      slippage_bps: 20.0
+      min_amount: 1200000.0
+    signal_filters:
+      - factor: "weekly_macd_golden_cross_2d"
+        op: "quantile_gte"
+        value: 0.5
+    factor_config:
+      weekly_macd_golden_cross_2d: 0.25
+      weekly_kdj_golden_cross_2d: 0.20
+      macd_hist_slope_5d: 0.20
+      amount_mean_20d: 0.15
+      false_breakout_risk_negative: 0.20

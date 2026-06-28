@@ -470,6 +470,41 @@ def daily_macd_golden_cross_2d_factor(
     return build_factor_output(data, "daily_macd_golden_cross_2d", "daily_macd_golden_cross_2d")
 
 
+def macd_hist_slope_5d_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """5-day slope of daily MACD histogram, where larger values mean improving momentum."""
+
+    data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=120)
+    validate_factor_input(data, ["trade_date", "ts_code", "close"])
+    data = _append_macd_columns(data)
+    data["macd_hist_slope_5d"] = data["macd_hist"] - data.groupby("ts_code")["macd_hist"].shift(5)
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "macd_hist_slope_5d", "macd_hist_slope_5d")
+
+
+def macd_zero_axis_strength_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """Daily MACD DIF/DEA zero-axis strength, favoring crosses above or near zero."""
+
+    data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=120)
+    validate_factor_input(data, ["trade_date", "ts_code", "close"])
+    data = _append_macd_columns(data)
+    close = pd.to_numeric(data["close"], errors="coerce")
+    data["macd_zero_axis_strength"] = ((data["macd_dif"] + data["macd_dea"]) / 2.0).where(close != 0) / close
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "macd_zero_axis_strength", "macd_zero_axis_strength")
+
+
 def weekly_macd_golden_cross_2d_factor(
     *,
     ts_code: str,
@@ -573,6 +608,71 @@ def weekly_kdj_golden_cross_2d_factor(
     )
     data = _clip_dates(data, start_date, end_date)
     return build_factor_output(data, "weekly_kdj_golden_cross_2d", "weekly_kdj_golden_cross_2d")
+
+
+def kdj_low_zone_cross_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """KDJ golden cross in a low zone, where larger values mean lower-position reversal."""
+
+    data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=45,
+        fields=("high", "low", "close"),
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "high", "low", "close"])
+    data = _append_kdj_columns(data)
+    previous_k = data.groupby("ts_code")["kdj_k"].shift(1)
+    previous_d = data.groupby("ts_code")["kdj_d"].shift(1)
+    cross = (previous_k <= previous_d) & (data["kdj_k"] > data["kdj_d"])
+    low_zone = np.minimum(data["kdj_k"], data["kdj_d"])
+    low_zone_score = np.where(low_zone <= 50.0, (50.0 - low_zone) / 50.0, np.nan)
+    data["kdj_low_zone_cross"] = np.where(cross, low_zone_score, np.nan)
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "kdj_low_zone_cross", "kdj_low_zone_cross")
+
+
+def post_cross_pullback_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """Pullback after a recent daily MACD/KDJ cross, valid only after the cross date."""
+
+    data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=120,
+        fields=("high", "low", "close"),
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "high", "low", "close"])
+    data = _append_kdj_columns(_append_macd_columns(data))
+    previous_dif = data.groupby("ts_code")["macd_dif"].shift(1)
+    previous_dea = data.groupby("ts_code")["macd_dea"].shift(1)
+    previous_k = data.groupby("ts_code")["kdj_k"].shift(1)
+    previous_d = data.groupby("ts_code")["kdj_d"].shift(1)
+    macd_cross = (previous_dif <= previous_dea) & (data["macd_dif"] > data["macd_dea"])
+    kdj_cross = (previous_k <= previous_d) & (data["kdj_k"] > data["kdj_d"])
+    raw_cross = pd.Series(np.where(macd_cross | kdj_cross, 1.0, np.nan), index=data.index, dtype="float64")
+    recent_cross = _trailing_decay_max(raw_cross, data["ts_code"], decay_weights=(np.nan, 1.0, 1.0, 1.0))
+    return_3d = data.groupby("ts_code")["close"].pct_change(3)
+    rolling_high = data.groupby("ts_code")["high"].rolling(5).max().reset_index(level=0, drop=True)
+    near_high_penalty = np.where(rolling_high == 0, np.nan, data["close"] / rolling_high)
+    pullback = (-return_3d).clip(lower=0.0, upper=0.08)
+    data["post_cross_pullback"] = np.where(recent_cross.notna(), pullback * (2.0 - near_high_penalty), np.nan)
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "post_cross_pullback", "post_cross_pullback")
 
 
 def amount_mild_expansion_5d_factor(
@@ -978,6 +1078,40 @@ def down_day_absorption_20d_factor(
     )
     data = _clip_dates(data, start_date, end_date)
     return build_factor_output(data, "down_day_absorption_20d", "down_day_absorption_20d")
+
+
+def false_breakout_risk_negative_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """Negative false-breakout risk, penalizing high-volume weak closes and upper shadows."""
+
+    data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=45,
+        fields=("open", "high", "low", "close", "pre_close", "amount"),
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "open", "high", "low", "close", "pre_close", "amount"])
+    data = data.sort_values(["ts_code", "trade_date"]).reset_index(drop=True)
+    price_range = (data["high"] - data["low"]).replace(0, np.nan)
+    upper_shadow = (data["high"] - data[["open", "close"]].max(axis=1)) / price_range
+    close_location = (data["close"] - data["low"]) / price_range
+    daily_return = ((data["close"] / data["pre_close"]) - 1.0).where(data["pre_close"] != 0)
+    amount = pd.to_numeric(data["amount"], errors="coerce")
+    amount_mean_20d = amount.groupby(data["ts_code"]).rolling(20).mean().reset_index(level=0, drop=True)
+    amount_ratio = np.where(amount_mean_20d == 0, np.nan, amount / amount_mean_20d)
+    weak_close = (1.0 - close_location).clip(lower=0.0)
+    no_progress = (0.01 - daily_return).clip(lower=0.0)
+    raw_risk = upper_shadow.clip(lower=0.0) + weak_close + (amount_ratio * no_progress)
+    data["false_breakout_risk_negative"] = -raw_risk
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "false_breakout_risk_negative", "false_breakout_risk_negative")
 
 
 def amplitude_20d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:

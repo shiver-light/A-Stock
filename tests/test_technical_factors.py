@@ -18,6 +18,7 @@ from factors.technical import (
     distribution_risk_20d_negative_factor,
     down_day_absorption_20d_factor,
     down_day_support_20d_factor,
+    false_breakout_risk_negative_factor,
     high_turnover_low_range_20d_factor,
     illiq_negative_factor,
     kdj_bullish_divergence_20d_factor,
@@ -25,7 +26,10 @@ from factors.technical import (
     kdj_golden_cross_3d_factor,
     kdj_j_turn_up_factor,
     kdj_j_turn_up_3d_factor,
+    kdj_low_zone_cross_factor,
     liquidity_improvement_20d_factor,
+    macd_hist_slope_5d_factor,
+    macd_zero_axis_strength_factor,
     max_drawdown_60d_negative_factor,
     ma5_ma10_breakout_factor,
     ma5_ma10_breakout_3d_factor,
@@ -33,6 +37,7 @@ from factors.technical import (
     money_flow_strength_20d_factor,
     price_new_low_20d_factor,
     position_safety_60d_factor,
+    post_cross_pullback_factor,
     return_120d_factor,
     return_5d_negative_factor,
     return_60d_factor,
@@ -630,6 +635,119 @@ class TechnicalFactorsTestCase(unittest.TestCase):
         self.assertEqual(signals.iloc[0]["factor_value"], 1.0)
         self.assertEqual(signals.iloc[1]["factor_value"], 1.0)
 
+    @patch("factors.technical._load_qfq_daily")
+    def test_macd_hist_slope_5d_factor(self, mock_load_qfq_daily) -> None:
+        dates = self._date_range(80)
+        closes = [10.0] * 40 + [10.0 + (index * 0.2) for index in range(40)]
+        mock_load_qfq_daily.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * len(dates),
+                "close": closes,
+            }
+        )
+
+        result = macd_hist_slope_5d_factor(
+            ts_code="000001.SZ",
+            start_date=dates[60],
+            end_date=dates[-1],
+        )
+
+        self.assertEqual(result.iloc[-1]["factor_name"], "macd_hist_slope_5d")
+        self.assertTrue(result["factor_value"].notna().any())
+
+    @patch("factors.technical._load_qfq_daily")
+    def test_macd_zero_axis_strength_factor(self, mock_load_qfq_daily) -> None:
+        dates = self._date_range(80)
+        closes = [10.0] * 40 + [10.0 + (index * 0.2) for index in range(40)]
+        mock_load_qfq_daily.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * len(dates),
+                "close": closes,
+            }
+        )
+
+        result = macd_zero_axis_strength_factor(
+            ts_code="000001.SZ",
+            start_date=dates[60],
+            end_date=dates[-1],
+        )
+
+        self.assertEqual(result.iloc[-1]["factor_name"], "macd_zero_axis_strength")
+        self.assertTrue(result["factor_value"].notna().any())
+
+    @patch("factors.technical._load_qfq_market_data")
+    def test_kdj_low_zone_cross_factor_preserves_schema(self, mock_load_qfq_market_data) -> None:
+        dates = self._date_range(35)
+        closes = [10.0] * 10 + [9.0, 8.0, 7.0, 6.0, 5.0, 5.2, 5.4, 5.6, 5.8, 6.0] + [6.2] * 15
+        mock_load_qfq_market_data.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * len(dates),
+                "high": [value + 0.5 for value in closes],
+                "low": [value - 0.5 for value in closes],
+                "close": closes,
+            }
+        )
+
+        result = kdj_low_zone_cross_factor(
+            ts_code="000001.SZ",
+            start_date=dates[20],
+            end_date=dates[-1],
+        )
+
+        self.assertEqual(result.columns.tolist(), ["trade_date", "ts_code", "factor_name", "factor_value"])
+        self.assertEqual(result.iloc[-1]["factor_name"], "kdj_low_zone_cross")
+
+    @patch("factors.technical._load_qfq_market_data")
+    def test_post_cross_pullback_factor_preserves_schema(self, mock_load_qfq_market_data) -> None:
+        dates = self._date_range(90)
+        closes = [10.0] * 40 + [10.0 + (index * 0.2) for index in range(10)] + [11.8, 11.5, 11.3, 11.2] + [11.4] * 36
+        mock_load_qfq_market_data.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * len(dates),
+                "high": [value + 0.5 for value in closes],
+                "low": [value - 0.5 for value in closes],
+                "close": closes,
+            }
+        )
+
+        result = post_cross_pullback_factor(
+            ts_code="000001.SZ",
+            start_date=dates[60],
+            end_date=dates[-1],
+        )
+
+        self.assertEqual(result.columns.tolist(), ["trade_date", "ts_code", "factor_name", "factor_value"])
+        self.assertEqual(result.iloc[-1]["factor_name"], "post_cross_pullback")
+
+    @patch("factors.technical._load_qfq_market_data")
+    def test_false_breakout_risk_negative_factor(self, mock_load_qfq_market_data) -> None:
+        dates = self._date_range(25)
+        mock_load_qfq_market_data.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * len(dates),
+                "open": [10.0] * len(dates),
+                "high": [11.0] * len(dates),
+                "low": [9.5] * len(dates),
+                "close": [9.8] * len(dates),
+                "pre_close": [10.0] * len(dates),
+                "amount": [100.0] * len(dates),
+            }
+        )
+
+        result = false_breakout_risk_negative_factor(
+            ts_code="000001.SZ",
+            start_date=dates[20],
+            end_date=dates[-1],
+        )
+
+        self.assertEqual(result.iloc[-1]["factor_name"], "false_breakout_risk_negative")
+        self.assertLessEqual(result.iloc[-1]["factor_value"], 0.0)
+
     @patch("factors.technical._load_qfq_market_data")
     def test_illiq_negative_factor(self, mock_load_qfq_market_data) -> None:
         dates = self._date_range(25)
@@ -1147,8 +1265,13 @@ class TechnicalFactorsTestCase(unittest.TestCase):
         self.assertIs(get_factor_function("kdj_golden_cross"), kdj_golden_cross_factor)
         self.assertIs(get_factor_function("kdj_golden_cross_3d"), kdj_golden_cross_3d_factor)
         self.assertIs(get_factor_function("daily_macd_golden_cross_2d"), daily_macd_golden_cross_2d_factor)
+        self.assertIs(get_factor_function("macd_hist_slope_5d"), macd_hist_slope_5d_factor)
+        self.assertIs(get_factor_function("macd_zero_axis_strength"), macd_zero_axis_strength_factor)
         self.assertIs(get_factor_function("weekly_kdj_golden_cross_2d"), weekly_kdj_golden_cross_2d_factor)
         self.assertIs(get_factor_function("weekly_macd_golden_cross_2d"), weekly_macd_golden_cross_2d_factor)
+        self.assertIs(get_factor_function("kdj_low_zone_cross"), kdj_low_zone_cross_factor)
+        self.assertIs(get_factor_function("post_cross_pullback"), post_cross_pullback_factor)
+        self.assertIs(get_factor_function("false_breakout_risk_negative"), false_breakout_risk_negative_factor)
         self.assertIs(get_factor_function("ma5_ma10_breakout"), ma5_ma10_breakout_factor)
         self.assertIs(get_factor_function("ma5_ma10_breakout_3d"), ma5_ma10_breakout_3d_factor)
         self.assertIs(get_factor_function("high_turnover_low_range_20d"), high_turnover_low_range_20d_factor)
