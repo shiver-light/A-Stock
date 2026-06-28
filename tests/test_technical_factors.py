@@ -14,6 +14,7 @@ from factors.technical import (
     amplitude_20d_factor,
     close_to_high_20d_factor,
     close_near_high_on_high_amount_20d_factor,
+    daily_macd_golden_cross_2d_factor,
     distribution_risk_20d_negative_factor,
     down_day_absorption_20d_factor,
     down_day_support_20d_factor,
@@ -47,6 +48,7 @@ from factors.technical import (
     volatility_20d_negative_factor,
     volatility_60d_factor,
     volatility_60d_negative_factor,
+    weekly_kdj_golden_cross_2d_factor,
     weekly_macd_golden_cross_2d_factor,
 )
 
@@ -572,6 +574,62 @@ class TechnicalFactorsTestCase(unittest.TestCase):
         self.assertEqual(signals.iloc[0]["factor_value"], 1.0)
         self.assertEqual(signals.iloc[1]["factor_value"], 1.0)
 
+    @patch("factors.technical._load_qfq_daily")
+    def test_daily_macd_golden_cross_2d_factor_carries_today_and_yesterday(
+        self,
+        mock_load_qfq_daily,
+    ) -> None:
+        dates = self._date_range(80)
+        closes = [10.0] * 40 + [10.0 + (index * 0.2) for index in range(40)]
+        mock_load_qfq_daily.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * len(dates),
+                "close": closes,
+            }
+        )
+
+        result = daily_macd_golden_cross_2d_factor(
+            ts_code="000001.SZ",
+            start_date=dates[35],
+            end_date=dates[-1],
+        )
+
+        signals = result.loc[result["factor_value"].notna()].reset_index(drop=True)
+        self.assertGreaterEqual(len(signals), 2)
+        self.assertEqual(signals.iloc[0]["factor_name"], "daily_macd_golden_cross_2d")
+        self.assertEqual(signals.iloc[0]["factor_value"], 1.0)
+        self.assertEqual(signals.iloc[1]["factor_value"], 1.0)
+
+    @patch("factors.technical._load_qfq_market_data")
+    def test_weekly_kdj_golden_cross_2d_factor_carries_today_and_yesterday(
+        self,
+        mock_load_qfq_market_data,
+    ) -> None:
+        dates = self._date_range(130)
+        closes = [10.0] * 70 + [9.0] * 20 + [9.0 + (index * 0.2) for index in range(40)]
+        mock_load_qfq_market_data.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * len(dates),
+                "high": [value + 0.5 for value in closes],
+                "low": [value - 0.5 for value in closes],
+                "close": closes,
+            }
+        )
+
+        result = weekly_kdj_golden_cross_2d_factor(
+            ts_code="000001.SZ",
+            start_date=dates[60],
+            end_date=dates[-1],
+        )
+
+        signals = result.loc[result["factor_value"].notna()].reset_index(drop=True)
+        self.assertGreaterEqual(len(signals), 2)
+        self.assertEqual(signals.iloc[0]["factor_name"], "weekly_kdj_golden_cross_2d")
+        self.assertEqual(signals.iloc[0]["factor_value"], 1.0)
+        self.assertEqual(signals.iloc[1]["factor_value"], 1.0)
+
     @patch("factors.technical._load_qfq_market_data")
     def test_illiq_negative_factor(self, mock_load_qfq_market_data) -> None:
         dates = self._date_range(25)
@@ -1088,6 +1146,9 @@ class TechnicalFactorsTestCase(unittest.TestCase):
         self.assertIs(get_factor_function("kdj_j_turn_up_3d"), kdj_j_turn_up_3d_factor)
         self.assertIs(get_factor_function("kdj_golden_cross"), kdj_golden_cross_factor)
         self.assertIs(get_factor_function("kdj_golden_cross_3d"), kdj_golden_cross_3d_factor)
+        self.assertIs(get_factor_function("daily_macd_golden_cross_2d"), daily_macd_golden_cross_2d_factor)
+        self.assertIs(get_factor_function("weekly_kdj_golden_cross_2d"), weekly_kdj_golden_cross_2d_factor)
+        self.assertIs(get_factor_function("weekly_macd_golden_cross_2d"), weekly_macd_golden_cross_2d_factor)
         self.assertIs(get_factor_function("ma5_ma10_breakout"), ma5_ma10_breakout_factor)
         self.assertIs(get_factor_function("ma5_ma10_breakout_3d"), ma5_ma10_breakout_3d_factor)
         self.assertIs(get_factor_function("high_turnover_low_range_20d"), high_turnover_low_range_20d_factor)

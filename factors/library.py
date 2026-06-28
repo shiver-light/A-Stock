@@ -18,6 +18,7 @@ from factors.technical import (
     amplitude_20d_factor,
     close_to_high_20d_factor,
     close_near_high_on_high_amount_20d_factor,
+    daily_macd_golden_cross_2d_factor,
     distribution_risk_20d_negative_factor,
     down_day_absorption_20d_factor,
     down_day_support_20d_factor,
@@ -55,6 +56,7 @@ from factors.technical import (
     volatility_20d_negative_factor,
     volatility_60d_factor,
     volatility_60d_negative_factor,
+    weekly_kdj_golden_cross_2d_factor,
     weekly_macd_golden_cross_2d_factor,
 )
 
@@ -88,6 +90,8 @@ FACTOR_REGISTRY = {
     "kdj_j_turn_up_3d": kdj_j_turn_up_3d_factor,
     "kdj_golden_cross": kdj_golden_cross_factor,
     "kdj_golden_cross_3d": kdj_golden_cross_3d_factor,
+    "daily_macd_golden_cross_2d": daily_macd_golden_cross_2d_factor,
+    "weekly_kdj_golden_cross_2d": weekly_kdj_golden_cross_2d_factor,
     "weekly_macd_golden_cross_2d": weekly_macd_golden_cross_2d_factor,
     "ma5_ma10_breakout": ma5_ma10_breakout_factor,
     "ma5_ma10_breakout_3d": ma5_ma10_breakout_3d_factor,

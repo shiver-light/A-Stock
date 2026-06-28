@@ -1,0 +1,161 @@
+global:
+  # A-share KDJ/MACD cross research.
+  # Daily and weekly cross factors are event signals with a 2-day valid window:
+  # the cross day and the next trading day both count. Factors only use same-day
+  # and historical OHLC data; they are ex-ante signals, not forward returns.
+  start_date: "20250101"
+  end_date: "20260608"
+  enable_factor_diagnostics: false
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 300000.0
+
+experiments:
+  - name: "akm_01_hs300_daily_kdj_macd_cross_top10"
+    universe_name: "hs300"
+    benchmark_code: "000300.SH"
+    rebalance_frequency: "daily"
+    top_n: 10
+    signal_filters:
+      - factor: "daily_macd_golden_cross_2d"
+        op: "quantile_gte"
+        value: 0.5
+      - factor: "kdj_golden_cross_3d"
+        op: "quantile_gte"
+        value: 0.5
+    factor_config:
+      daily_macd_golden_cross_2d: 0.30
+      kdj_golden_cross_3d: 0.30
+      amount_mild_expansion_5d: 0.20
+      position_safety_60d: 0.20
+
+  - name: "akm_02_hs300_weekly_daily_confirm_top10"
+    universe_name: "hs300"
+    benchmark_code: "000300.SH"
+    rebalance_frequency: "daily"
+    top_n: 10
+    signal_filters:
+      - factor: "weekly_macd_golden_cross_2d"
+        op: "quantile_gte"
+        value: 0.5
+    factor_config:
+      weekly_macd_golden_cross_2d: 0.30
+      weekly_kdj_golden_cross_2d: 0.25
+      daily_macd_golden_cross_2d: 0.20
+      kdj_golden_cross_3d: 0.15
+      amount_mean_20d: 0.10
+
+  - name: "akm_03_zz500_daily_kdj_macd_cross_top20"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    rebalance_frequency: "daily"
+    top_n: 20
+    signal_filters:
+      - factor: "daily_macd_golden_cross_2d"
+        op: "quantile_gte"
+        value: 0.5
+      - factor: "kdj_golden_cross_3d"
+        op: "quantile_gte"
+        value: 0.5
+    factor_config:
+      daily_macd_golden_cross_2d: 0.30
+      kdj_golden_cross_3d: 0.30
+      amount_mild_expansion_5d: 0.20
+      position_safety_60d: 0.20
+
+  - name: "akm_04_zz500_weekly_daily_confirm_top20"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    rebalance_frequency: "daily"
+    top_n: 20
+    signal_filters:
+      - factor: "weekly_macd_golden_cross_2d"
+        op: "quantile_gte"
+        value: 0.5
+    factor_config:
+      weekly_macd_golden_cross_2d: 0.30
+      weekly_kdj_golden_cross_2d: 0.25
+      daily_macd_golden_cross_2d: 0.20
+      kdj_golden_cross_3d: 0.15
+      amount_mean_20d: 0.10
+
+  - name: "akm_05_zz1000_daily_kdj_macd_cross_top30"
+    universe_name: "zz1000"
+    benchmark_code: "000852.SH"
+    rebalance_frequency: "daily"
+    top_n: 30
+    signal_filters:
+      - factor: "daily_macd_golden_cross_2d"
+        op: "quantile_gte"
+        value: 0.5
+      - factor: "kdj_golden_cross_3d"
+        op: "quantile_gte"
+        value: 0.5
+    factor_config:
+      daily_macd_golden_cross_2d: 0.30
+      kdj_golden_cross_3d: 0.30
+      amount_mild_expansion_5d: 0.20
+      position_safety_60d: 0.20
+
+  - name: "akm_06_zz1000_weekly_daily_confirm_top30"
+    universe_name: "zz1000"
+    benchmark_code: "000852.SH"
+    rebalance_frequency: "daily"
+    top_n: 30
+    signal_filters:
+      - factor: "weekly_macd_golden_cross_2d"
+        op: "quantile_gte"
+        value: 0.5
+    factor_config:
+      weekly_macd_golden_cross_2d: 0.30
+      weekly_kdj_golden_cross_2d: 0.25
+      daily_macd_golden_cross_2d: 0.20
+      kdj_golden_cross_3d: 0.15
+      amount_mean_20d: 0.10
+
+  - name: "akm_07_zz2000_ex_bj_daily_kdj_macd_cross_top80"
+    universe_name: "zz2000_ex_bj"
+    benchmark_code: "000300.SH"
+    rebalance_frequency: "daily"
+    top_n: 80
+    backtest_config:
+      slippage_bps: 20.0
+      min_amount: 1200000.0
+    signal_filters:
+      - factor: "daily_macd_golden_cross_2d"
+        op: "quantile_gte"
+        value: 0.5
+      - factor: "kdj_golden_cross_3d"
+        op: "quantile_gte"
+        value: 0.5
+    factor_config:
+      daily_macd_golden_cross_2d: 0.30
+      kdj_golden_cross_3d: 0.30
+      amount_mild_expansion_5d: 0.20
+      position_safety_60d: 0.20
+
+  - name: "akm_08_zz2000_ex_bj_weekly_daily_confirm_top80"
+    universe_name: "zz2000_ex_bj"
+    benchmark_code: "000300.SH"
+    rebalance_frequency: "daily"
+    top_n: 80
+    backtest_config:
+      slippage_bps: 20.0
+      min_amount: 1200000.0
+    signal_filters:
+      - factor: "weekly_macd_golden_cross_2d"
+        op: "quantile_gte"
+        value: 0.5
+    factor_config:
+      weekly_macd_golden_cross_2d: 0.30
+      weekly_kdj_golden_cross_2d: 0.25
+      daily_macd_golden_cross_2d: 0.20
+      kdj_golden_cross_3d: 0.15
+      amount_mean_20d: 0.10

@@ -445,6 +445,31 @@ def kdj_golden_cross_3d_factor(*, ts_code: str, start_date: str, end_date: str, 
     return build_factor_output(data, "kdj_golden_cross_3d", "kdj_golden_cross_3d")
 
 
+def daily_macd_golden_cross_2d_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """Daily MACD golden cross, valid on the event day and next trading day."""
+
+    data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=120)
+    validate_factor_input(data, ["trade_date", "ts_code", "close"])
+    data = _append_macd_columns(data)
+    previous_dif = data.groupby("ts_code")["macd_dif"].shift(1)
+    previous_dea = data.groupby("ts_code")["macd_dea"].shift(1)
+    cross = (previous_dif <= previous_dea) & (data["macd_dif"] > data["macd_dea"])
+    raw_signal = pd.Series(np.where(cross, 1.0, np.nan), index=data.index, dtype="float64")
+    data["daily_macd_golden_cross_2d"] = _trailing_decay_max(
+        raw_signal,
+        data["ts_code"],
+        decay_weights=(1.0, 1.0),
+    )
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "daily_macd_golden_cross_2d", "daily_macd_golden_cross_2d")
+
+
 def weekly_macd_golden_cross_2d_factor(
     *,
     ts_code: str,
@@ -471,15 +496,11 @@ def weekly_macd_golden_cross_2d_factor(
         .reset_index(drop=True)
     )
     weekly_close = weekly_close.sort_values(["ts_code", "trade_date"]).reset_index(drop=True)
-    grouped_close = weekly_close.groupby("ts_code")["close"]
-    dif = grouped_close.transform(lambda series: series.ewm(span=12, adjust=False).mean()) - grouped_close.transform(
-        lambda series: series.ewm(span=26, adjust=False).mean()
-    )
-    dea = dif.groupby(weekly_close["ts_code"]).transform(lambda series: series.ewm(span=9, adjust=False).mean())
-    previous_dif = dif.groupby(weekly_close["ts_code"]).shift(1)
-    previous_dea = dea.groupby(weekly_close["ts_code"]).shift(1)
+    weekly_close = _append_macd_columns(weekly_close)
+    previous_dif = weekly_close.groupby("ts_code")["macd_dif"].shift(1)
+    previous_dea = weekly_close.groupby("ts_code")["macd_dea"].shift(1)
     weekly_close["weekly_macd_golden_cross"] = np.where(
-        (previous_dif <= previous_dea) & (dif > dea),
+        (previous_dif <= previous_dea) & (weekly_close["macd_dif"] > weekly_close["macd_dea"]),
         1.0,
         np.nan,
     )
@@ -498,6 +519,60 @@ def weekly_macd_golden_cross_2d_factor(
     )
     data = _clip_dates(data, start_date, end_date)
     return build_factor_output(data, "weekly_macd_golden_cross_2d", "weekly_macd_golden_cross_2d")
+
+
+def weekly_kdj_golden_cross_2d_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """Weekly KDJ golden cross, valid on the event day and next trading day."""
+
+    data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=260,
+        fields=("high", "low", "close"),
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "high", "low", "close"])
+    data = data.sort_values(["ts_code", "trade_date"]).reset_index(drop=True)
+    data["week"] = pd.to_datetime(data["trade_date"].astype(str)).dt.to_period("W-FRI").astype(str)
+    weekly = (
+        data.groupby(["ts_code", "week"], as_index=False)
+        .agg(
+            trade_date=("trade_date", "last"),
+            high=("high", "max"),
+            low=("low", "min"),
+            close=("close", "last"),
+        )
+        .reset_index(drop=True)
+    )
+    weekly = _append_kdj_columns(weekly)
+    previous_k = weekly.groupby("ts_code")["kdj_k"].shift(1)
+    previous_d = weekly.groupby("ts_code")["kdj_d"].shift(1)
+    weekly["weekly_kdj_golden_cross"] = np.where(
+        (previous_k <= previous_d) & (weekly["kdj_k"] > weekly["kdj_d"]),
+        1.0,
+        np.nan,
+    )
+    data = data.merge(
+        weekly.loc[:, ["trade_date", "ts_code", "weekly_kdj_golden_cross"]],
+        on=["trade_date", "ts_code"],
+        how="left",
+        validate="one_to_one",
+    )
+    raw_signal = pd.Series(data["weekly_kdj_golden_cross"], index=data.index, dtype="float64")
+    data["weekly_kdj_golden_cross_2d"] = _trailing_decay_max(
+        raw_signal,
+        data["ts_code"],
+        decay_weights=(1.0, 1.0),
+    )
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "weekly_kdj_golden_cross_2d", "weekly_kdj_golden_cross_2d")
 
 
 def amount_mild_expansion_5d_factor(
@@ -965,6 +1040,19 @@ def _append_kdj_columns(data: pd.DataFrame) -> pd.DataFrame:
     result["kdj_k"] = grouped["kdj_rsv"].transform(lambda series: series.ewm(alpha=1.0 / 3.0, adjust=False).mean())
     result["kdj_d"] = grouped["kdj_k"].transform(lambda series: series.ewm(alpha=1.0 / 3.0, adjust=False).mean())
     result["kdj_j"] = (3.0 * result["kdj_k"]) - (2.0 * result["kdj_d"])
+    return result
+
+
+def _append_macd_columns(data: pd.DataFrame) -> pd.DataFrame:
+    result = data.sort_values(["ts_code", "trade_date"]).reset_index(drop=True).copy()
+    grouped_close = result.groupby("ts_code")["close"]
+    ema_12 = grouped_close.transform(lambda series: series.ewm(span=12, adjust=False).mean())
+    ema_26 = grouped_close.transform(lambda series: series.ewm(span=26, adjust=False).mean())
+    result["macd_dif"] = ema_12 - ema_26
+    result["macd_dea"] = result["macd_dif"].groupby(result["ts_code"]).transform(
+        lambda series: series.ewm(span=9, adjust=False).mean()
+    )
+    result["macd_hist"] = (result["macd_dif"] - result["macd_dea"]) * 2.0
     return result
 
 
