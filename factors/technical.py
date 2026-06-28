@@ -445,6 +445,61 @@ def kdj_golden_cross_3d_factor(*, ts_code: str, start_date: str, end_date: str, 
     return build_factor_output(data, "kdj_golden_cross_3d", "kdj_golden_cross_3d")
 
 
+def weekly_macd_golden_cross_2d_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """Weekly MACD golden cross, valid on the event day and next trading day.
+
+    Weekly bars are built from historical daily closes only. A signal is emitted
+    on the last available trading day of the week when weekly DIF crosses above
+    DEA, then carried for one additional trading day without look-ahead.
+    """
+
+    data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=260)
+    validate_factor_input(data, ["trade_date", "ts_code", "close"])
+    data = data.sort_values(["ts_code", "trade_date"]).reset_index(drop=True)
+    data["week"] = pd.to_datetime(data["trade_date"].astype(str)).dt.to_period("W-FRI").astype(str)
+
+    weekly_close = (
+        data.groupby(["ts_code", "week"], as_index=False)
+        .tail(1)
+        .loc[:, ["trade_date", "ts_code", "week", "close"]]
+        .reset_index(drop=True)
+    )
+    weekly_close = weekly_close.sort_values(["ts_code", "trade_date"]).reset_index(drop=True)
+    grouped_close = weekly_close.groupby("ts_code")["close"]
+    dif = grouped_close.transform(lambda series: series.ewm(span=12, adjust=False).mean()) - grouped_close.transform(
+        lambda series: series.ewm(span=26, adjust=False).mean()
+    )
+    dea = dif.groupby(weekly_close["ts_code"]).transform(lambda series: series.ewm(span=9, adjust=False).mean())
+    previous_dif = dif.groupby(weekly_close["ts_code"]).shift(1)
+    previous_dea = dea.groupby(weekly_close["ts_code"]).shift(1)
+    weekly_close["weekly_macd_golden_cross"] = np.where(
+        (previous_dif <= previous_dea) & (dif > dea),
+        1.0,
+        np.nan,
+    )
+
+    data = data.merge(
+        weekly_close.loc[:, ["trade_date", "ts_code", "weekly_macd_golden_cross"]],
+        on=["trade_date", "ts_code"],
+        how="left",
+        validate="one_to_one",
+    )
+    raw_signal = pd.Series(data["weekly_macd_golden_cross"], index=data.index, dtype="float64")
+    data["weekly_macd_golden_cross_2d"] = _trailing_decay_max(
+        raw_signal,
+        data["ts_code"],
+        decay_weights=(1.0, 1.0),
+    )
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "weekly_macd_golden_cross_2d", "weekly_macd_golden_cross_2d")
+
+
 def amount_mild_expansion_5d_factor(
     *,
     ts_code: str,

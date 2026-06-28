@@ -47,6 +47,7 @@ from factors.technical import (
     volatility_20d_negative_factor,
     volatility_60d_factor,
     volatility_60d_negative_factor,
+    weekly_macd_golden_cross_2d_factor,
 )
 
 
@@ -543,6 +544,33 @@ class TechnicalFactorsTestCase(unittest.TestCase):
 
         self.assertEqual(result.columns.tolist(), ["trade_date", "ts_code", "factor_name", "factor_value"])
         self.assertEqual(result.iloc[-1]["factor_name"], "kdj_bullish_divergence_20d")
+
+    @patch("factors.technical._load_qfq_daily")
+    def test_weekly_macd_golden_cross_2d_factor_carries_today_and_yesterday(
+        self,
+        mock_load_qfq_daily,
+    ) -> None:
+        dates = self._date_range(130)
+        closes = [10.0] * 70 + [10.0 + (index * 0.25) for index in range(60)]
+        mock_load_qfq_daily.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * len(dates),
+                "close": closes,
+            }
+        )
+
+        result = weekly_macd_golden_cross_2d_factor(
+            ts_code="000001.SZ",
+            start_date=dates[60],
+            end_date=dates[-1],
+        )
+
+        signals = result.loc[result["factor_value"].notna()].reset_index(drop=True)
+        self.assertGreaterEqual(len(signals), 2)
+        self.assertEqual(signals.iloc[0]["factor_name"], "weekly_macd_golden_cross_2d")
+        self.assertEqual(signals.iloc[0]["factor_value"], 1.0)
+        self.assertEqual(signals.iloc[1]["factor_value"], 1.0)
 
     @patch("factors.technical._load_qfq_market_data")
     def test_illiq_negative_factor(self, mock_load_qfq_market_data) -> None:

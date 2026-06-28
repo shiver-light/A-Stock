@@ -55,6 +55,7 @@ from .technical import (
     volatility_20d_negative_factor,
     volatility_60d_factor,
     volatility_60d_negative_factor,
+    weekly_macd_golden_cross_2d_factor,
 )
 
 __all__ = [
@@ -91,6 +92,7 @@ __all__ = [
     "kdj_j_turn_up_3d_factor",
     "kdj_golden_cross_factor",
     "kdj_golden_cross_3d_factor",
+    "weekly_macd_golden_cross_2d_factor",
     "ma5_ma10_breakout_factor",
     "ma5_ma10_breakout_3d_factor",
     "high_turnover_low_range_20d_factor",

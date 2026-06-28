@@ -1,0 +1,115 @@
+global:
+  # Weekly MACD golden-cross research.
+  # weekly_macd_golden_cross_2d is valid when the weekly MACD golden cross
+  # happened on the current trading day or the previous trading day. Weekly
+  # bars are built from daily closes available up to each signal date only.
+  start_date: "20250101"
+  end_date: "20260608"
+  enable_factor_diagnostics: false
+  analysis_horizons:
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 300000.0
+
+experiments:
+  - name: "wmacd_01_hs300_weekly_cross_top10"
+    universe_name: "hs300"
+    benchmark_code: "000300.SH"
+    rebalance_frequency: "daily"
+    top_n: 10
+    signal_filters:
+      - factor: "weekly_macd_golden_cross_2d"
+        op: "quantile_gte"
+        value: 0.5
+    factor_config:
+      weekly_macd_golden_cross_2d: 0.40
+      amount_mild_expansion_5d: 0.25
+      position_safety_60d: 0.20
+      amount_mean_20d: 0.15
+
+  - name: "wmacd_02_zz500_weekly_cross_top20"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    rebalance_frequency: "daily"
+    top_n: 20
+    signal_filters:
+      - factor: "weekly_macd_golden_cross_2d"
+        op: "quantile_gte"
+        value: 0.5
+    factor_config:
+      weekly_macd_golden_cross_2d: 0.40
+      amount_mild_expansion_5d: 0.25
+      position_safety_60d: 0.20
+      amount_mean_20d: 0.15
+
+  - name: "wmacd_03_zz1000_weekly_cross_top30"
+    universe_name: "zz1000"
+    benchmark_code: "000852.SH"
+    rebalance_frequency: "daily"
+    top_n: 30
+    signal_filters:
+      - factor: "weekly_macd_golden_cross_2d"
+        op: "quantile_gte"
+        value: 0.5
+    factor_config:
+      weekly_macd_golden_cross_2d: 0.40
+      amount_mild_expansion_5d: 0.25
+      position_safety_60d: 0.20
+      amount_mean_20d: 0.15
+
+  - name: "wmacd_04_zz2000_ex_bj_weekly_cross_top80"
+    universe_name: "zz2000_ex_bj"
+    benchmark_code: "000300.SH"
+    rebalance_frequency: "daily"
+    top_n: 80
+    backtest_config:
+      slippage_bps: 20.0
+      min_amount: 1200000.0
+    signal_filters:
+      - factor: "weekly_macd_golden_cross_2d"
+        op: "quantile_gte"
+        value: 0.5
+    factor_config:
+      weekly_macd_golden_cross_2d: 0.40
+      amount_mild_expansion_5d: 0.25
+      position_safety_60d: 0.20
+      amount_mean_20d: 0.15
+
+  - name: "wmacd_05_zz1000_weekly_cross_turnover_safe_top30"
+    universe_name: "zz1000"
+    benchmark_code: "000852.SH"
+    rebalance_frequency: "daily"
+    top_n: 30
+    signal_filters:
+      - factor: "weekly_macd_golden_cross_2d"
+        op: "quantile_gte"
+        value: 0.5
+    factor_config:
+      weekly_macd_golden_cross_2d: 0.35
+      turnover_stability_20d: 0.25
+      position_safety_60d: 0.25
+      amount_mean_20d: 0.15
+
+  - name: "wmacd_06_zz2000_ex_bj_weekly_cross_turnover_safe_top80"
+    universe_name: "zz2000_ex_bj"
+    benchmark_code: "000300.SH"
+    rebalance_frequency: "daily"
+    top_n: 80
+    backtest_config:
+      slippage_bps: 20.0
+      min_amount: 1200000.0
+    signal_filters:
+      - factor: "weekly_macd_golden_cross_2d"
+        op: "quantile_gte"
+        value: 0.5
+    factor_config:
+      weekly_macd_golden_cross_2d: 0.35
+      turnover_stability_20d: 0.25
+      position_safety_60d: 0.25
+      amount_mean_20d: 0.15
