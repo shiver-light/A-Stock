@@ -17,6 +17,29 @@ class UniverseSupportTestCase(unittest.TestCase):
     def test_supported_universes_include_zz2000_ex_bj(self) -> None:
         self.assertIn("zz2000_ex_bj", SUPPORTED_UNIVERSES)
 
+    def test_supported_universes_include_all_a_ex_chinext_st(self) -> None:
+        self.assertIn("all_a_ex_chinext_st", SUPPORTED_UNIVERSES)
+
+    @patch("universe.provider.get_stock_basic_history")
+    def test_get_universe_all_a_ex_chinext_st_filters_chinext_and_st(self, mock_get_stock_basic_history) -> None:
+        import pandas as pd
+
+        mock_get_stock_basic_history.return_value = pd.DataFrame(
+            {
+                "ts_code": ["000001.SZ", "300001.SZ", "600001.SH", "600002.SH"],
+                "name": ["平安银行", "创业科技", "ST风险", "*ST退市"],
+                "market": ["主板", "创业板", "主板", "主板"],
+                "exchange": ["SZSE", "SZSE", "SSE", "SSE"],
+                "list_date": ["20000101", "20000101", "20000101", "20000101"],
+                "delist_date": ["", "", "", ""],
+            }
+        )
+
+        result = get_universe("all_a_ex_chinext_st", "20260501")
+
+        self.assertEqual(result["ts_code"].tolist(), ["000001.SZ"])
+        self.assertTrue((result["universe_name"] == "all_a_ex_chinext_st").all())
+
     @patch("universe.provider.get_index_constituents")
     def test_get_universe_zz2000_ex_bj_filters_bj_constituents(self, mock_get_index_constituents) -> None:
         import pandas as pd

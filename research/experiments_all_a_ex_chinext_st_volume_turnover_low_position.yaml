@@ -1,0 +1,188 @@
+global:
+  # Daily close signal research for active low-position stocks.
+  # Universe explicitly excludes ChiNext and ST-like stock names.
+  # Signal time: T close. Execution time: T+1, unchanged from pipeline defaults.
+  start_date: "20250101"
+  end_date: "20260608"
+  benchmark_code: "000985.CSI"
+  universe_name: "all_a_ex_chinext_st"
+  rebalance_frequency: "daily"
+  enable_factor_diagnostics: false
+  analysis_horizons:
+    - 1
+    - 3
+    - 5
+    - 7
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 300000.0
+
+experiments:
+  - name: "vtlp_01_strict_vr25_turn3_10_ret2_8_low20_top30"
+    top_n: 30
+    signal_filters:
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 2.5
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 3.0
+        max_value: 10.0
+      - factor: "ma20_slope_1d"
+        op: "gte"
+        value: 0.0
+      - factor: "price_position_120d"
+        op: "lte"
+        value: 0.20
+      - factor: "daily_return"
+        op: "between"
+        min_value: 0.02
+        max_value: 0.08
+    factor_config:
+      low_position_120d: 0.30
+      volume_ratio_5d: 0.25
+      ma20_slope_1d: 0.20
+      turnover_rate_f: 0.15
+      false_breakout_risk_negative: 0.10
+
+  - name: "vtlp_02_strict_vr25_turn3_10_ret2_8_low20_top50"
+    top_n: 50
+    signal_filters:
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 2.5
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 3.0
+        max_value: 10.0
+      - factor: "ma20_slope_1d"
+        op: "gte"
+        value: 0.0
+      - factor: "price_position_120d"
+        op: "lte"
+        value: 0.20
+      - factor: "daily_return"
+        op: "between"
+        min_value: 0.02
+        max_value: 0.08
+    factor_config:
+      low_position_120d: 0.30
+      volume_ratio_5d: 0.25
+      ma20_slope_1d: 0.20
+      turnover_rate_f: 0.15
+      false_breakout_risk_negative: 0.10
+
+  - name: "vtlp_03_relaxed_vr25_turn3_10_retm2_8_low20_top30"
+    top_n: 30
+    signal_filters:
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 2.5
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 3.0
+        max_value: 10.0
+      - factor: "ma20_slope_1d"
+        op: "gte"
+        value: 0.0
+      - factor: "price_position_120d"
+        op: "lte"
+        value: 0.20
+      - factor: "daily_return"
+        op: "between"
+        min_value: -0.02
+        max_value: 0.08
+    factor_config:
+      low_position_120d: 0.30
+      volume_ratio_5d: 0.20
+      ma20_slope_1d: 0.20
+      turnover_rate_f: 0.15
+      daily_return: 0.05
+      false_breakout_risk_negative: 0.10
+
+  - name: "vtlp_04_relaxed_vr25_turn3_10_retm2_8_low20_top50"
+    top_n: 50
+    signal_filters:
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 2.5
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 3.0
+        max_value: 10.0
+      - factor: "ma20_slope_1d"
+        op: "gte"
+        value: 0.0
+      - factor: "price_position_120d"
+        op: "lte"
+        value: 0.20
+      - factor: "daily_return"
+        op: "between"
+        min_value: -0.02
+        max_value: 0.08
+    factor_config:
+      low_position_120d: 0.30
+      volume_ratio_5d: 0.20
+      ma20_slope_1d: 0.20
+      turnover_rate_f: 0.15
+      daily_return: 0.05
+      false_breakout_risk_negative: 0.10
+
+  - name: "vtlp_05_loose_vr20_turn3_10_ret2_8_low20_top50"
+    top_n: 50
+    signal_filters:
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 2.0
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 3.0
+        max_value: 10.0
+      - factor: "ma20_slope_1d"
+        op: "gte"
+        value: 0.0
+      - factor: "price_position_120d"
+        op: "lte"
+        value: 0.20
+      - factor: "daily_return"
+        op: "between"
+        min_value: 0.02
+        max_value: 0.08
+    factor_config:
+      low_position_120d: 0.30
+      volume_ratio_5d: 0.20
+      ma20_slope_1d: 0.20
+      turnover_rate_f: 0.15
+      amount_mean_20d: 0.05
+      false_breakout_risk_negative: 0.10
+
+  - name: "vtlp_06_loose_vr20_turn3_10_retm2_8_low20_top50"
+    top_n: 50
+    signal_filters:
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 2.0
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 3.0
+        max_value: 10.0
+      - factor: "ma20_slope_1d"
+        op: "gte"
+        value: 0.0
+      - factor: "price_position_120d"
+        op: "lte"
+        value: 0.20
+      - factor: "daily_return"
+        op: "between"
+        min_value: -0.02
+        max_value: 0.08
+    factor_config:
+      low_position_120d: 0.30
+      volume_ratio_5d: 0.20
+      ma20_slope_1d: 0.20
+      turnover_rate_f: 0.15
+      amount_mean_20d: 0.05
+      false_breakout_risk_negative: 0.10

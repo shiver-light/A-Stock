@@ -15,6 +15,7 @@ from factors.technical import (
     close_to_high_20d_factor,
     close_near_high_on_high_amount_20d_factor,
     daily_macd_golden_cross_2d_factor,
+    daily_return_factor,
     distribution_risk_20d_negative_factor,
     down_day_absorption_20d_factor,
     down_day_support_20d_factor,
@@ -28,14 +29,17 @@ from factors.technical import (
     kdj_j_turn_up_3d_factor,
     kdj_low_zone_cross_factor,
     liquidity_improvement_20d_factor,
+    low_position_120d_factor,
     macd_hist_slope_5d_factor,
     macd_zero_axis_strength_factor,
     max_drawdown_60d_negative_factor,
     ma5_ma10_breakout_factor,
     ma5_ma10_breakout_3d_factor,
+    ma20_slope_1d_factor,
     momentum_60d_factor,
     money_flow_strength_20d_factor,
     price_new_low_20d_factor,
+    price_position_120d_factor,
     position_safety_60d_factor,
     post_cross_pullback_factor,
     return_120d_factor,
@@ -49,12 +53,14 @@ from factors.technical import (
     gap_risk_20d_negative_factor,
     turnover_volatility_20d_factor,
     turnover_stability_20d_factor,
+    turnover_rate_f_factor,
     volatility_contraction_20d_factor,
     volatility_20d_negative_factor,
     volatility_60d_factor,
     volatility_60d_negative_factor,
     weekly_kdj_golden_cross_2d_factor,
     weekly_macd_golden_cross_2d_factor,
+    volume_ratio_5d_factor,
 )
 
 
@@ -749,6 +755,91 @@ class TechnicalFactorsTestCase(unittest.TestCase):
         self.assertLessEqual(result.iloc[-1]["factor_value"], 0.0)
 
     @patch("factors.technical._load_qfq_market_data")
+    def test_volume_ratio_5d_factor_uses_prior_volume(self, mock_load_qfq_market_data) -> None:
+        dates = self._date_range(8)
+        mock_load_qfq_market_data.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * len(dates),
+                "vol": [100.0, 100.0, 100.0, 100.0, 100.0, 250.0, 300.0, 350.0],
+            }
+        )
+
+        result = volume_ratio_5d_factor(ts_code="000001.SZ", start_date=dates[5], end_date=dates[5])
+
+        self.assertEqual(result.iloc[0]["factor_name"], "volume_ratio_5d")
+        self.assertAlmostEqual(result.iloc[0]["factor_value"], 2.5)
+
+    @patch("factors.technical._load_turnover_data")
+    def test_turnover_rate_f_factor_preserves_percent_units(self, mock_load_turnover_data) -> None:
+        dates = self._date_range(2)
+        mock_load_turnover_data.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * len(dates),
+                "turnover_rate_f": [3.2, 9.8],
+            }
+        )
+
+        result = turnover_rate_f_factor(ts_code="000001.SZ", start_date=dates[0], end_date=dates[-1])
+
+        self.assertEqual(result["factor_value"].tolist(), [3.2, 9.8])
+
+    @patch("factors.technical._load_qfq_daily")
+    def test_ma20_slope_1d_factor(self, mock_load_qfq_daily) -> None:
+        dates = self._date_range(25)
+        closes = [10.0] * 20 + [10.1, 10.2, 10.3, 10.4, 10.5]
+        mock_load_qfq_daily.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * len(dates),
+                "close": closes,
+            }
+        )
+
+        result = ma20_slope_1d_factor(ts_code="000001.SZ", start_date=dates[21], end_date=dates[-1])
+
+        self.assertEqual(result.iloc[-1]["factor_name"], "ma20_slope_1d")
+        self.assertGreater(result.iloc[-1]["factor_value"], 0.0)
+
+    @patch("factors.technical._load_qfq_daily")
+    def test_price_position_120d_and_low_position_120d_factors(self, mock_load_qfq_daily) -> None:
+        dates = self._date_range(130)
+        closes = [10.0 + index for index in range(120)] + [34.0] * 10
+        mock_load_qfq_daily.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * len(dates),
+                "close": closes,
+            }
+        )
+
+        position = price_position_120d_factor(ts_code="000001.SZ", start_date=dates[-1], end_date=dates[-1])
+        low_position = low_position_120d_factor(ts_code="000001.SZ", start_date=dates[-1], end_date=dates[-1])
+
+        self.assertEqual(position.iloc[0]["factor_name"], "price_position_120d")
+        self.assertEqual(low_position.iloc[0]["factor_name"], "low_position_120d")
+        self.assertLess(position.iloc[0]["factor_value"], 0.25)
+        self.assertGreater(low_position.iloc[0]["factor_value"], 0.75)
+
+    @patch("factors.technical._load_qfq_market_data")
+    def test_daily_return_factor(self, mock_load_qfq_market_data) -> None:
+        dates = self._date_range(2)
+        mock_load_qfq_market_data.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * len(dates),
+                "close": [10.2, 10.5],
+                "pre_close": [10.0, 10.0],
+            }
+        )
+
+        result = daily_return_factor(ts_code="000001.SZ", start_date=dates[0], end_date=dates[-1])
+
+        self.assertAlmostEqual(result.iloc[0]["factor_value"], 0.02)
+        self.assertAlmostEqual(result.iloc[1]["factor_value"], 0.05)
+
+    @patch("factors.technical._load_qfq_market_data")
     def test_illiq_negative_factor(self, mock_load_qfq_market_data) -> None:
         dates = self._date_range(25)
         closes = [100.0 * (1.01**index) for index in range(25)]
@@ -1256,6 +1347,12 @@ class TechnicalFactorsTestCase(unittest.TestCase):
         self.assertIs(get_factor_function("turnover_volatility_20d"), turnover_volatility_20d_factor)
         self.assertIs(get_factor_function("amount_mean_20d"), amount_mean_20d_factor)
         self.assertIs(get_factor_function("amount_mild_expansion_5d"), amount_mild_expansion_5d_factor)
+        self.assertIs(get_factor_function("volume_ratio_5d"), volume_ratio_5d_factor)
+        self.assertIs(get_factor_function("turnover_rate_f"), turnover_rate_f_factor)
+        self.assertIs(get_factor_function("ma20_slope_1d"), ma20_slope_1d_factor)
+        self.assertIs(get_factor_function("price_position_120d"), price_position_120d_factor)
+        self.assertIs(get_factor_function("low_position_120d"), low_position_120d_factor)
+        self.assertIs(get_factor_function("daily_return"), daily_return_factor)
         self.assertIs(get_factor_function("illiq_negative"), illiq_negative_factor)
         self.assertIs(get_factor_function("money_flow_strength_20d"), money_flow_strength_20d_factor)
         self.assertIs(get_factor_function("price_new_low_20d"), price_new_low_20d_factor)

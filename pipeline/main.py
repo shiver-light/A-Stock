@@ -175,6 +175,9 @@ def _apply_signal_filters(
     Supported operators:
     - quantile_gte: keep rows with factor >= same-date quantile threshold
     - quantile_lte: keep rows with factor <= same-date quantile threshold
+    - gte: keep rows with factor >= value
+    - lte: keep rows with factor <= value
+    - between: keep rows with min_value <= factor <= max_value
     """
 
     if not signal_filters:
@@ -197,20 +200,41 @@ def _apply_signal_filters(
             raise ValueError("Each signal filter must contain a non-empty 'factor'.")
         if factor_name not in result.columns:
             raise ValueError(f"Signal filter factor is missing from factor panel: {factor_name}")
-        if op not in {"quantile_gte", "quantile_lte"}:
+        if op not in {"quantile_gte", "quantile_lte", "gte", "lte", "between"}:
             raise ValueError(f"Unsupported signal filter op: {op}")
-        try:
-            threshold_value = float(value)
-        except (TypeError, ValueError) as exc:
-            raise ValueError(f"Signal filter value must be numeric: {value}") from exc
-        if not 0.0 <= threshold_value <= 1.0:
-            raise ValueError("Signal filter quantile value must be between 0 and 1.")
-
-        thresholds = result.groupby(date_col)[factor_name].transform(lambda series: series.quantile(threshold_value))
-        if op == "quantile_gte":
-            rule_keep = result[factor_name].notna() & thresholds.notna() & (result[factor_name] >= thresholds)
+        factor_values = pd.to_numeric(result[factor_name], errors="coerce")
+        if op in {"quantile_gte", "quantile_lte"}:
+            try:
+                threshold_value = float(value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"Signal filter value must be numeric: {value}") from exc
+            if not 0.0 <= threshold_value <= 1.0:
+                raise ValueError("Signal filter quantile value must be between 0 and 1.")
+            thresholds = result.groupby(date_col)[factor_name].transform(lambda series: series.quantile(threshold_value))
+            if op == "quantile_gte":
+                rule_keep = factor_values.notna() & thresholds.notna() & (factor_values >= thresholds)
+            else:
+                rule_keep = factor_values.notna() & thresholds.notna() & (factor_values <= thresholds)
+        elif op in {"gte", "lte"}:
+            try:
+                threshold_value = float(value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"Signal filter value must be numeric: {value}") from exc
+            if op == "gte":
+                rule_keep = factor_values.notna() & (factor_values >= threshold_value)
+            else:
+                rule_keep = factor_values.notna() & (factor_values <= threshold_value)
         else:
-            rule_keep = result[factor_name].notna() & thresholds.notna() & (result[factor_name] <= thresholds)
+            try:
+                min_value = float(rule["min_value"])
+                max_value = float(rule["max_value"])
+            except KeyError as exc:
+                raise ValueError("Signal filter 'between' requires min_value and max_value.") from exc
+            except (TypeError, ValueError) as exc:
+                raise ValueError("Signal filter 'between' bounds must be numeric.") from exc
+            if min_value > max_value:
+                raise ValueError("Signal filter 'between' min_value must be <= max_value.")
+            rule_keep = factor_values.notna() & factor_values.between(min_value, max_value, inclusive="both")
         keep = keep & rule_keep
 
     return result.loc[keep].sort_values([date_col, asset_col]).reset_index(drop=True)

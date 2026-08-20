@@ -9,6 +9,7 @@ from data import INDEX_CODE_MAP, get_index_constituents, get_stock_basic_history
 
 SUPPORTED_UNIVERSES = {
     "all_a",
+    "all_a_ex_chinext_st",
     "hs300",
     "zz500",
     "zz1000",
@@ -70,6 +71,8 @@ def get_universe(
 
     if universe_name == "all_a":
         result = filtered.copy()
+    elif universe_name == "all_a_ex_chinext_st":
+        result = _filter_ex_chinext_st(filtered)
     elif universe_name == "main_board":
         result = filtered.loc[filtered["market"] == "主板"].copy()
     elif universe_name == "chinext":
@@ -125,3 +128,14 @@ def _filter_active_a_share(stock_basic: pd.DataFrame, as_of_date: str) -> pd.Dat
         .drop_duplicates(subset=["ts_code"], keep="last")
         .reset_index(drop=True)
     )
+
+
+def _filter_ex_chinext_st(stock_basic: pd.DataFrame) -> pd.DataFrame:
+    """Exclude ChiNext and ST-like names from an active A-share universe."""
+
+    data = stock_basic.copy()
+    market = data.get("market", pd.Series("", index=data.index)).fillna("").astype(str)
+    name = data.get("name", pd.Series("", index=data.index)).fillna("").astype(str).str.upper()
+    non_chinext = market.ne("创业板")
+    non_st = ~name.str.contains("ST", regex=False)
+    return data.loc[non_chinext & non_st].copy()

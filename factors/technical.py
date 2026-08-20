@@ -312,6 +312,98 @@ def amount_mean_20d_factor(*, ts_code: str, start_date: str, end_date: str, refr
     return build_factor_output(data, "amount_mean_20d", "amount_mean_20d")
 
 
+def volume_ratio_5d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
+    """Daily volume ratio defined as volume divided by prior 5-day average volume."""
+
+    data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=15,
+        fields=("vol",),
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "vol"])
+    data = data.sort_values(["ts_code", "trade_date"]).reset_index(drop=True)
+    volume = pd.to_numeric(data["vol"], errors="coerce")
+    prior_volume_mean = volume.groupby(data["ts_code"]).shift(1).groupby(data["ts_code"]).rolling(5).mean()
+    prior_volume_mean = prior_volume_mean.reset_index(level=0, drop=True)
+    data["volume_ratio_5d"] = np.where(prior_volume_mean == 0, np.nan, volume / prior_volume_mean)
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "volume_ratio_5d", "volume_ratio_5d")
+
+
+def turnover_rate_f_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
+    """Daily free-float turnover rate from daily_basic.turnover_rate_f, in percent units."""
+
+    data = _load_turnover_data(ts_code, start_date, end_date, refresh, lookback_days=5)
+    validate_factor_input(data, ["trade_date", "ts_code", "turnover_rate_f"])
+    data["turnover_rate_f"] = pd.to_numeric(data["turnover_rate_f"], errors="coerce")
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "turnover_rate_f", "turnover_rate_f")
+
+
+def ma20_slope_1d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
+    """One-day slope of the 20-day moving average; non-negative means flat or rising."""
+
+    data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=45)
+    validate_factor_input(data, ["trade_date", "ts_code", "close"])
+    data = data.sort_values(["ts_code", "trade_date"]).reset_index(drop=True)
+    ma20 = data.groupby("ts_code")["close"].rolling(20).mean().reset_index(level=0, drop=True)
+    prior_ma20 = ma20.groupby(data["ts_code"]).shift(1)
+    data["ma20_slope_1d"] = np.where(prior_ma20 == 0, np.nan, (ma20 / prior_ma20) - 1.0)
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "ma20_slope_1d", "ma20_slope_1d")
+
+
+def price_position_120d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
+    """120-day price position: 0 is range low and 1 is range high."""
+
+    data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=170)
+    validate_factor_input(data, ["trade_date", "ts_code", "close"])
+    data = data.sort_values(["ts_code", "trade_date"]).reset_index(drop=True)
+    grouped_close = data.groupby("ts_code")["close"]
+    rolling_low = grouped_close.rolling(120).min().reset_index(level=0, drop=True)
+    rolling_high = grouped_close.rolling(120).max().reset_index(level=0, drop=True)
+    denominator = rolling_high - rolling_low
+    data["price_position_120d"] = np.where(denominator == 0, np.nan, (data["close"] - rolling_low) / denominator)
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "price_position_120d", "price_position_120d")
+
+
+def low_position_120d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
+    """Low-position score over 120 days, where larger values mean closer to range low."""
+
+    data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=170)
+    validate_factor_input(data, ["trade_date", "ts_code", "close"])
+    data = data.sort_values(["ts_code", "trade_date"]).reset_index(drop=True)
+    grouped_close = data.groupby("ts_code")["close"]
+    rolling_low = grouped_close.rolling(120).min().reset_index(level=0, drop=True)
+    rolling_high = grouped_close.rolling(120).max().reset_index(level=0, drop=True)
+    denominator = rolling_high - rolling_low
+    price_position = np.where(denominator == 0, np.nan, (data["close"] - rolling_low) / denominator)
+    data["low_position_120d"] = 1.0 - price_position
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "low_position_120d", "low_position_120d")
+
+
+def daily_return_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
+    """Daily close-to-previous-close return using historical daily bars."""
+
+    data = _load_qfq_market_data(
+        ts_code,
+        start_date,
+        end_date,
+        refresh,
+        lookback_days=5,
+        fields=("close", "pre_close"),
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "close", "pre_close"])
+    data["daily_return"] = np.where(data["pre_close"] == 0, np.nan, (data["close"] / data["pre_close"]) - 1.0)
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "daily_return", "daily_return")
+
+
 def price_new_low_20d_factor(*, ts_code: str, start_date: str, end_date: str, refresh: bool = False) -> pd.DataFrame:
     """Closeness to a 20-day closing low, where larger values mean closer to a stage low."""
 

@@ -81,6 +81,28 @@ class PipelineMainTestCase(unittest.TestCase):
                 [{"factor": "accumulation_score", "op": "bad_op", "value": 0.6}],
             )
 
+    def test_apply_signal_filters_supports_absolute_thresholds(self) -> None:
+        factor_panel = pd.DataFrame(
+            {
+                "trade_date": ["20240102", "20240102", "20240102"],
+                "ts_code": ["000001.SZ", "000002.SZ", "000003.SZ"],
+                "volume_ratio_5d": [2.4, 2.8, 3.1],
+                "turnover_rate_f": [2.9, 5.0, 11.0],
+                "daily_return": [0.03, 0.06, 0.04],
+            }
+        )
+
+        result = _apply_signal_filters(
+            factor_panel,
+            [
+                {"factor": "volume_ratio_5d", "op": "gte", "value": 2.5},
+                {"factor": "turnover_rate_f", "op": "between", "min_value": 3.0, "max_value": 10.0},
+                {"factor": "daily_return", "op": "lte", "value": 0.08},
+            ],
+        )
+
+        self.assertEqual(result["ts_code"].tolist(), ["000002.SZ"])
+
     def test_build_market_regime_flags_uses_historical_benchmark_returns(self) -> None:
         benchmark = pd.DataFrame(
             {

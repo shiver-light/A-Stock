@@ -13,7 +13,17 @@ def build_parser() -> argparse.ArgumentParser:
     source_group = parser.add_mutually_exclusive_group(required=True)
     source_group.add_argument(
         "--universe-name",
-        choices=["all_a", "hs300", "zz500", "zz1000", "zz2000", "sse50", "main_board", "chinext"],
+        choices=[
+            "all_a",
+            "all_a_ex_chinext_st",
+            "hs300",
+            "zz500",
+            "zz1000",
+            "zz2000",
+            "sse50",
+            "main_board",
+            "chinext",
+        ],
         help="Universe name to resolve dynamically.",
     )
     source_group.add_argument(
