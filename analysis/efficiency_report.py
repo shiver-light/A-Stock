@@ -278,6 +278,7 @@ def render_efficiency_report_text(report: dict[str, object]) -> str:
         f"大盘环境：{benchmark_context.get('strength', '暂无数据')}",
         f"说明：{benchmark_context.get('description', '未提供大盘指数数据。')}",
         "",
+        f"板块：{sector_context.get('label', '') or '暂无数据'}",
         f"板块环境：{sector_context.get('strength', '暂无数据')}",
         f"说明：{sector_context.get('description', '暂未接入板块数据。')}",
         "",

@@ -78,6 +78,7 @@ class EfficiencyReportTestCase(unittest.TestCase):
         self.assertIn("【最近10日上涨/下跌效率报告】", text)
         self.assertIn("股票：000001.SZ", text)
         self.assertIn("大盘环境：", text)
+        self.assertIn("板块：", text)
         self.assertIn("板块环境：", text)
         self.assertIn("个股相对强弱：", text)
         self.assertIn("个股相对板块：", text)
