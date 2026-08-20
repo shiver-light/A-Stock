@@ -74,6 +74,8 @@ def build_efficiency_report(
                 "close_position": _to_float(row["close_position"]),
                 "up_efficiency": _to_float(row["up_efficiency"]),
                 "down_efficiency": _to_float(row["down_efficiency"]),
+                "up_efficiency_x10000": _scale_efficiency(row["up_efficiency"]),
+                "down_efficiency_x10000": _scale_efficiency(row["down_efficiency"]),
             }
         )
 
@@ -94,6 +96,7 @@ def build_efficiency_report(
         "current_stage": stage,
         "final_conclusion": _final_conclusion(up_trend, down_trend, selling_pressure, absorption),
         "summary": _summary_stats(data, recent, previous),
+        "efficiency_display_scale": 10000,
         "rows": rows,
         "warnings": [],
     }
@@ -141,7 +144,7 @@ def render_efficiency_report_text(report: dict[str, object]) -> str:
         ),
         "",
         "最近10日明细：",
-        "trade_date  return  turnover%  vol_ratio  amplitude  close_pos  up_eff  down_eff",
+        "trade_date  return  turnover%  vol_ratio  amplitude  close_pos  up_eff_x10000  down_eff_x10000",
     ]
     for row in rows:
         lines.append(
@@ -153,8 +156,8 @@ def render_efficiency_report_text(report: dict[str, object]) -> str:
                     _format_num(row["volume_ratio"]).rjust(9),
                     _format_pct(row["amplitude"]).rjust(9),
                     _format_num(row["close_position"]).rjust(9),
-                    _format_num(row["up_efficiency"]).rjust(7),
-                    _format_num(row["down_efficiency"]).rjust(8),
+                    _format_num(row["up_efficiency_x10000"]).rjust(13),
+                    _format_num(row["down_efficiency_x10000"]).rjust(15),
                 ]
             )
         )
@@ -183,6 +186,7 @@ def _empty_report(stock_label: str | None, window: int, warning: str) -> dict[st
         "current_stage": "其他",
         "final_conclusion": "数据不足，暂不形成短线效率判断。",
         "summary": {},
+        "efficiency_display_scale": 10000,
         "rows": [],
         "warnings": [warning],
     }
@@ -219,6 +223,13 @@ def _to_float(value) -> float | None:
     if value is None or pd.isna(value):
         return None
     return float(value)
+
+
+def _scale_efficiency(value) -> float | None:
+    raw = _to_float(value)
+    if raw is None:
+        return None
+    return raw * 10000.0
 
 
 def _summary_stats(data: pd.DataFrame, recent: pd.DataFrame, previous: pd.DataFrame) -> dict[str, float | None]:
