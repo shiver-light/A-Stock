@@ -4,6 +4,7 @@ import unittest
 
 import pandas as pd
 
+from scripts.research_accumulation import _filter_dataset_by_universe_membership, _sample_dates
 from analysis.accumulation_research import (
     DEFAULT_ACCUMULATION_FEATURES,
     apply_accumulation_score,
@@ -93,6 +94,34 @@ class AccumulationResearchTestCase(unittest.TestCase):
         self.assertIn("accumulation_score", scored.columns)
         self.assertIn("condition", ladder.columns)
         self.assertIsInstance(buckets, pd.DataFrame)
+
+    def test_sample_dates_supports_monthly_and_weekly(self) -> None:
+        monthly = _sample_dates("20240101", "20240315", "monthly")
+        weekly = _sample_dates("20240101", "20240115", "weekly")
+
+        self.assertEqual(monthly, ["20240131", "20240229", "20240315"])
+        self.assertEqual(weekly[-1], "20240115")
+
+    def test_filter_dataset_by_universe_membership_uses_historical_intervals(self) -> None:
+        dataset = pd.DataFrame(
+            {
+                "trade_date": ["20240101", "20240115", "20240201", "20240215"],
+                "ts_code": ["000001.SZ"] * 4,
+                "close": [1.0, 2.0, 3.0, 4.0],
+            }
+        )
+        membership = pd.DataFrame(
+            {
+                "as_of_date": ["20240110"],
+                "ts_code": ["000001.SZ"],
+                "source_universe": ["hs300"],
+            }
+        )
+
+        result = _filter_dataset_by_universe_membership(dataset, membership)
+
+        self.assertEqual(result["trade_date"].tolist(), ["20240115", "20240201", "20240215"])
+        self.assertEqual(result["source_universe"].unique().tolist(), ["hs300"])
 
 
 if __name__ == "__main__":

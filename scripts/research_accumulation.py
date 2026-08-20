@@ -32,14 +32,34 @@ from data import (
     get_a_share_index_daily,
     get_stock_basic_history,
 )
+from universe import get_universe_history
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Research low-position accumulation volume-price features.")
-    parser.add_argument("--ts-codes", nargs="+", required=True, help="Stock codes to analyze, e.g. 000001.SZ 600000.SH.")
+    source_group = parser.add_mutually_exclusive_group(required=True)
+    source_group.add_argument("--ts-codes", nargs="+", help="Stock codes to analyze, e.g. 000001.SZ 600000.SH.")
+    source_group.add_argument(
+        "--universes",
+        nargs="+",
+        choices=["hs300", "zz500", "zz1000", "zz2000", "zz2000_ex_bj"],
+        help="Universe names to resolve with historical constituents.",
+    )
     parser.add_argument("--start-date", required=True, help="Start date in YYYYMMDD.")
     parser.add_argument("--end-date", required=True, help="End date in YYYYMMDD.")
     parser.add_argument("--output-dir", default="output/accumulation_research", help="Directory for CSV/JSON outputs.")
+    parser.add_argument(
+        "--sample-frequency",
+        choices=["monthly", "weekly", "daily"],
+        default="monthly",
+        help="Dates used to resolve historical constituents when --universes is used.",
+    )
+    parser.add_argument(
+        "--max-stocks-per-universe",
+        type=int,
+        default=None,
+        help="Optional cap per universe for smoke tests or staged runs.",
+    )
     parser.add_argument("--train-end", default="20211231", help="Training set end date.")
     parser.add_argument("--validation-end", default="20231231", help="Validation set end date.")
     parser.add_argument("--benchmark-hs300", default="000300.SH", help="HS300 benchmark code.")
@@ -53,8 +73,20 @@ def main() -> int:
     args = build_parser().parse_args()
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    universe_membership = pd.DataFrame()
+    if args.universes:
+        ts_codes, universe_membership = _resolve_universe_ts_codes(
+            args.universes,
+            start_date=args.start_date,
+            end_date=args.end_date,
+            sample_frequency=args.sample_frequency,
+            max_stocks_per_universe=args.max_stocks_per_universe,
+            refresh=args.refresh,
+        )
+    else:
+        ts_codes = sorted(set(args.ts_codes or []))
     market_data, turnover_data = _load_stock_data(
-        args.ts_codes,
+        ts_codes,
         start_date=args.start_date,
         end_date=args.end_date,
         refresh=args.refresh,
@@ -80,6 +112,8 @@ def main() -> int:
         industry_map=stock_basic,
         benchmark_returns=benchmarks,
     )
+    if not universe_membership.empty:
+        dataset = _filter_dataset_by_universe_membership(dataset, universe_membership)
     samples = filter_research_samples(dataset)
     splits = split_by_time(samples, train_end=args.train_end, validation_end=args.validation_end)
     train_stats = single_factor_analysis(splits["train"], DEFAULT_ACCUMULATION_FEATURES)
@@ -106,9 +140,14 @@ def main() -> int:
     ladder.to_csv(output_dir / "condition_ladder.csv", index=False)
     for split_name, frame in bucket_frames.items():
         frame.to_csv(output_dir / f"score_buckets_{split_name}.csv", index=False)
+    if not universe_membership.empty:
+        universe_membership.to_csv(output_dir / "universe_membership.csv", index=False)
     (output_dir / "score_model.json").write_text(json.dumps(model, ensure_ascii=False, indent=2), encoding="utf-8")
 
     summary = {
+        "universes": args.universes or [],
+        "ts_code_count": int(len(ts_codes)),
+        "sample_frequency": args.sample_frequency if args.universes else None,
         "sample_count": int(len(samples)),
         "positive_ratio": _safe_ratio(samples),
         "splits": {name: {"sample_count": int(len(frame)), "positive_ratio": _safe_ratio(frame)} for name, frame in splits.items()},
@@ -156,6 +195,91 @@ def _load_stock_data(
     return pd.concat(market_frames, ignore_index=True), pd.concat(turnover_frames, ignore_index=True)
 
 
+def _resolve_universe_ts_codes(
+    universes: list[str],
+    *,
+    start_date: str,
+    end_date: str,
+    sample_frequency: str,
+    max_stocks_per_universe: int | None,
+    refresh: bool,
+) -> tuple[list[str], pd.DataFrame]:
+    sample_dates = _sample_dates(start_date, end_date, sample_frequency)
+    frames = []
+    for universe_name in universes:
+        history = get_universe_history(universe_name, sample_dates, refresh=refresh)
+        if history.empty:
+            continue
+        history = history.loc[history["in_universe"].astype(bool)].copy()
+        history["source_universe"] = universe_name
+        if max_stocks_per_universe is not None:
+            capped_frames = []
+            for as_of_date, group in history.groupby("as_of_date", sort=True):
+                capped_frames.append(group.sort_values("ts_code").head(max_stocks_per_universe))
+            history = pd.concat(capped_frames, ignore_index=True) if capped_frames else history.iloc[0:0].copy()
+        frames.append(history)
+    if not frames:
+        raise ValueError("No universe members resolved.")
+    membership = (
+        pd.concat(frames, ignore_index=True)
+        .sort_values(["source_universe", "as_of_date", "ts_code"])
+        .drop_duplicates(subset=["source_universe", "as_of_date", "ts_code"], keep="last")
+        .reset_index(drop=True)
+    )
+    ts_codes = sorted(membership["ts_code"].dropna().astype(str).unique().tolist())
+    return ts_codes, membership
+
+
+def _filter_dataset_by_universe_membership(dataset: pd.DataFrame, membership: pd.DataFrame) -> pd.DataFrame:
+    if dataset.empty or membership.empty:
+        return dataset.copy()
+    members = membership.loc[:, ["as_of_date", "ts_code", "source_universe"]].copy()
+    members["as_of_date"] = members["as_of_date"].astype(str)
+    members["ts_code"] = members["ts_code"].astype(str)
+    data = dataset.copy()
+    data["trade_date"] = data["trade_date"].astype(str)
+    data["ts_code"] = data["ts_code"].astype(str)
+    frames = []
+    for source_universe, group in members.groupby("source_universe", sort=True):
+        intervals = group.sort_values(["ts_code", "as_of_date"]).copy()
+        intervals["next_as_of_date"] = intervals.groupby("ts_code")["as_of_date"].shift(-1)
+        for row in intervals.itertuples(index=False):
+            start = str(row.as_of_date)
+            end = str(row.next_as_of_date) if pd.notna(row.next_as_of_date) else "99999999"
+            matched = data.loc[
+                (data["ts_code"] == row.ts_code)
+                & (data["trade_date"] >= start)
+                & (data["trade_date"] < end)
+            ].copy()
+            if matched.empty:
+                continue
+            matched["source_universe"] = source_universe
+            frames.append(matched)
+    if not frames:
+        return data.iloc[0:0].copy()
+    return (
+        pd.concat(frames, ignore_index=True)
+        .sort_values(["source_universe", "trade_date", "ts_code"])
+        .drop_duplicates(subset=["source_universe", "trade_date", "ts_code"], keep="last")
+        .reset_index(drop=True)
+    )
+
+
+def _sample_dates(start_date: str, end_date: str, frequency: str) -> list[str]:
+    dates = pd.date_range(start_date, end_date, freq="D")
+    if dates.empty:
+        raise ValueError("No sample dates in requested range.")
+    if frequency == "daily":
+        sampled = dates
+    elif frequency == "weekly":
+        sampled = dates.to_series().groupby(dates.to_period("W-FRI")).max()
+    elif frequency == "monthly":
+        sampled = dates.to_series().groupby(dates.to_period("M")).max()
+    else:
+        raise ValueError(f"Unsupported sample frequency: {frequency}")
+    return [pd.Timestamp(date).strftime("%Y%m%d") for date in sampled]
+
+
 def _safe_ratio(data: pd.DataFrame) -> float | None:
     if data.empty or "label" not in data.columns:
         return None
@@ -166,6 +290,9 @@ def _render_text_summary(summary: dict[str, object]) -> str:
     lines = [
         "【低位横盘吸筹研究MVP】",
         "",
+        f"股票数：{summary['ts_code_count']}",
+        f"股票池：{', '.join(summary['universes']) if summary['universes'] else 'custom ts_codes'}",
+        f"成分采样频率：{summary['sample_frequency'] or 'N/A'}",
         f"样本数：{summary['sample_count']}",
         f"正样本比例：{_format_pct(summary['positive_ratio'])}",
         "",
