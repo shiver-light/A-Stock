@@ -11,6 +11,18 @@ from .data_checks import (
     check_missing_ratio_by_date,
     check_universe_stability,
 )
+from .accumulation_research import (
+    DEFAULT_ACCUMULATION_FEATURES,
+    apply_accumulation_score,
+    build_accumulation_dataset,
+    evaluate_condition_ladder,
+    filter_research_samples,
+    fit_accumulation_score_model,
+    score_bucket_analysis,
+    single_factor_analysis,
+    split_by_time,
+    summarize_feature_power,
+)
 from .external_regime import build_external_regime_flags, load_external_regime_data
 from .efficiency_report import build_efficiency_report, render_efficiency_report_text
 from .factor_metrics import (
@@ -31,6 +43,16 @@ __all__ = [
     "check_factor_signal_alignment",
     "check_missing_ratio_by_date",
     "check_universe_stability",
+    "DEFAULT_ACCUMULATION_FEATURES",
+    "apply_accumulation_score",
+    "build_accumulation_dataset",
+    "evaluate_condition_ladder",
+    "filter_research_samples",
+    "fit_accumulation_score_model",
+    "score_bucket_analysis",
+    "single_factor_analysis",
+    "split_by_time",
+    "summarize_feature_power",
     "calc_factor_coverage",
     "calc_forward_returns",
     "calc_ic",
