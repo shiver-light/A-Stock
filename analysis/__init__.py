@@ -12,6 +12,7 @@ from .data_checks import (
     check_universe_stability,
 )
 from .external_regime import build_external_regime_flags, load_external_regime_data
+from .efficiency_report import build_efficiency_report, render_efficiency_report_text
 from .factor_metrics import (
     calc_factor_coverage,
     calc_forward_returns,
@@ -38,6 +39,8 @@ __all__ = [
     "calc_rank_ic",
     "build_factor_diagnostics_report",
     "render_factor_report_text",
+    "build_efficiency_report",
+    "render_efficiency_report_text",
     "build_external_regime_flags",
     "load_external_regime_data",
 ]
