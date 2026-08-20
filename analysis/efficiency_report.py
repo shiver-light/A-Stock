@@ -15,6 +15,8 @@ def build_efficiency_report(
     stock_label: str | None = None,
     benchmark_data: pd.DataFrame | None = None,
     benchmark_label: str | None = None,
+    sector_data: pd.DataFrame | None = None,
+    sector_label: str | None = None,
     window: int = 10,
     recent_days: int = 3,
 ) -> dict[str, object]:
@@ -67,6 +69,11 @@ def build_efficiency_report(
         stock_returns=data.loc[:, ["trade_date", "daily_return"]],
         label=benchmark_label,
     )
+    sector_context = build_sector_context(
+        sector_data,
+        stock_returns=data.loc[:, ["trade_date", "daily_return"]],
+        label=sector_label,
+    )
 
     rows = []
     for _, row in data.iterrows():
@@ -102,18 +109,88 @@ def build_efficiency_report(
         "long_short_structure": long_short,
         "current_stage": stage,
         "benchmark_context": benchmark_context,
-        "sector_context": _empty_sector_context(),
+        "sector_context": sector_context,
         "final_conclusion": _final_conclusion(
             up_trend,
             down_trend,
             selling_pressure,
             absorption,
             benchmark_context,
+            sector_context,
         ),
         "summary": _summary_stats(data, recent, previous),
         "efficiency_display_scale": 10000,
         "rows": rows,
         "warnings": [],
+    }
+
+
+def build_sector_context(
+    sector_data: pd.DataFrame | None,
+    *,
+    stock_returns: pd.DataFrame | None = None,
+    label: str | None = None,
+) -> dict[str, object]:
+    """Build sector context from same-sector stock daily closes.
+
+    The sector return is an equal-weight average of available constituent
+    close-to-close returns by trade_date. This is intended for diagnostics, not
+    for historical universe membership backtests.
+    """
+
+    if sector_data is None or sector_data.empty:
+        return _empty_sector_context()
+    _validate_columns(sector_data, ["trade_date", "ts_code", "close"])
+    data = sector_data.loc[:, ["trade_date", "ts_code", "close"]].copy()
+    data["trade_date"] = data["trade_date"].astype(str)
+    data["ts_code"] = data["ts_code"].astype(str)
+    data["close"] = pd.to_numeric(data["close"], errors="coerce")
+    data = data.sort_values(["ts_code", "trade_date"]).drop_duplicates(
+        subset=["trade_date", "ts_code"],
+        keep="last",
+    )
+    data["daily_return"] = data.groupby("ts_code")["close"].pct_change()
+    sector_returns = (
+        data.dropna(subset=["daily_return"])
+        .groupby("trade_date", as_index=False)
+        .agg(sector_return=("daily_return", "mean"), member_count=("ts_code", "nunique"))
+        .sort_values("trade_date")
+        .reset_index(drop=True)
+    )
+    if sector_returns.empty:
+        return _empty_sector_context(label=label, description="板块成分行情不足，无法计算板块强弱。")
+    returns = sector_returns["sector_return"]
+    return_5d = _trailing_compound_return(returns, 5)
+    return_10d = _trailing_compound_return(returns, 10)
+    return_20d = _trailing_compound_return(returns, 20)
+    recent_3d = _trailing_compound_return(returns, 3)
+    sector_index = (1.0 + returns.fillna(0.0)).cumprod()
+    ma20 = sector_index.rolling(20).mean()
+    above_ma20 = (
+        bool(sector_index.iloc[-1] >= ma20.iloc[-1])
+        if len(sector_index) >= 20 and pd.notna(ma20.iloc[-1])
+        else False
+    )
+    strength = _benchmark_strength(return_20d, above_ma20, recent_3d)
+    relative_strength = _relative_strength_from_return_series(stock_returns, sector_returns)
+    latest_member_count = int(sector_returns["member_count"].iloc[-1])
+    return {
+        "label": label or "sector",
+        "status": "available",
+        "strength": strength,
+        "relative_strength": relative_strength,
+        "return_5d": return_5d,
+        "return_10d": return_10d,
+        "return_20d": return_20d,
+        "return_3d": recent_3d,
+        "close_above_ma20": above_ma20,
+        "member_count": latest_member_count,
+        "description": (
+            f"板块近5/10/20日等权收益分别为{_format_pct(return_5d)}、"
+            f"{_format_pct(return_10d)}、{_format_pct(return_20d)}，"
+            f"{'站上' if above_ma20 else '未站上'}MA20；"
+            f"最近可用成分数{latest_member_count}。"
+        ),
     }
 
 
@@ -205,6 +282,7 @@ def render_efficiency_report_text(report: dict[str, object]) -> str:
         f"说明：{sector_context.get('description', '暂未接入板块数据。')}",
         "",
         f"个股相对强弱：{benchmark_context.get('relative_strength', '暂无数据')}",
+        f"个股相对板块：{sector_context.get('relative_strength', '暂无数据')}",
         "",
         "最终结论：",
         str(report.get("final_conclusion", "")),
@@ -281,12 +359,13 @@ def _infer_benchmark_label(data: pd.DataFrame) -> str:
     return "benchmark"
 
 
-def _empty_sector_context() -> dict[str, object]:
+def _empty_sector_context(label: str | None = None, description: str | None = None) -> dict[str, object]:
     return {
+        "label": label or "",
         "status": "not_available",
         "strength": "暂无数据",
         "relative_strength": "暂无数据",
-        "description": "暂未接入板块/行业成分数据，当前报告只判断个股和大盘。",
+        "description": description or "暂未接入板块/行业成分数据，当前报告只判断个股和大盘。",
     }
 
 
@@ -299,6 +378,13 @@ def _period_return(close: pd.Series, periods: int) -> float | None:
     if previous == 0:
         return None
     return float((latest / previous) - 1.0)
+
+
+def _trailing_compound_return(returns: pd.Series, periods: int) -> float | None:
+    values = pd.to_numeric(returns, errors="coerce").dropna()
+    if len(values) < periods:
+        return None
+    return _compound_return(values.tail(periods))
 
 
 def _benchmark_strength(return_20d: float | None, above_ma20: bool, return_3d: float | None) -> str:
@@ -339,6 +425,29 @@ def _relative_strength_label(stock_returns: pd.DataFrame | None, benchmark_data:
     if diff < -0.03:
         return "弱于大盘"
     return "跟随大盘"
+
+
+def _relative_strength_from_return_series(stock_returns: pd.DataFrame | None, sector_returns: pd.DataFrame) -> str:
+    if stock_returns is None or stock_returns.empty or sector_returns.empty:
+        return "暂无数据"
+    stock = stock_returns.copy()
+    stock["trade_date"] = stock["trade_date"].astype(str)
+    stock = stock.sort_values("trade_date").tail(10)
+    sector = sector_returns.loc[:, ["trade_date", "sector_return"]].copy()
+    sector["trade_date"] = sector["trade_date"].astype(str)
+    aligned = stock.loc[:, ["trade_date", "daily_return"]].merge(sector, on="trade_date", how="inner")
+    if aligned.empty:
+        return "暂无数据"
+    stock_total = _compound_return(aligned["daily_return"])
+    sector_total = _compound_return(aligned["sector_return"])
+    if stock_total is None or sector_total is None:
+        return "暂无数据"
+    diff = stock_total - sector_total
+    if diff > 0.03:
+        return "强于板块"
+    if diff < -0.03:
+        return "弱于板块"
+    return "跟随板块"
 
 
 def _compound_return(returns: pd.Series) -> float | None:
@@ -509,24 +618,29 @@ def _final_conclusion(
     selling_pressure: str,
     absorption: str,
     benchmark_context: dict[str, object] | None = None,
+    sector_context: dict[str, object] | None = None,
 ) -> str:
     market_note = _market_context_note(benchmark_context)
+    sector_note = _sector_context_note(sector_context)
     if up_trend == "提高" and down_trend == "下降":
         return (
             "最近10日出现上涨效率提高、下跌效率降低的组合，说明上涨相对越来越容易、下跌相对越来越困难。"
-            f"若同时伴随承接增强或卖压衰竭，属于短线转强信号。{market_note}"
+            f"若同时伴随承接增强或卖压衰竭，属于短线转强信号。{market_note}{sector_note}"
         )
     if up_trend == "下降" and down_trend == "提高":
         return (
             "最近10日表现为上涨效率下降、下跌效率提高，说明上涨越来越费力、下跌越来越容易。"
-            f"短线结构偏弱，不宜仅凭缩量判断卖压衰竭。{market_note}"
+            f"短线结构偏弱，不宜仅凭缩量判断卖压衰竭。{market_note}{sector_note}"
         )
     if selling_pressure == "衰竭" and absorption == "增强":
         return (
             "最近下跌幅度和换手同步收敛，同时收盘位置改善，卖压有衰竭迹象且承接增强。"
-            f"结构有改善，但仍需观察后续上涨效率能否继续提高。{market_note}"
+            f"结构有改善，但仍需观察后续上涨效率能否继续提高。{market_note}{sector_note}"
         )
-    return f"最近10日上涨/下跌效率未形成单边强信号，当前更适合观察量能、换手和收盘位置是否继续改善。{market_note}"
+    return (
+        "最近10日上涨/下跌效率未形成单边强信号，当前更适合观察量能、换手和收盘位置是否继续改善。"
+        f"{market_note}{sector_note}"
+    )
 
 
 def _market_context_note(benchmark_context: dict[str, object] | None) -> str:
@@ -540,6 +654,20 @@ def _market_context_note(benchmark_context: dict[str, object] | None) -> str:
         return " 当前大盘偏弱但个股强于大盘，若量价继续改善，信号质量更高。"
     if strength == "弱":
         return " 当前大盘偏弱，短线信号需要降低仓位或等待确认。"
+    return ""
+
+
+def _sector_context_note(sector_context: dict[str, object] | None) -> str:
+    if not sector_context or sector_context.get("status") != "available":
+        return ""
+    strength = sector_context.get("strength")
+    relative = sector_context.get("relative_strength")
+    if strength == "强" and relative != "强于板块":
+        return " 但当前板块偏强，需区分个股独立转强还是板块带动。"
+    if strength == "弱" and relative == "强于板块":
+        return " 当前板块偏弱但个股强于板块，若承接继续改善，属于相对强势。"
+    if strength == "弱":
+        return " 当前板块偏弱，短线信号需要等待板块修复确认。"
     return ""
 
 
