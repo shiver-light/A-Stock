@@ -13,6 +13,8 @@ def build_efficiency_report(
     market_data: pd.DataFrame,
     *,
     stock_label: str | None = None,
+    benchmark_data: pd.DataFrame | None = None,
+    benchmark_label: str | None = None,
     window: int = 10,
     recent_days: int = 3,
 ) -> dict[str, object]:
@@ -60,6 +62,11 @@ def build_efficiency_report(
     absorption = _absorption_label(recent, previous)
     long_short = _long_short_label(up_trend, down_trend, selling_pressure, absorption)
     stage = _stage_label(data, up_trend, down_trend, selling_pressure, absorption, long_short)
+    benchmark_context = build_benchmark_context(
+        benchmark_data,
+        stock_returns=data.loc[:, ["trade_date", "daily_return"]],
+        label=benchmark_label,
+    )
 
     rows = []
     for _, row in data.iterrows():
@@ -94,7 +101,15 @@ def build_efficiency_report(
         "absorption": absorption,
         "long_short_structure": long_short,
         "current_stage": stage,
-        "final_conclusion": _final_conclusion(up_trend, down_trend, selling_pressure, absorption),
+        "benchmark_context": benchmark_context,
+        "sector_context": _empty_sector_context(),
+        "final_conclusion": _final_conclusion(
+            up_trend,
+            down_trend,
+            selling_pressure,
+            absorption,
+            benchmark_context,
+        ),
         "summary": _summary_stats(data, recent, previous),
         "efficiency_display_scale": 10000,
         "rows": rows,
@@ -102,10 +117,61 @@ def build_efficiency_report(
     }
 
 
+def build_benchmark_context(
+    benchmark_data: pd.DataFrame | None,
+    *,
+    stock_returns: pd.DataFrame | None = None,
+    label: str | None = None,
+) -> dict[str, object]:
+    """Build market environment context from historical index daily closes."""
+
+    if benchmark_data is None or benchmark_data.empty:
+        return {
+            "label": label or "",
+            "status": "暂无数据",
+            "strength": "暂无数据",
+            "relative_strength": "暂无数据",
+            "description": "未提供大盘指数数据，暂不判断市场环境。",
+        }
+    _validate_columns(benchmark_data, ["trade_date", "close"])
+    data = benchmark_data.copy()
+    data = data.loc[:, [column for column in ["trade_date", "ts_code", "close"] if column in data.columns]]
+    data["trade_date"] = data["trade_date"].astype(str)
+    data["close"] = pd.to_numeric(data["close"], errors="coerce")
+    data = data.sort_values("trade_date").drop_duplicates(subset=["trade_date"], keep="last").reset_index(drop=True)
+    close = data["close"]
+    return_5d = _period_return(close, 5)
+    return_10d = _period_return(close, 10)
+    return_20d = _period_return(close, 20)
+    ma20 = close.rolling(20).mean()
+    above_ma20 = bool(close.iloc[-1] >= ma20.iloc[-1]) if len(close) >= 20 and pd.notna(ma20.iloc[-1]) else False
+    recent_3d = _period_return(close, 3)
+    strength = _benchmark_strength(return_20d, above_ma20, recent_3d)
+    relative_strength = _relative_strength_label(stock_returns, data)
+    return {
+        "label": label or _infer_benchmark_label(data),
+        "status": "available",
+        "strength": strength,
+        "relative_strength": relative_strength,
+        "return_5d": return_5d,
+        "return_10d": return_10d,
+        "return_20d": return_20d,
+        "return_3d": recent_3d,
+        "close_above_ma20": above_ma20,
+        "description": (
+            f"大盘近5/10/20日收益分别为{_format_pct(return_5d)}、"
+            f"{_format_pct(return_10d)}、{_format_pct(return_20d)}，"
+            f"{'站上' if above_ma20 else '未站上'}MA20。"
+        ),
+    }
+
+
 def render_efficiency_report_text(report: dict[str, object]) -> str:
     """Render an efficiency report in a human-readable Chinese text format."""
 
     summary = report.get("summary", {})
+    benchmark_context = report.get("benchmark_context", {})
+    sector_context = report.get("sector_context", {})
     rows = report.get("rows", [])
     lines = [
         "【最近10日上涨/下跌效率报告】",
@@ -131,6 +197,14 @@ def render_efficiency_report_text(report: dict[str, object]) -> str:
         f"多空结构：{report.get('long_short_structure', '平衡')}",
         "",
         f"当前阶段：{report.get('current_stage', '其他')}",
+        "",
+        f"大盘环境：{benchmark_context.get('strength', '暂无数据')}",
+        f"说明：{benchmark_context.get('description', '未提供大盘指数数据。')}",
+        "",
+        f"板块环境：{sector_context.get('strength', '暂无数据')}",
+        f"说明：{sector_context.get('description', '暂未接入板块数据。')}",
+        "",
+        f"个股相对强弱：{benchmark_context.get('relative_strength', '暂无数据')}",
         "",
         "最终结论：",
         str(report.get("final_conclusion", "")),
@@ -184,6 +258,8 @@ def _empty_report(stock_label: str | None, window: int, warning: str) -> dict[st
         "absorption": "一般",
         "long_short_structure": "平衡",
         "current_stage": "其他",
+        "benchmark_context": build_benchmark_context(None),
+        "sector_context": _empty_sector_context(),
         "final_conclusion": "数据不足，暂不形成短线效率判断。",
         "summary": {},
         "efficiency_display_scale": 10000,
@@ -195,6 +271,81 @@ def _empty_report(stock_label: str | None, window: int, warning: str) -> dict[st
 def _infer_stock_label(data: pd.DataFrame) -> str:
     ts_code = data["ts_code"].dropna().astype(str)
     return ts_code.iloc[0] if not ts_code.empty else ""
+
+
+def _infer_benchmark_label(data: pd.DataFrame) -> str:
+    if "ts_code" in data.columns:
+        ts_code = data["ts_code"].dropna().astype(str)
+        if not ts_code.empty:
+            return ts_code.iloc[0]
+    return "benchmark"
+
+
+def _empty_sector_context() -> dict[str, object]:
+    return {
+        "status": "not_available",
+        "strength": "暂无数据",
+        "relative_strength": "暂无数据",
+        "description": "暂未接入板块/行业成分数据，当前报告只判断个股和大盘。",
+    }
+
+
+def _period_return(close: pd.Series, periods: int) -> float | None:
+    values = pd.to_numeric(close, errors="coerce").dropna()
+    if len(values) <= periods:
+        return None
+    previous = values.iloc[-periods - 1]
+    latest = values.iloc[-1]
+    if previous == 0:
+        return None
+    return float((latest / previous) - 1.0)
+
+
+def _benchmark_strength(return_20d: float | None, above_ma20: bool, return_3d: float | None) -> str:
+    if return_20d is None:
+        return "暂无数据"
+    if return_20d > 0.03 and above_ma20:
+        return "强"
+    if return_20d < -0.03 and not above_ma20:
+        return "弱"
+    if return_3d is not None and return_3d < -0.03 and not above_ma20:
+        return "弱"
+    return "中性"
+
+
+def _relative_strength_label(stock_returns: pd.DataFrame | None, benchmark_data: pd.DataFrame) -> str:
+    if stock_returns is None or stock_returns.empty or "daily_return" not in stock_returns.columns:
+        return "暂无数据"
+    stock = stock_returns.copy()
+    stock["trade_date"] = stock["trade_date"].astype(str)
+    stock = stock.sort_values("trade_date").tail(10)
+    benchmark = benchmark_data.loc[:, ["trade_date", "close"]].copy()
+    benchmark["trade_date"] = benchmark["trade_date"].astype(str)
+    benchmark["benchmark_return"] = pd.to_numeric(benchmark["close"], errors="coerce").pct_change()
+    aligned = stock.loc[:, ["trade_date", "daily_return"]].merge(
+        benchmark.loc[:, ["trade_date", "benchmark_return"]],
+        on="trade_date",
+        how="inner",
+    )
+    if aligned.empty:
+        return "暂无数据"
+    stock_total = _compound_return(aligned["daily_return"])
+    benchmark_total = _compound_return(aligned["benchmark_return"])
+    if stock_total is None or benchmark_total is None:
+        return "暂无数据"
+    diff = stock_total - benchmark_total
+    if diff > 0.03:
+        return "强于大盘"
+    if diff < -0.03:
+        return "弱于大盘"
+    return "跟随大盘"
+
+
+def _compound_return(returns: pd.Series) -> float | None:
+    values = pd.to_numeric(returns, errors="coerce").dropna()
+    if values.empty:
+        return None
+    return float((1.0 + values).prod() - 1.0)
 
 
 def _trend_label(series: pd.Series) -> str:
@@ -352,14 +503,44 @@ def _stage_label(
     return "其他"
 
 
-def _final_conclusion(up_trend: str, down_trend: str, selling_pressure: str, absorption: str) -> str:
+def _final_conclusion(
+    up_trend: str,
+    down_trend: str,
+    selling_pressure: str,
+    absorption: str,
+    benchmark_context: dict[str, object] | None = None,
+) -> str:
+    market_note = _market_context_note(benchmark_context)
     if up_trend == "提高" and down_trend == "下降":
-        return "最近10日出现上涨效率提高、下跌效率降低的组合，说明上涨相对越来越容易、下跌相对越来越困难。若同时伴随承接增强或卖压衰竭，属于短线转强信号。"
+        return (
+            "最近10日出现上涨效率提高、下跌效率降低的组合，说明上涨相对越来越容易、下跌相对越来越困难。"
+            f"若同时伴随承接增强或卖压衰竭，属于短线转强信号。{market_note}"
+        )
     if up_trend == "下降" and down_trend == "提高":
-        return "最近10日表现为上涨效率下降、下跌效率提高，说明上涨越来越费力、下跌越来越容易。短线结构偏弱，不宜仅凭缩量判断卖压衰竭。"
+        return (
+            "最近10日表现为上涨效率下降、下跌效率提高，说明上涨越来越费力、下跌越来越容易。"
+            f"短线结构偏弱，不宜仅凭缩量判断卖压衰竭。{market_note}"
+        )
     if selling_pressure == "衰竭" and absorption == "增强":
-        return "最近下跌幅度和换手同步收敛，同时收盘位置改善，卖压有衰竭迹象且承接增强。结构有改善，但仍需观察后续上涨效率能否继续提高。"
-    return "最近10日上涨/下跌效率未形成单边强信号，当前更适合观察量能、换手和收盘位置是否继续改善。"
+        return (
+            "最近下跌幅度和换手同步收敛，同时收盘位置改善，卖压有衰竭迹象且承接增强。"
+            f"结构有改善，但仍需观察后续上涨效率能否继续提高。{market_note}"
+        )
+    return f"最近10日上涨/下跌效率未形成单边强信号，当前更适合观察量能、换手和收盘位置是否继续改善。{market_note}"
+
+
+def _market_context_note(benchmark_context: dict[str, object] | None) -> str:
+    if not benchmark_context or benchmark_context.get("status") != "available":
+        return ""
+    strength = benchmark_context.get("strength")
+    relative = benchmark_context.get("relative_strength")
+    if strength == "强" and relative != "强于大盘":
+        return " 但当前大盘偏强，需警惕个股只是跟随市场反弹。"
+    if strength == "弱" and relative == "强于大盘":
+        return " 当前大盘偏弱但个股强于大盘，若量价继续改善，信号质量更高。"
+    if strength == "弱":
+        return " 当前大盘偏弱，短线信号需要降低仓位或等待确认。"
+    return ""
 
 
 def _format_pct(value) -> str:

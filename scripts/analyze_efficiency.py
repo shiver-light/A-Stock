@@ -14,7 +14,13 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from analysis.efficiency_report import build_efficiency_report, render_efficiency_report_text
-from data import AShareDailyMarketService, DailyMarketRequest, get_a_share_daily_valuation, get_stock_basic_history
+from data import (
+    AShareDailyMarketService,
+    DailyMarketRequest,
+    get_a_share_daily_valuation,
+    get_a_share_index_daily,
+    get_stock_basic_history,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -24,6 +30,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--start-date", default=None, help="Optional data start date in YYYYMMDD format.")
     parser.add_argument("--window", type=int, default=10, help="Number of recent trading days to analyze.")
     parser.add_argument("--recent-days", type=int, default=3, help="Recent days compared with earlier window.")
+    parser.add_argument(
+        "--benchmark-code",
+        default="000985.CSI",
+        help="Benchmark index for market context. Use 'none' to disable.",
+    )
     parser.add_argument("--refresh", action="store_true", help="Refresh Tushare cache.")
     parser.add_argument("--output", choices=["text", "json"], default="text", help="Output text report or JSON.")
     return parser
@@ -54,9 +65,21 @@ def main() -> int:
         validate="one_to_one",
     )
     stock_label = _stock_label(args.ts_code)
+    benchmark_data = None
+    benchmark_label = None
+    if args.benchmark_code.lower() != "none":
+        benchmark_data = get_a_share_index_daily(
+            ts_code=args.benchmark_code,
+            start_date=start_date,
+            end_date=args.end_date,
+            refresh=args.refresh,
+        )
+        benchmark_label = args.benchmark_code
     report = build_efficiency_report(
         data,
         stock_label=stock_label,
+        benchmark_data=benchmark_data,
+        benchmark_label=benchmark_label,
         window=args.window,
         recent_days=args.recent_days,
     )

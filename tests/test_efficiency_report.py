@@ -22,7 +22,15 @@ class EfficiencyReportTestCase(unittest.TestCase):
             }
         )
 
-        report = build_efficiency_report(data, stock_label="平安银行/000001.SZ")
+        benchmark = pd.DataFrame(
+            {
+                "trade_date": pd.date_range("2023-12-20", periods=23, freq="D").strftime("%Y%m%d"),
+                "ts_code": ["000985.CSI"] * 23,
+                "close": [100.0 + index for index in range(23)],
+            }
+        )
+
+        report = build_efficiency_report(data, stock_label="平安银行/000001.SZ", benchmark_data=benchmark)
 
         self.assertEqual(report["stock"], "平安银行/000001.SZ")
         self.assertEqual(report["up_efficiency_trend"], "提高")
@@ -31,6 +39,9 @@ class EfficiencyReportTestCase(unittest.TestCase):
         self.assertIn("上涨效率提高", report["final_conclusion"])
         self.assertEqual(report["efficiency_display_scale"], 10000)
         self.assertAlmostEqual(report["rows"][0]["down_efficiency_x10000"], 20.0)
+        self.assertEqual(report["benchmark_context"]["strength"], "强")
+        self.assertIn(report["benchmark_context"]["relative_strength"], {"强于大盘", "跟随大盘", "弱于大盘"})
+        self.assertEqual(report["sector_context"]["strength"], "暂无数据")
 
     def test_render_efficiency_report_text_uses_expected_sections(self) -> None:
         data = pd.DataFrame(
@@ -51,6 +62,9 @@ class EfficiencyReportTestCase(unittest.TestCase):
 
         self.assertIn("【最近10日上涨/下跌效率报告】", text)
         self.assertIn("股票：000001.SZ", text)
+        self.assertIn("大盘环境：", text)
+        self.assertIn("板块环境：", text)
+        self.assertIn("个股相对强弱：", text)
         self.assertIn("up_eff_x10000", text)
         self.assertIn("最终结论：", text)
 
