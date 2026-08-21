@@ -21,6 +21,8 @@ def build_parser() -> argparse.ArgumentParser:
             "zz500",
             "zz1000",
             "zz2000",
+            "zz2000_ex_bj",
+            "zz2000_ex_bj_ex_chinext_star",
             "sse50",
             "main_board",
             "chinext",

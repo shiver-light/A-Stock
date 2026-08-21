@@ -17,6 +17,9 @@ class UniverseSupportTestCase(unittest.TestCase):
     def test_supported_universes_include_zz2000_ex_bj(self) -> None:
         self.assertIn("zz2000_ex_bj", SUPPORTED_UNIVERSES)
 
+    def test_supported_universes_include_zz2000_ex_bj_ex_chinext_star(self) -> None:
+        self.assertIn("zz2000_ex_bj_ex_chinext_star", SUPPORTED_UNIVERSES)
+
     def test_supported_universes_include_all_a_ex_chinext_st(self) -> None:
         self.assertIn("all_a_ex_chinext_st", SUPPORTED_UNIVERSES)
 
@@ -83,6 +86,35 @@ class UniverseSupportTestCase(unittest.TestCase):
 
         self.assertEqual(result["ts_code"].tolist(), ["000001.SZ", "600000.SH"])
         self.assertTrue((result["universe_name"] == "zz2000_ex_bj").all())
+
+    @patch("universe.provider.get_stock_basic_history")
+    @patch("universe.provider.get_index_constituents")
+    def test_get_universe_zz2000_ex_bj_ex_chinext_star_filters_growth_boards(
+        self,
+        mock_get_index_constituents,
+        mock_get_stock_basic_history,
+    ) -> None:
+        import pandas as pd
+
+        mock_get_index_constituents.return_value = pd.DataFrame(
+            {
+                "as_of_date": ["20260501"] * 5,
+                "ts_code": ["000001.SZ", "300001.SZ", "688001.SH", "600000.SH", "920001.BJ"],
+                "weight": [0.2] * 5,
+                "in_universe": [True] * 5,
+            }
+        )
+        mock_get_stock_basic_history.return_value = pd.DataFrame(
+            {
+                "ts_code": ["000001.SZ", "300001.SZ", "688001.SH", "600000.SH"],
+                "market": ["主板", "创业板", "科创板", "主板"],
+            }
+        )
+
+        result = get_universe("zz2000_ex_bj_ex_chinext_star", "20260501", include_weights=True)
+
+        self.assertEqual(result["ts_code"].tolist(), ["000001.SZ", "600000.SH"])
+        self.assertTrue((result["universe_name"] == "zz2000_ex_bj_ex_chinext_star").all())
 
 
 if __name__ == "__main__":

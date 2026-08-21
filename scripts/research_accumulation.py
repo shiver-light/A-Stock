@@ -42,7 +42,15 @@ def build_parser() -> argparse.ArgumentParser:
     source_group.add_argument(
         "--universes",
         nargs="+",
-        choices=["hs300", "zz500", "zz1000", "zz2000", "zz2000_ex_bj", "all_a_ex_chinext_star_st"],
+        choices=[
+            "hs300",
+            "zz500",
+            "zz1000",
+            "zz2000",
+            "zz2000_ex_bj",
+            "zz2000_ex_bj_ex_chinext_star",
+            "all_a_ex_chinext_star_st",
+        ],
         help="Universe names to resolve with historical constituents.",
     )
     parser.add_argument("--start-date", required=True, help="Start date in YYYYMMDD.")

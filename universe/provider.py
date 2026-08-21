@@ -16,6 +16,7 @@ SUPPORTED_UNIVERSES = {
     "zz1000",
     "zz2000",
     "zz2000_ex_bj",
+    "zz2000_ex_bj_ex_chinext_star",
     "sse50",
     "main_board",
     "chinext",
@@ -52,15 +53,26 @@ def get_universe(
             raise ValueError("custom universe requires ts_codes.")
         return get_custom_universe(ts_codes, as_of_date=as_of_date)
 
-    if universe_name in {"hs300", "zz500", "zz1000", "zz2000", "zz2000_ex_bj", "sse50"}:
-        index_universe_name = "zz2000" if universe_name == "zz2000_ex_bj" else universe_name
+    if universe_name in {
+        "hs300",
+        "zz500",
+        "zz1000",
+        "zz2000",
+        "zz2000_ex_bj",
+        "zz2000_ex_bj_ex_chinext_star",
+        "sse50",
+    }:
+        index_universe_name = "zz2000" if universe_name.startswith("zz2000_ex_bj") else universe_name
         result = get_index_constituents(
             index_code=INDEX_CODE_MAP[index_universe_name],
             as_of_date=as_of_date,
             refresh=refresh,
         )
-        if universe_name == "zz2000_ex_bj":
+        if universe_name.startswith("zz2000_ex_bj"):
             result = result.loc[~result["ts_code"].astype(str).str.endswith(".BJ")].copy()
+        if universe_name == "zz2000_ex_bj_ex_chinext_star":
+            stock_basic = get_stock_basic_history(refresh=refresh)
+            result = _filter_index_ex_chinext_star(result, stock_basic)
         result["universe_name"] = universe_name
         ordered_columns = ["as_of_date", "ts_code", "universe_name", "in_universe"]
         if include_weights and "weight" in result.columns:
@@ -153,3 +165,18 @@ def _filter_ex_chinext_star_st(stock_basic: pd.DataFrame) -> pd.DataFrame:
     non_growth_boards = ~market.isin(["创业板", "科创板"])
     non_st = ~name.str.contains("ST", regex=False)
     return data.loc[non_growth_boards & non_st].copy()
+
+
+def _filter_index_ex_chinext_star(index_members: pd.DataFrame, stock_basic: pd.DataFrame) -> pd.DataFrame:
+    """Exclude ChiNext and STAR Market from index constituents using stock_basic market labels."""
+
+    if index_members.empty:
+        return index_members.copy()
+    basic = stock_basic.loc[:, ["ts_code", "market"]].copy()
+    basic["ts_code"] = basic["ts_code"].astype(str)
+    basic["market"] = basic["market"].fillna("").astype(str)
+    data = index_members.copy()
+    data["ts_code"] = data["ts_code"].astype(str)
+    merged = data.merge(basic, on="ts_code", how="left", validate="many_to_one")
+    market = merged["market"].fillna("").astype(str)
+    return merged.loc[~market.isin(["创业板", "科创板"]), data.columns].copy()
