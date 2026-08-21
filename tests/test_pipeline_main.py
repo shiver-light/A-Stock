@@ -468,6 +468,8 @@ class PipelineMainTestCase(unittest.TestCase):
                 "trade_date": ["20240102", "20240102"],
                 "ts_code": ["000001.SZ", "000002.SZ"],
                 "return_20d": [0.1, 0.2],
+                "ma20_slope_1d": [-0.001, -0.01],
+                "price_position_120d": [0.3, 0.5],
             }
         )
         mock_combine_scores.return_value = pd.DataFrame(
@@ -740,6 +742,8 @@ class PipelineMainTestCase(unittest.TestCase):
                 "trade_date": ["20240102", "20240102"],
                 "ts_code": ["000001.SZ", "000002.SZ"],
                 "return_20d": [0.1, 0.2],
+                "ma20_slope_1d": [-0.001, -0.01],
+                "price_position_120d": [0.3, 0.5],
             }
         )
         mock_combine_scores.return_value = pd.DataFrame(
@@ -756,13 +760,28 @@ class PipelineMainTestCase(unittest.TestCase):
             start_date="20240101",
             end_date="20240131",
             factor_config={"return_20d": 1.0},
-            backtest_config={"slippage_bps": 12.0, "min_amount": 1000000.0},
+            backtest_config={
+                "slippage_bps": 12.0,
+                "min_amount": 1000000.0,
+                "position_exit_policy": {
+                    "enabled": True,
+                    "min_hold_days": 3,
+                    "max_hold_days": 10,
+                    "exit_filters": [
+                        {"factor": "ma20_slope_1d", "op": "gte", "value": -0.005},
+                        {"factor": "price_position_120d", "op": "lte", "value": 0.45},
+                    ],
+                },
+            },
         )
 
         self.assertIn("performance", result)
         _, kwargs = mock_run_backtest.call_args
         self.assertEqual(kwargs["slippage_bps"], 12.0)
         self.assertEqual(kwargs["min_amount"], 1000000.0)
+        self.assertEqual(kwargs["position_exit_policy"]["min_hold_days"], 3)
+        self.assertEqual(kwargs["exit_signals"]["ts_code"].tolist(), ["000001.SZ"])
+        self.assertIn("ma20_slope_1d", mock_build_factor_panel.call_args.kwargs["factor_config"])
 
     @patch("pipeline.main.render_strategy_report_text", return_value="strategy report")
     @patch("pipeline.main.format_strategy_report", return_value={"report": "ok"})

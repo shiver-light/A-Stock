@@ -369,6 +369,87 @@ class BacktestEngineTestCase(unittest.TestCase):
         self.assertAlmostEqual(cash_day["strategy_return"], 0.0)
         self.assertTrue(holdings.loc[holdings["trade_date"] == "20240301"].empty)
 
+    def test_run_backtest_position_exit_policy_keeps_position_before_min_hold(self) -> None:
+        signals = pd.DataFrame(
+            {
+                "trade_date": ["20240102", "20240103"],
+                "ts_code": ["A", "B"],
+                "selected": [True, True],
+            }
+        )
+        exit_signals = pd.DataFrame(
+            {
+                "trade_date": ["20240103"],
+                "ts_code": ["A"],
+                "selected": [False],
+            }
+        )
+        market_data = pd.DataFrame(
+            {
+                "trade_date": ["20240102", "20240102", "20240103", "20240103", "20240104", "20240104"],
+                "ts_code": ["A", "B", "A", "B", "A", "B"],
+                "open": [10.0, 20.0, 10.0, 20.0, 10.0, 20.0],
+                "close": [10.0, 20.0, 10.0, 20.0, 10.0, 20.0],
+            }
+        )
+
+        _, holdings = run_backtest(
+            signals,
+            market_data,
+            fee_bps=0.0,
+            rebalance_frequency="daily",
+            exit_signals=exit_signals,
+            position_exit_policy={
+                "enabled": True,
+                "min_hold_days": 2,
+                "exit_filters": [{"factor": "placeholder"}],
+            },
+        )
+
+        day_holdings = holdings.loc[holdings["trade_date"] == "20240104", "ts_code"].tolist()
+        self.assertEqual(day_holdings, ["A", "B"])
+
+    def test_run_backtest_position_exit_policy_exits_after_min_hold_when_hold_filter_fails(self) -> None:
+        signals = pd.DataFrame(
+            {
+                "trade_date": ["20240102", "20240103", "20240104"],
+                "ts_code": ["A", "A", "A"],
+                "selected": [True, False, False],
+            }
+        )
+        exit_signals = pd.DataFrame(
+            {
+                "trade_date": ["20240104"],
+                "ts_code": ["A"],
+                "selected": [False],
+            }
+        )
+        market_data = pd.DataFrame(
+            {
+                "trade_date": ["20240102", "20240103", "20240104", "20240105"],
+                "ts_code": ["A", "A", "A", "A"],
+                "open": [10.0, 10.0, 10.0, 10.0],
+                "close": [10.0, 10.0, 10.0, 10.0],
+            }
+        )
+
+        returns, holdings = run_backtest(
+            signals,
+            market_data,
+            fee_bps=0.0,
+            rebalance_frequency="daily",
+            exit_signals=exit_signals,
+            position_exit_policy={
+                "enabled": True,
+                "min_hold_days": 2,
+                "exit_filters": [{"factor": "placeholder"}],
+            },
+        )
+
+        exit_day = returns.loc[returns["trade_date"] == "20240105"].iloc[0]
+        self.assertAlmostEqual(exit_day["turnover"], 1.0)
+        self.assertTrue(holdings.loc[holdings["trade_date"] == "20240105"].empty)
+
 
 if __name__ == "__main__":
     unittest.main()

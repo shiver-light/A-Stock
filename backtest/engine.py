@@ -41,6 +41,12 @@ def _prepare_signals(signals: pd.DataFrame) -> pd.DataFrame:
     return data.reset_index(drop=True)
 
 
+def _prepare_exit_signals(exit_signals: pd.DataFrame | None) -> pd.DataFrame:
+    if exit_signals is None:
+        return pd.DataFrame(columns=["trade_date", "ts_code", "selected"])
+    return _prepare_signals(exit_signals)
+
+
 def _monthly_first_trade_dates(trade_dates: list[str]) -> list[str]:
     series = pd.Series(sorted(trade_dates), name="trade_date")
     months = series.str.slice(0, 6)
@@ -200,6 +206,60 @@ def _apply_execution_constraints(
     return {asset: weight for asset, weight in current_weights.items() if weight > 0}
 
 
+def _position_exit_policy_enabled(position_exit_policy: dict[str, object] | None) -> bool:
+    return bool(position_exit_policy and position_exit_policy.get("enabled", False))
+
+
+def _get_hold_allowed_assets_by_date(exit_signals: pd.DataFrame) -> dict[str, set[str]]:
+    if exit_signals.empty:
+        return {}
+    allowed = exit_signals.loc[exit_signals["selected"], ["trade_date", "ts_code"]].copy()
+    return {
+        str(trade_date): set(group["ts_code"].astype(str).tolist())
+        for trade_date, group in allowed.groupby("trade_date", sort=True)
+    }
+
+
+def _apply_position_exit_policy(
+    previous_close_weights: dict[str, float],
+    target_weights: dict[str, float],
+    *,
+    signal_date: str | None,
+    holding_days: dict[str, int],
+    hold_allowed_assets_by_date: dict[str, set[str]],
+    position_exit_policy: dict[str, object] | None,
+) -> dict[str, float]:
+    if not _position_exit_policy_enabled(position_exit_policy):
+        return target_weights
+
+    policy = position_exit_policy or {}
+    min_hold_days = int(policy.get("min_hold_days", 0))
+    max_hold_days = policy.get("max_hold_days")
+    max_hold_days = int(max_hold_days) if max_hold_days is not None else None
+    hold_allowed_assets = hold_allowed_assets_by_date.get(str(signal_date), set()) if signal_date else set()
+    has_exit_signal_rules = bool(policy.get("exit_filters"))
+
+    retained_assets: set[str] = set()
+    for asset in previous_close_weights:
+        days_held = int(holding_days.get(asset, 0))
+        if max_hold_days is not None and days_held >= max_hold_days:
+            continue
+        if days_held < min_hold_days:
+            retained_assets.add(asset)
+            continue
+        if not has_exit_signal_rules or asset in hold_allowed_assets:
+            retained_assets.add(asset)
+
+    forced_exit_assets = set(previous_close_weights) - retained_assets
+    target_assets = {asset for asset, weight in target_weights.items() if weight > 0 and asset not in forced_exit_assets}
+    final_assets = sorted(retained_assets | target_assets)
+    if not final_assets:
+        return {}
+
+    weight = 1.0 / len(final_assets)
+    return {asset: weight for asset in final_assets}
+
+
 def _normalize_asset_gross_return(gross_return: float | int | None) -> float:
     if gross_return is None or pd.isna(gross_return) or gross_return <= 0:
         return 1.0
@@ -278,6 +338,8 @@ def run_backtest(
     block_limit_down_sell: bool = False,
     min_amount: float | None = None,
     cash_on_empty_signal: bool = False,
+    exit_signals: pd.DataFrame | None = None,
+    position_exit_policy: dict[str, object] | None = None,
     date_col: str = "trade_date",
     asset_col: str = "ts_code",
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -292,6 +354,7 @@ def run_backtest(
     signal_data = _prepare_signals(signals).rename(
         columns={"trade_date": date_col, "ts_code": asset_col, "selected": "selected"}
     )
+    exit_signal_data = _prepare_exit_signals(exit_signals)
     weights = generate_weights(
         signals,
         market.rename(columns={date_col: "trade_date", asset_col: "ts_code"}),
@@ -302,22 +365,29 @@ def run_backtest(
     close_wide = market.pivot(index=date_col, columns=asset_col, values="close").sort_index()
     open_wide = market.pivot(index=date_col, columns=asset_col, values="open").sort_index()
     market_indexed = market.set_index([date_col, asset_col]).sort_index()
+    schedule = _execution_schedule(trade_dates, rebalance_frequency=rebalance_frequency)
+    signal_date_by_exec = {
+        row.execution_date: row.signal_date
+        for row in schedule.itertuples(index=False)
+    }
+    hold_allowed_assets_by_date = _get_hold_allowed_assets_by_date(exit_signal_data)
 
     weight_by_exec = {}
     for exec_date, group in weights.groupby("trade_date"):
         weight_by_exec[exec_date] = dict(zip(group["ts_code"], group["target_weight"]))
-    if cash_on_empty_signal:
-        schedule = _execution_schedule(trade_dates, rebalance_frequency=rebalance_frequency)
+    if cash_on_empty_signal or _position_exit_policy_enabled(position_exit_policy):
         selected_by_date = (
             signal_data.groupby(date_col)["selected"].any()
             if not signal_data.empty
             else pd.Series(dtype=bool)
         )
         for row in schedule.itertuples(index=False):
-            if row.signal_date in selected_by_date.index and not bool(selected_by_date.loc[row.signal_date]):
+            has_selected = bool(selected_by_date.loc[row.signal_date]) if row.signal_date in selected_by_date.index else False
+            if not has_selected:
                 weight_by_exec[row.execution_date] = {}
 
     previous_close_weights: dict[str, float] = {}
+    holding_days: dict[str, int] = {}
     records: list[dict[str, float | str]] = []
     holdings_rows: list[dict[str, float | str]] = []
 
@@ -328,6 +398,14 @@ def run_backtest(
         gross_return = 0.0
 
         if exec_weights is not None:
+            exec_weights = _apply_position_exit_policy(
+                previous_close_weights,
+                exec_weights,
+                signal_date=signal_date_by_exec.get(trade_date),
+                holding_days=holding_days,
+                hold_allowed_assets_by_date=hold_allowed_assets_by_date,
+                position_exit_policy=position_exit_policy,
+            )
             realized_exec_weights = _apply_execution_constraints(
                 previous_close_weights,
                 exec_weights,
@@ -381,6 +459,10 @@ def run_backtest(
         for asset, weight in end_of_day_weights.items():
             holdings_rows.append({"trade_date": trade_date, "ts_code": asset, "weight": weight})
         previous_close_weights = end_of_day_weights
+        holding_days = {
+            asset: holding_days.get(asset, 0) + 1
+            for asset in end_of_day_weights
+        }
 
     returns = pd.DataFrame(records)
     holdings = pd.DataFrame(holdings_rows)

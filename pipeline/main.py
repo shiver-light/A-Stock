@@ -153,14 +153,42 @@ def _get_signal_filter_factor_names(signal_filters: list[dict[str, object]] | No
     return factor_names
 
 
+def _get_position_exit_filters(position_exit_policy: dict[str, object] | None) -> list[dict[str, object]]:
+    if not position_exit_policy or position_exit_policy.get("enabled", False) is False:
+        return []
+    exit_filters = position_exit_policy.get("exit_filters", [])
+    if not exit_filters:
+        return []
+    if not isinstance(exit_filters, list):
+        raise ValueError("position_exit_policy exit_filters must be a list.")
+    return exit_filters
+
+
 def _merge_factor_configs(
     factor_config: dict[str, float],
     signal_filters: list[dict[str, object]] | None,
+    position_exit_policy: dict[str, object] | None = None,
 ) -> dict[str, float]:
     merged = dict(factor_config)
-    for factor_name in _get_signal_filter_factor_names(signal_filters):
+    filter_rules = list(signal_filters or []) + _get_position_exit_filters(position_exit_policy)
+    for factor_name in _get_signal_filter_factor_names(filter_rules):
         merged.setdefault(factor_name, 1.0)
     return merged
+
+
+def _build_exit_signals(
+    factor_panel: pd.DataFrame,
+    position_exit_policy: dict[str, object] | None,
+) -> pd.DataFrame | None:
+    exit_filters = _get_position_exit_filters(position_exit_policy)
+    if not exit_filters:
+        return None
+    held = _apply_signal_filters(factor_panel, exit_filters)
+    if held.empty:
+        return pd.DataFrame(columns=["trade_date", "ts_code", "selected"])
+    result = held.loc[:, ["trade_date", "ts_code"]].copy()
+    result["selected"] = True
+    return result.sort_values(["trade_date", "ts_code"]).reset_index(drop=True)
 
 
 def _apply_signal_filters(
@@ -484,7 +512,8 @@ def run_minimal_pipeline(
         "volatility_20d": -1.0,
         "turnover_mean_20d": 1.0,
     }
-    panel_factor_config = _merge_factor_configs(factor_config, signal_filters)
+    position_exit_policy = backtest_config.get("position_exit_policy")
+    panel_factor_config = _merge_factor_configs(factor_config, signal_filters, position_exit_policy)
     resolved_ts_codes = _resolve_ts_codes(
         ts_codes=ts_codes,
         universe_name=universe_name,
@@ -520,6 +549,7 @@ def run_minimal_pipeline(
         reference_index_data=market_regime_reference_data,
     )
     selected, external_regime = _apply_external_regime_filter(selected, external_regime_filter)
+    exit_signals = _build_exit_signals(factor_panel, position_exit_policy if isinstance(position_exit_policy, dict) else None)
 
     market_panel = _build_market_panel(ts_codes=resolved_ts_codes, start_date=start_date, end_date=end_date)
     has_market_regime = bool(market_regime_filter and market_regime_filter.get("enabled", True) is not False)
@@ -530,6 +560,7 @@ def run_minimal_pipeline(
         signals=selected.loc[:, ["trade_date", "ts_code", "selected"]],
         market_data=market_panel,
         rebalance_frequency=rebalance_frequency,
+        exit_signals=exit_signals,
         **backtest_config,
     )
     benchmark_returns = calc_benchmark_returns(
@@ -568,6 +599,7 @@ def run_minimal_pipeline(
         "filtered_factor_data": filtered_factor_panel,
         "scored_signals": scored,
         "selected_signals": selected,
+        "exit_signals": exit_signals if exit_signals is not None else pd.DataFrame(columns=["trade_date", "ts_code", "selected"]),
         "strategy_returns": strategy_returns,
         "benchmark_returns": benchmark_returns,
         "returns_with_benchmark": returns_with_benchmark,
