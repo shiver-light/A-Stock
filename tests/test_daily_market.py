@@ -11,6 +11,48 @@ from data.daily_market import AShareDailyMarketService, DailyMarketRequest
 
 
 class DailyMarketServiceTestCase(unittest.TestCase):
+    def test_get_daily_refreshes_incomplete_base_cache_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            cache_path = Path(tmp_dir) / "daily" / "000001.SZ.parquet"
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            pd.DataFrame(
+                {
+                    "ts_code": ["000001.SZ"],
+                    "trade_date": ["20240102"],
+                }
+            ).to_parquet(cache_path, index=False)
+
+            client = Mock()
+            client.daily.return_value = pd.DataFrame(
+                {
+                    "ts_code": ["000001.SZ"],
+                    "trade_date": ["20240102"],
+                    "open": [10.0],
+                    "high": [10.5],
+                    "low": [9.5],
+                    "close": [10.1],
+                    "pre_close": [10.0],
+                    "change": [0.1],
+                    "pct_chg": [1.0],
+                    "vol": [100.0],
+                    "amount": [1000.0],
+                }
+            )
+
+            service = AShareDailyMarketService(client=client, cache_dir=tmp_dir)
+            result = service.get_daily(
+                DailyMarketRequest(
+                    ts_code="000001.SZ",
+                    start_date="20240102",
+                    end_date="20240102",
+                    fields=("trade_date", "ts_code", "open", "close", "vol", "amount"),
+                )
+            )
+
+            self.assertEqual(client.daily.call_count, 1)
+            self.assertEqual(result.columns.tolist(), ["trade_date", "ts_code", "open", "close", "vol", "amount"])
+            self.assertEqual(float(result.iloc[0]["close"]), 10.1)
+
     def test_get_daily_refills_missing_adj_factor_dates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             client = Mock()

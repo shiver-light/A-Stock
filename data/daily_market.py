@@ -135,6 +135,8 @@ class AShareDailyMarketService:
     ) -> pd.DataFrame:
         cache_path = self._base_cache_path(ts_code)
         cached = self._read_cache(cache_path)
+        if not cached.empty and not self._has_required_fields(cached, DEFAULT_FIELDS):
+            cached = pd.DataFrame()
         missing_ranges = self._compute_missing_ranges(cached, start_date, end_date, refresh)
 
         frames = [cached] if not cached.empty else []
@@ -305,6 +307,9 @@ class AShareDailyMarketService:
         if not path.exists():
             return pd.DataFrame()
         return self._normalize_frame(pd.read_parquet(path))
+
+    def _has_required_fields(self, data: pd.DataFrame, fields: Iterable[str]) -> bool:
+        return all(field in data.columns for field in fields)
 
     def _write_cache(self, path: Path, data: pd.DataFrame) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
