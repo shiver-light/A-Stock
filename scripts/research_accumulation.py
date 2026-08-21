@@ -68,6 +68,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional cap per universe for smoke tests or staged runs.",
     )
+    parser.add_argument(
+        "--exclude-growth-boards",
+        action="store_true",
+        help="Exclude ChiNext and STAR Market stocks from resolved target pools.",
+    )
     parser.add_argument("--train-end", default="20211231", help="Training set end date.")
     parser.add_argument("--validation-end", default="20231231", help="Validation set end date.")
     parser.add_argument("--benchmark-hs300", default="000300.SH", help="HS300 benchmark code.")
@@ -89,10 +94,13 @@ def main() -> int:
             end_date=args.end_date,
             sample_frequency=args.sample_frequency,
             max_stocks_per_universe=args.max_stocks_per_universe,
+            exclude_growth_boards=args.exclude_growth_boards,
             refresh=args.refresh,
         )
     else:
         ts_codes = sorted(set(args.ts_codes or []))
+        if args.exclude_growth_boards:
+            ts_codes = _filter_growth_board_ts_codes(ts_codes, refresh=args.refresh)
     market_data, turnover_data = _load_stock_data(
         ts_codes,
         start_date=args.start_date,
@@ -156,6 +164,7 @@ def main() -> int:
         "universes": args.universes or [],
         "ts_code_count": int(len(ts_codes)),
         "sample_frequency": args.sample_frequency if args.universes else None,
+        "exclude_growth_boards": bool(args.exclude_growth_boards),
         "sample_count": int(len(samples)),
         "positive_ratio": _safe_ratio(samples),
         "splits": {name: {"sample_count": int(len(frame)), "positive_ratio": _safe_ratio(frame)} for name, frame in splits.items()},
@@ -210,6 +219,7 @@ def _resolve_universe_ts_codes(
     end_date: str,
     sample_frequency: str,
     max_stocks_per_universe: int | None,
+    exclude_growth_boards: bool,
     refresh: bool,
 ) -> tuple[list[str], pd.DataFrame]:
     sample_dates = _sample_dates(start_date, end_date, sample_frequency)
@@ -220,6 +230,10 @@ def _resolve_universe_ts_codes(
             continue
         history = history.loc[history["in_universe"].astype(bool)].copy()
         history["source_universe"] = universe_name
+        if exclude_growth_boards:
+            history = _filter_growth_board_membership(history, refresh=refresh)
+        if history.empty:
+            continue
         if max_stocks_per_universe is not None:
             capped_frames = []
             for as_of_date, group in history.groupby("as_of_date", sort=True):
@@ -236,6 +250,26 @@ def _resolve_universe_ts_codes(
     )
     ts_codes = sorted(membership["ts_code"].dropna().astype(str).unique().tolist())
     return ts_codes, membership
+
+
+def _filter_growth_board_membership(membership: pd.DataFrame, *, refresh: bool) -> pd.DataFrame:
+    if membership.empty:
+        return membership.copy()
+    allowed_codes = set(_filter_growth_board_ts_codes(membership["ts_code"].astype(str).tolist(), refresh=refresh))
+    return membership.loc[membership["ts_code"].astype(str).isin(allowed_codes)].copy()
+
+
+def _filter_growth_board_ts_codes(ts_codes: list[str], *, refresh: bool) -> list[str]:
+    if not ts_codes:
+        return []
+    stock_basic = get_stock_basic_history(refresh=refresh)
+    if stock_basic.empty or "ts_code" not in stock_basic.columns or "market" not in stock_basic.columns:
+        return sorted(set(ts_codes))
+    basic = stock_basic.loc[:, ["ts_code", "market"]].copy()
+    basic["ts_code"] = basic["ts_code"].astype(str)
+    basic["market"] = basic["market"].fillna("").astype(str)
+    growth_codes = set(basic.loc[basic["market"].isin(["创业板", "科创板"]), "ts_code"].tolist())
+    return sorted(code for code in set(ts_codes) if code not in growth_codes)
 
 
 def _filter_dataset_by_universe_membership(dataset: pd.DataFrame, membership: pd.DataFrame) -> pd.DataFrame:
@@ -300,6 +334,7 @@ def _render_text_summary(summary: dict[str, object]) -> str:
         "",
         f"股票数：{summary['ts_code_count']}",
         f"股票池：{', '.join(summary['universes']) if summary['universes'] else 'custom ts_codes'}",
+        f"剔除创业板/科创板：{'是' if summary.get('exclude_growth_boards') else '否'}",
         f"成分采样频率：{summary['sample_frequency'] or 'N/A'}",
         f"样本数：{summary['sample_count']}",
         f"正样本比例：{_format_pct(summary['positive_ratio'])}",

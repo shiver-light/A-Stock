@@ -1,10 +1,16 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
 import pandas as pd
 
-from scripts.research_accumulation import _filter_dataset_by_universe_membership, _sample_dates
+from scripts.research_accumulation import (
+    _filter_dataset_by_universe_membership,
+    _filter_growth_board_membership,
+    _filter_growth_board_ts_codes,
+    _sample_dates,
+)
 from analysis.accumulation_research import (
     DEFAULT_ACCUMULATION_FEATURES,
     apply_accumulation_score,
@@ -122,6 +128,42 @@ class AccumulationResearchTestCase(unittest.TestCase):
 
         self.assertEqual(result["trade_date"].tolist(), ["20240115", "20240201", "20240215"])
         self.assertEqual(result["source_universe"].unique().tolist(), ["hs300"])
+
+    @patch("scripts.research_accumulation.get_stock_basic_history")
+    def test_filter_growth_board_ts_codes_excludes_chinext_and_star(self, mock_get_stock_basic_history) -> None:
+        mock_get_stock_basic_history.return_value = pd.DataFrame(
+            {
+                "ts_code": ["000001.SZ", "300001.SZ", "688001.SH", "600001.SH"],
+                "market": ["主板", "创业板", "科创板", "主板"],
+            }
+        )
+
+        result = _filter_growth_board_ts_codes(
+            ["000001.SZ", "300001.SZ", "688001.SH", "600001.SH"],
+            refresh=False,
+        )
+
+        self.assertEqual(result, ["000001.SZ", "600001.SH"])
+
+    @patch("scripts.research_accumulation.get_stock_basic_history")
+    def test_filter_growth_board_membership_keeps_main_board_rows(self, mock_get_stock_basic_history) -> None:
+        mock_get_stock_basic_history.return_value = pd.DataFrame(
+            {
+                "ts_code": ["000001.SZ", "300001.SZ", "688001.SH", "600001.SH"],
+                "market": ["主板", "创业板", "科创板", "主板"],
+            }
+        )
+        membership = pd.DataFrame(
+            {
+                "as_of_date": ["20240131"] * 4,
+                "ts_code": ["000001.SZ", "300001.SZ", "688001.SH", "600001.SH"],
+                "source_universe": ["all_a"] * 4,
+            }
+        )
+
+        result = _filter_growth_board_membership(membership, refresh=False)
+
+        self.assertEqual(result["ts_code"].tolist(), ["000001.SZ", "600001.SH"])
 
 
 if __name__ == "__main__":
