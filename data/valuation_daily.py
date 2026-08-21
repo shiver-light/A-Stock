@@ -115,6 +115,8 @@ class AShareDailyValuationService:
 
     def _select_fields(self, data: pd.DataFrame, fields: tuple[str, ...]) -> pd.DataFrame:
         missing = [field for field in fields if field not in data.columns]
+        if missing and data.empty:
+            return pd.DataFrame(columns=list(fields))
         if missing:
             raise ValueError(f"Requested fields are unavailable: {missing}")
         return data.loc[:, list(fields)].copy()

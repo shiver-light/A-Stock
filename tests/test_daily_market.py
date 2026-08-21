@@ -53,6 +53,24 @@ class DailyMarketServiceTestCase(unittest.TestCase):
             self.assertEqual(result.columns.tolist(), ["trade_date", "ts_code", "open", "close", "vol", "amount"])
             self.assertEqual(float(result.iloc[0]["close"]), 10.1)
 
+    def test_get_daily_returns_requested_schema_for_empty_result(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            client = Mock()
+            client.daily.return_value = pd.DataFrame()
+            service = AShareDailyMarketService(client=client, cache_dir=tmp_dir)
+
+            result = service.get_daily(
+                DailyMarketRequest(
+                    ts_code="002820.SH",
+                    start_date="20160101",
+                    end_date="20260608",
+                    fields=("trade_date", "ts_code", "open", "close", "vol", "amount"),
+                )
+            )
+
+            self.assertTrue(result.empty)
+            self.assertEqual(result.columns.tolist(), ["trade_date", "ts_code", "open", "close", "vol", "amount"])
+
     def test_get_daily_refills_missing_adj_factor_dates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             client = Mock()
