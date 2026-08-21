@@ -9,6 +9,8 @@
 ## 支持的 universe
 
 - `all_a`
+- `all_a_ex_chinext_st`
+- `all_a_ex_chinext_star_st`
 - `hs300`
 - `zz500`
 - `zz1000`
@@ -31,6 +33,14 @@
 - `all_a`
   - 使用 `stock_basic + list_date + delist_date`
   - 避免只用当前上市股票列表回填历史
+
+- `all_a_ex_chinext_st`
+  - 在 `all_a` 基础上排除创业板与名称包含 `ST` 的股票
+  - 不排除科创板，保留旧研究口径兼容性
+
+- `all_a_ex_chinext_star_st`
+  - 在 `all_a` 基础上排除创业板、科创板与名称包含 `ST` 的股票
+  - 用于不希望纳入 300/301 创业板和 688 科创板的研究
 
 - `main_board` / `chinext`
   - 基于 `stock_basic.market` 字段做历史近似

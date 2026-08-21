@@ -16,6 +16,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=[
             "all_a",
             "all_a_ex_chinext_st",
+            "all_a_ex_chinext_star_st",
             "hs300",
             "zz500",
             "zz1000",
