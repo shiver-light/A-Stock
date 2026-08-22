@@ -101,6 +101,44 @@ class AccumulationResearchTestCase(unittest.TestCase):
         self.assertIn("condition", ladder.columns)
         self.assertIsInstance(buckets, pd.DataFrame)
 
+    def test_feature_power_excludes_low_coverage_features(self) -> None:
+        stats = pd.DataFrame(
+            {
+                "feature": ["thin", "thin", "covered", "covered"],
+                "quantile": [1, 5, 1, 5],
+                "sample_count": [10, 10, 1000, 1000],
+                "positive_ratio": [0.1, 0.8, 0.1, 0.3],
+                "mean_forward_20d": [0.0, 0.2, 0.0, 0.05],
+                "mean_future_20d_max_drawdown": [-0.05, -0.05, -0.05, -0.04],
+            }
+        )
+
+        power = summarize_feature_power(stats, min_sample_count=100, min_coverage_ratio=0.1)
+        model = fit_accumulation_score_model(pd.DataFrame({"label": [0, 1]}), power)
+
+        thin = power.loc[power["feature"] == "thin"].iloc[0]
+        self.assertFalse(bool(thin["eligible"]))
+        self.assertEqual(float(thin["score"]), 0.0)
+        self.assertNotIn("thin", model["features"])
+
+    def test_feature_power_penalizes_worse_drawdown(self) -> None:
+        stats = pd.DataFrame(
+            {
+                "feature": ["safe", "safe", "risky", "risky"],
+                "quantile": [1, 5, 1, 5],
+                "sample_count": [1000, 1000, 1000, 1000],
+                "positive_ratio": [0.1, 0.2, 0.1, 0.2],
+                "mean_forward_20d": [0.0, 0.02, 0.0, 0.02],
+                "mean_future_20d_max_drawdown": [-0.08, -0.04, -0.08, -0.18],
+            }
+        )
+
+        power = summarize_feature_power(stats, min_sample_count=100, min_coverage_ratio=0.1)
+        safe_score = float(power.loc[power["feature"] == "safe", "score"].iloc[0])
+        risky_score = float(power.loc[power["feature"] == "risky", "score"].iloc[0])
+
+        self.assertGreater(safe_score, risky_score)
+
     def test_sample_dates_supports_monthly_and_weekly(self) -> None:
         monthly = _sample_dates("20240101", "20240315", "monthly")
         weekly = _sample_dates("20240101", "20240115", "weekly")

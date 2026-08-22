@@ -141,29 +141,58 @@ def single_factor_analysis(
     return pd.DataFrame(rows).sort_values(["feature", "quantile"]).reset_index(drop=True)
 
 
-def summarize_feature_power(quantile_stats: pd.DataFrame) -> pd.DataFrame:
+def summarize_feature_power(
+    quantile_stats: pd.DataFrame,
+    *,
+    min_sample_count: int = 1000,
+    min_coverage_ratio: float = 0.05,
+) -> pd.DataFrame:
     """Summarize feature discrimination from quantile-level statistics."""
 
     if quantile_stats.empty:
-        return pd.DataFrame(columns=["feature", "sample_count", "positive_ratio_spread", "return_20d_spread", "score"])
+        return pd.DataFrame(
+            columns=[
+                "feature",
+                "sample_count",
+                "coverage_ratio",
+                "eligible",
+                "positive_ratio_spread",
+                "return_20d_spread",
+                "drawdown_20d_spread",
+                "score",
+            ]
+        )
     rows = []
+    max_sample_count = int(quantile_stats.groupby("feature")["sample_count"].sum().max())
     for feature, group in quantile_stats.groupby("feature", sort=True):
         ordered = group.sort_values("quantile")
         low = ordered.iloc[0]
         high = ordered.iloc[-1]
+        sample_count = int(group["sample_count"].sum())
+        coverage_ratio = float(sample_count / max_sample_count) if max_sample_count > 0 else 0.0
+        eligible = sample_count >= int(min_sample_count) and coverage_ratio >= float(min_coverage_ratio)
         positive_spread = float(high["positive_ratio"] - low["positive_ratio"])
         return_spread = float(high["mean_forward_20d"] - low["mean_forward_20d"])
-        score = max(positive_spread, 0.0) + max(return_spread, 0.0)
+        drawdown_spread = float(high["mean_future_20d_max_drawdown"] - low["mean_future_20d_max_drawdown"])
+        raw_score = positive_spread + return_spread + 0.5 * drawdown_spread
+        score = max(raw_score, 0.0) if eligible else 0.0
         rows.append(
             {
                 "feature": feature,
-                "sample_count": int(group["sample_count"].sum()),
+                "sample_count": sample_count,
+                "coverage_ratio": coverage_ratio,
+                "eligible": bool(eligible),
                 "positive_ratio_spread": positive_spread,
                 "return_20d_spread": return_spread,
+                "drawdown_20d_spread": drawdown_spread,
                 "score": score,
             }
         )
-    return pd.DataFrame(rows).sort_values("score", ascending=False).reset_index(drop=True)
+    return (
+        pd.DataFrame(rows)
+        .sort_values(["eligible", "score", "sample_count"], ascending=[False, False, False])
+        .reset_index(drop=True)
+    )
 
 
 def evaluate_condition_ladder(samples: pd.DataFrame, conditions: list[dict[str, object]]) -> pd.DataFrame:
@@ -192,7 +221,10 @@ def fit_accumulation_score_model(
 
     if train_samples.empty or feature_power.empty:
         return {"features": [], "weights": {}, "feature_directions": {}, "reason": "empty training data"}
-    selected = feature_power.loc[feature_power["score"] > 0].head(max_features).copy()
+    eligible = feature_power
+    if "eligible" in eligible.columns:
+        eligible = eligible.loc[eligible["eligible"].astype(bool)].copy()
+    selected = eligible.loc[eligible["score"] > 0].head(max_features).copy()
     if selected.empty:
         return {"features": [], "weights": {}, "feature_directions": {}, "reason": "no positive feature power"}
     total = float(selected["score"].sum())
@@ -204,7 +236,10 @@ def fit_accumulation_score_model(
         "features": list(weights.keys()),
         "weights": weights,
         "feature_directions": directions,
-        "reason": "weights are proportional to training-set positive-rate and 20d-return quantile spreads",
+        "reason": (
+            "weights are proportional to eligible training-set feature scores; "
+            "scores reward positive-rate and 20d-return improvement and penalize worse 20d drawdown"
+        ),
     }
 
 
