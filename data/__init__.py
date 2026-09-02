@@ -2,6 +2,7 @@
 
 from .daily_market import AShareDailyMarketService, DailyMarketRequest, get_a_share_daily_prices
 from .fundamental_daily import AShareFundamentalService, get_a_share_fundamental_daily
+from .holder_number import AShareHolderNumberService, get_a_share_holder_number_daily
 from .index_daily import AShareIndexDailyService, IndexDailyRequest, get_a_share_index_daily
 from .stock_universe import (
     INDEX_CODE_MAP,
@@ -19,6 +20,7 @@ __all__ = [
     "AShareDailyMarketService",
     "AShareDailyValuationService",
     "AShareFundamentalService",
+    "AShareHolderNumberService",
     "AShareIndexDailyService",
     "StockUniverseDataService",
     "USMarketDailyService",
@@ -31,6 +33,7 @@ __all__ = [
     "get_a_share_daily_prices",
     "get_a_share_daily_valuation",
     "get_a_share_fundamental_daily",
+    "get_a_share_holder_number_daily",
     "get_a_share_index_daily",
     "get_stock_basic_history",
     "get_index_constituents",

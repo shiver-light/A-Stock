@@ -1,0 +1,117 @@
+global:
+  # Shareholder count decline research.
+  # Universe excludes ChiNext, STAR Market, and ST stocks.
+  # holder_num_change_ratio_negative is aligned by ann_date, not report end_date.
+  # Signal time: T close. Execution time: T+1.
+  start_date: "20250101"
+  end_date: "20260608"
+  benchmark_code: "000985.CSI"
+  universe_name: "all_a_ex_chinext_star_st"
+  rebalance_frequency: "daily"
+  enable_factor_diagnostics: false
+  analysis_horizons:
+    - 1
+    - 3
+    - 5
+    - 10
+    - 20
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 300000.0
+    position_exit_policy:
+      enabled: true
+      min_hold_days: 3
+      max_hold_days: 20
+      exit_filters:
+        - factor: "holder_num_change_ratio_negative"
+          op: "gte"
+          value: 0.0
+        - factor: "price_position_120d"
+          op: "lte"
+          value: 0.60
+
+experiments:
+  - name: "hdecl_01_single_top50"
+    top_n: 50
+    signal_filters:
+      - factor: "holder_num_change_ratio_negative"
+        op: "gte"
+        value: 0.05
+    factor_config:
+      holder_num_change_ratio_negative: 1.00
+
+  - name: "hdecl_02_low_position_top50"
+    top_n: 50
+    signal_filters:
+      - factor: "holder_num_change_ratio_negative"
+        op: "gte"
+        value: 0.05
+      - factor: "price_position_120d"
+        op: "lte"
+        value: 0.50
+    factor_config:
+      holder_num_change_ratio_negative: 0.60
+      low_position_120d: 0.25
+      amount_mean_20d: 0.15
+
+  - name: "hdecl_03_low_volume_confirm_top50"
+    top_n: 50
+    signal_filters:
+      - factor: "holder_num_change_ratio_negative"
+        op: "gte"
+        value: 0.05
+      - factor: "price_position_120d"
+        op: "lte"
+        value: 0.50
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 1.2
+    factor_config:
+      holder_num_change_ratio_negative: 0.45
+      low_position_120d: 0.20
+      volume_ratio_5d: 0.15
+      ma20_slope_1d: 0.10
+      amount_mean_20d: 0.10
+
+  - name: "hdecl_04_low_turnover_confirm_top80"
+    top_n: 80
+    signal_filters:
+      - factor: "holder_num_change_ratio_negative"
+        op: "gte"
+        value: 0.03
+      - factor: "price_position_120d"
+        op: "lte"
+        value: 0.60
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 1.0
+        max_value: 12.0
+    factor_config:
+      holder_num_change_ratio_negative: 0.45
+      low_position_120d: 0.20
+      turnover_rate_f: 0.15
+      ma20_slope_1d: 0.10
+      false_breakout_risk_negative: 0.10
+
+  - name: "hdecl_05_risk_control_top50"
+    top_n: 50
+    signal_filters:
+      - factor: "holder_num_change_ratio_negative"
+        op: "gte"
+        value: 0.05
+      - factor: "price_position_120d"
+        op: "lte"
+        value: 0.50
+      - factor: "daily_return"
+        op: "between"
+        min_value: -0.03
+        max_value: 0.08
+    factor_config:
+      holder_num_change_ratio_negative: 0.45
+      low_position_120d: 0.20
+      false_breakout_risk_negative: 0.15
+      volatility_20d_negative: 0.10
+      amount_mean_20d: 0.10

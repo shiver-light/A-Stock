@@ -5,6 +5,7 @@ from __future__ import annotations
 import pandas as pd
 
 from data.fundamental_daily import get_a_share_fundamental_daily
+from data.holder_number import get_a_share_holder_number_daily
 from data.valuation_daily import get_a_share_daily_valuation
 from factors.base import build_factor_output, validate_factor_input
 
@@ -131,3 +132,26 @@ def revenue_growth_factor(
     )
     validate_factor_input(data, ["trade_date", "ts_code", "revenue_growth"])
     return build_factor_output(data, "revenue_growth", "revenue_growth")
+
+
+def holder_num_change_ratio_negative_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """Negative shareholder-number change ratio aligned by ann_date; larger means larger holder count decline."""
+
+    data = get_a_share_holder_number_daily(
+        ts_code=ts_code,
+        start_date=start_date,
+        end_date=end_date,
+        refresh=refresh,
+    )
+    validate_factor_input(data, ["trade_date", "ts_code", "holder_num_change_ratio_negative"])
+    return build_factor_output(
+        data,
+        "holder_num_change_ratio_negative",
+        "holder_num_change_ratio_negative",
+    )

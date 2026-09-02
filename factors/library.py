@@ -5,6 +5,7 @@ from __future__ import annotations
 from factors.fundamental import (
     bp_factor,
     ep_ttm_factor,
+    holder_num_change_ratio_negative_factor,
     pb_factor,
     pe_ttm_factor,
     revenue_growth_factor,
@@ -136,6 +137,7 @@ FACTOR_REGISTRY = {
     "roe": roe_factor,
     "roe_ttm": roe_ttm_factor,
     "revenue_growth": revenue_growth_factor,
+    "holder_num_change_ratio_negative": holder_num_change_ratio_negative_factor,
 }
 
 
