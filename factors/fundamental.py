@@ -185,6 +185,68 @@ def holder_num_change_ratio_negative_fresh_3d_factor(
     )
 
 
+def _build_fresh_holder_decline_decay_factor(data: pd.DataFrame, *, valid_days: int, factor_name: str) -> pd.DataFrame:
+    validate_factor_input(
+        data,
+        [
+            "trade_date",
+            "ts_code",
+            "holder_num_change_ratio_negative",
+            "holder_report_lag_trading_days",
+            "holder_announcement_age_trading_days",
+        ],
+    )
+    lag = pd.to_numeric(data["holder_report_lag_trading_days"], errors="coerce")
+    age = pd.to_numeric(data["holder_announcement_age_trading_days"], errors="coerce")
+    decay_weight = ((float(valid_days) - age + 1.0) / float(valid_days + 1)).clip(lower=0.0, upper=1.0)
+    data[factor_name] = data["holder_num_change_ratio_negative"].where((lag <= 3) & (age <= valid_days)) * decay_weight
+    return build_factor_output(data, factor_name, factor_name)
+
+
+def holder_num_change_ratio_negative_fresh_3d_decay_3d_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """Fresh holder-count decline factor with a 3-trading-day post-announcement linear decay."""
+
+    data = get_a_share_holder_number_daily(
+        ts_code=ts_code,
+        start_date=start_date,
+        end_date=end_date,
+        refresh=refresh,
+    )
+    return _build_fresh_holder_decline_decay_factor(
+        data,
+        valid_days=3,
+        factor_name="holder_num_change_ratio_negative_fresh_3d_decay_3d",
+    )
+
+
+def holder_num_change_ratio_negative_fresh_3d_decay_5d_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """Fresh holder-count decline factor with a 5-trading-day post-announcement linear decay."""
+
+    data = get_a_share_holder_number_daily(
+        ts_code=ts_code,
+        start_date=start_date,
+        end_date=end_date,
+        refresh=refresh,
+    )
+    return _build_fresh_holder_decline_decay_factor(
+        data,
+        valid_days=5,
+        factor_name="holder_num_change_ratio_negative_fresh_3d_decay_5d",
+    )
+
+
 def holder_num_change_ratio_negative_fresh_3d_decay_10d_factor(
     *,
     ts_code: str,
@@ -200,26 +262,10 @@ def holder_num_change_ratio_negative_fresh_3d_decay_10d_factor(
         end_date=end_date,
         refresh=refresh,
     )
-    validate_factor_input(
+    return _build_fresh_holder_decline_decay_factor(
         data,
-        [
-            "trade_date",
-            "ts_code",
-            "holder_num_change_ratio_negative",
-            "holder_report_lag_trading_days",
-            "holder_announcement_age_trading_days",
-        ],
-    )
-    lag = pd.to_numeric(data["holder_report_lag_trading_days"], errors="coerce")
-    age = pd.to_numeric(data["holder_announcement_age_trading_days"], errors="coerce")
-    decay_weight = ((10.0 - age + 1.0) / 11.0).clip(lower=0.0, upper=1.0)
-    data["holder_num_change_ratio_negative_fresh_3d_decay_10d"] = data[
-        "holder_num_change_ratio_negative"
-    ].where((lag <= 3) & (age <= 10)) * decay_weight
-    return build_factor_output(
-        data,
-        "holder_num_change_ratio_negative_fresh_3d_decay_10d",
-        "holder_num_change_ratio_negative_fresh_3d_decay_10d",
+        valid_days=10,
+        factor_name="holder_num_change_ratio_negative_fresh_3d_decay_10d",
     )
 
 
