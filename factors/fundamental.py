@@ -183,3 +183,34 @@ def holder_num_change_ratio_negative_fresh_3d_factor(
         "holder_num_change_ratio_negative_fresh_3d",
         "holder_num_change_ratio_negative_fresh_3d",
     )
+
+
+def holder_num_change_ratio_negative_fresh_3d_announced_today_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """Fresh holder-count decline factor that is only valid on its ann_date."""
+
+    data = get_a_share_holder_number_daily(
+        ts_code=ts_code,
+        start_date=start_date,
+        end_date=end_date,
+        refresh=refresh,
+    )
+    validate_factor_input(
+        data,
+        ["trade_date", "ts_code", "ann_date", "holder_num_change_ratio_negative", "holder_report_lag_trading_days"],
+    )
+    lag = pd.to_numeric(data["holder_report_lag_trading_days"], errors="coerce")
+    announced_today = data["trade_date"].astype(str) == data["ann_date"].astype(str)
+    data["holder_num_change_ratio_negative_fresh_3d_announced_today"] = data[
+        "holder_num_change_ratio_negative"
+    ].where((lag < 3) & announced_today)
+    return build_factor_output(
+        data,
+        "holder_num_change_ratio_negative_fresh_3d_announced_today",
+        "holder_num_change_ratio_negative_fresh_3d_announced_today",
+    )

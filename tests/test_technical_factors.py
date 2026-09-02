@@ -6,7 +6,12 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 
-from factors.fundamental import bp_factor, ep_ttm_factor, roe_ttm_factor
+from factors.fundamental import (
+    bp_factor,
+    ep_ttm_factor,
+    holder_num_change_ratio_negative_fresh_3d_announced_today_factor,
+    roe_ttm_factor,
+)
 from factors.library import get_factor_function
 from factors.technical import (
     amount_mean_20d_factor,
@@ -1333,6 +1338,28 @@ class TechnicalFactorsTestCase(unittest.TestCase):
 
         self.assertEqual(result.iloc[0]["factor_name"], "roe_ttm")
         self.assertEqual(result.iloc[0]["factor_value"], 12.3)
+
+    @patch("factors.fundamental.get_a_share_holder_number_daily")
+    def test_holder_num_change_ratio_negative_fresh_3d_announced_today_factor(self, mock_get_holder_daily) -> None:
+        mock_get_holder_daily.return_value = pd.DataFrame(
+            {
+                "trade_date": ["20250410", "20250411", "20250414"],
+                "ts_code": ["000001.SZ", "000001.SZ", "000001.SZ"],
+                "ann_date": ["20250410", "20250410", "20250414"],
+                "holder_num_change_ratio_negative": [0.20, 0.20, 0.10],
+                "holder_report_lag_trading_days": [2, 2, 3],
+            }
+        )
+
+        result = holder_num_change_ratio_negative_fresh_3d_announced_today_factor(
+            ts_code="000001.SZ",
+            start_date="20250410",
+            end_date="20250414",
+        )
+
+        self.assertEqual(result.iloc[0]["factor_value"], 0.20)
+        self.assertTrue(pd.isna(result.iloc[1]["factor_value"]))
+        self.assertTrue(pd.isna(result.iloc[2]["factor_value"]))
 
     def test_factor_library_registers_new_technical_factors(self) -> None:
         self.assertIs(get_factor_function("return_60d"), return_60d_factor)
