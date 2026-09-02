@@ -73,8 +73,9 @@ class AShareHolderNumberService:
             end_date=end_date,
             refresh=refresh,
         )
+        calendar_start = self._holder_calendar_start(history, start_date)
         calendar = self.get_trade_calendar(
-            start_date=self._shift_calendar_date(start_date, -30),
+            start_date=calendar_start,
             end_date=end_date,
             refresh=refresh,
         )
@@ -88,6 +89,10 @@ class AShareHolderNumberService:
         effective["holder_num_change"] = effective["holder_num"] - effective["previous_holder_num"]
         effective["holder_num_change_ratio"] = effective["holder_num_change"] / effective["previous_holder_num"]
         effective["holder_num_change_ratio_negative"] = -effective["holder_num_change_ratio"]
+        effective["holder_report_lag_trading_days"] = self._report_lag_trading_days(
+            effective,
+            calendar,
+        )
         effective = effective.dropna(subset=["holder_num_change_ratio_negative"]).copy()
         if effective.empty:
             return self._empty_aligned_frame(trading_days, start_date, end_date)
@@ -106,6 +111,7 @@ class AShareHolderNumberService:
                     "holder_num_change",
                     "holder_num_change_ratio",
                     "holder_num_change_ratio_negative",
+                    "holder_report_lag_trading_days",
                 ]
             ].sort_values("ann_date_key"),
             left_on="trade_date_key",
@@ -126,6 +132,7 @@ class AShareHolderNumberService:
                 "holder_num_change",
                 "holder_num_change_ratio",
                 "holder_num_change_ratio_negative",
+                "holder_report_lag_trading_days",
             ],
         ].reset_index(drop=True)
 
@@ -175,6 +182,7 @@ class AShareHolderNumberService:
             "holder_num_change",
             "holder_num_change_ratio",
             "holder_num_change_ratio_negative",
+            "holder_report_lag_trading_days",
         ]:
             result[column] = pd.NA
         mask = (result["trade_date"] >= start_date) & (result["trade_date"] <= end_date)
@@ -209,6 +217,35 @@ class AShareHolderNumberService:
             .drop_duplicates(subset=["exchange", "cal_date"], keep="last")
             .reset_index(drop=True)
         )
+
+    def _holder_calendar_start(self, history: pd.DataFrame, start_date: str) -> str:
+        default_start = self._shift_calendar_date(start_date, -30)
+        if history.empty or "end_date" not in history.columns:
+            return default_start
+        end_dates = history["end_date"].fillna("").astype(str)
+        end_dates = end_dates.loc[end_dates.ne("")]
+        if end_dates.empty:
+            return default_start
+        return min(default_start, str(end_dates.min()))
+
+    def _report_lag_trading_days(self, disclosures: pd.DataFrame, calendar: pd.DataFrame) -> pd.Series:
+        if disclosures.empty or calendar.empty:
+            return pd.Series(pd.NA, index=disclosures.index, dtype="Int64")
+        open_dates = (
+            calendar.loc[calendar["is_open"] == "1", "cal_date"]
+            .dropna()
+            .astype(str)
+            .sort_values()
+            .drop_duplicates()
+            .tolist()
+        )
+        rows = []
+        for row in disclosures.itertuples():
+            end_date = str(row.end_date)
+            ann_date = str(row.ann_date)
+            lag = sum(1 for trade_date in open_dates if end_date < trade_date <= ann_date)
+            rows.append(lag)
+        return pd.Series(rows, index=disclosures.index, dtype="Int64")
 
     def _read_cache(self, path: Path) -> pd.DataFrame:
         if not path.exists():

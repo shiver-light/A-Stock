@@ -55,6 +55,29 @@ class HolderNumberTestCase(unittest.TestCase):
         self.assertEqual(on_announcement["holder_num"], 800)
         self.assertAlmostEqual(on_announcement["holder_num_change_ratio"], -0.2)
         self.assertAlmostEqual(on_announcement["holder_num_change_ratio_negative"], 0.2)
+        self.assertEqual(on_announcement["holder_report_lag_trading_days"], 10)
+
+    def test_report_lag_trading_days_counts_end_to_announcement_window(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            service = AShareHolderNumberService(client=FakeHolderNumberClient(), cache_dir=Path(directory))
+            calendar = pd.DataFrame(
+                {
+                    "exchange": ["SSE"] * 5,
+                    "cal_date": ["20250331", "20250401", "20250402", "20250403", "20250404"],
+                    "is_open": ["1"] * 5,
+                    "pretrade_date": [""] * 5,
+                }
+            )
+            disclosures = pd.DataFrame(
+                {
+                    "ann_date": ["20250402", "20250404"],
+                    "end_date": ["20250331", "20250331"],
+                }
+            )
+
+            result = service._report_lag_trading_days(disclosures, calendar)
+
+        self.assertEqual(result.tolist(), [2, 4])
 
     def test_holder_number_cache_metadata_prevents_repeat_fetch(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
