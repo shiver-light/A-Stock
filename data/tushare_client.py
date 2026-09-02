@@ -306,6 +306,26 @@ class TushareClient:
             fields=fields,
         )
 
+    def stk_holdernumber(
+        self,
+        *,
+        ts_code: str | None = None,
+        ann_date: str | None = None,
+        enddate: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        fields: str | None = None,
+    ) -> pd.DataFrame:
+        return self._call_with_retry(
+            self._pro.stk_holdernumber,
+            ts_code=ts_code,
+            ann_date=ann_date,
+            enddate=enddate,
+            start_date=start_date,
+            end_date=end_date,
+            fields=fields,
+        )
+
     def trade_cal(
         self,
         *,
