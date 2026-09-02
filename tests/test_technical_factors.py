@@ -10,6 +10,7 @@ from factors.fundamental import (
     bp_factor,
     ep_ttm_factor,
     holder_num_change_ratio_negative_fresh_3d_announced_today_factor,
+    holder_num_change_ratio_negative_fresh_3d_decay_10d_factor,
     roe_ttm_factor,
 )
 from factors.library import get_factor_function
@@ -1361,6 +1362,29 @@ class TechnicalFactorsTestCase(unittest.TestCase):
         self.assertTrue(pd.isna(result.iloc[1]["factor_value"]))
         self.assertTrue(pd.isna(result.iloc[2]["factor_value"]))
 
+    @patch("factors.fundamental.get_a_share_holder_number_daily")
+    def test_holder_num_change_ratio_negative_fresh_3d_decay_10d_factor(self, mock_get_holder_daily) -> None:
+        mock_get_holder_daily.return_value = pd.DataFrame(
+            {
+                "trade_date": ["20250410", "20250411", "20250424", "20250425"],
+                "ts_code": ["000001.SZ"] * 4,
+                "holder_num_change_ratio_negative": [0.22, 0.22, 0.22, 0.22],
+                "holder_report_lag_trading_days": [3, 3, 3, 4],
+                "holder_announcement_age_trading_days": [0, 1, 10, 0],
+            }
+        )
+
+        result = holder_num_change_ratio_negative_fresh_3d_decay_10d_factor(
+            ts_code="000001.SZ",
+            start_date="20250410",
+            end_date="20250425",
+        )
+
+        self.assertAlmostEqual(result.iloc[0]["factor_value"], 0.22)
+        self.assertAlmostEqual(result.iloc[1]["factor_value"], 0.22 * 10.0 / 11.0)
+        self.assertAlmostEqual(result.iloc[2]["factor_value"], 0.22 / 11.0)
+        self.assertTrue(pd.isna(result.iloc[3]["factor_value"]))
+
     def test_factor_library_registers_new_technical_factors(self) -> None:
         self.assertIs(get_factor_function("return_60d"), return_60d_factor)
         self.assertIs(get_factor_function("return_120d"), return_120d_factor)
@@ -1423,6 +1447,10 @@ class TechnicalFactorsTestCase(unittest.TestCase):
         self.assertIs(get_factor_function("ep_ttm"), ep_ttm_factor)
         self.assertIs(get_factor_function("bp"), bp_factor)
         self.assertIs(get_factor_function("roe_ttm"), roe_ttm_factor)
+        self.assertIs(
+            get_factor_function("holder_num_change_ratio_negative_fresh_3d_decay_10d"),
+            holder_num_change_ratio_negative_fresh_3d_decay_10d_factor,
+        )
 
 
 if __name__ == "__main__":

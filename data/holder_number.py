@@ -119,6 +119,10 @@ class AShareHolderNumberService:
             direction="backward",
         )
         aligned = aligned.drop(columns=["trade_date_key", "ann_date_key"])
+        aligned["holder_announcement_age_trading_days"] = self._announcement_age_trading_days(
+            aligned,
+            calendar,
+        )
         mask = (aligned["trade_date"] >= start_date) & (aligned["trade_date"] <= end_date)
         return aligned.loc[
             mask,
@@ -133,6 +137,7 @@ class AShareHolderNumberService:
                 "holder_num_change_ratio",
                 "holder_num_change_ratio_negative",
                 "holder_report_lag_trading_days",
+                "holder_announcement_age_trading_days",
             ],
         ].reset_index(drop=True)
 
@@ -183,6 +188,7 @@ class AShareHolderNumberService:
             "holder_num_change_ratio",
             "holder_num_change_ratio_negative",
             "holder_report_lag_trading_days",
+            "holder_announcement_age_trading_days",
         ]:
             result[column] = pd.NA
         mask = (result["trade_date"] >= start_date) & (result["trade_date"] <= end_date)
@@ -246,6 +252,28 @@ class AShareHolderNumberService:
             lag = sum(1 for trade_date in open_dates if end_date < trade_date <= ann_date)
             rows.append(lag)
         return pd.Series(rows, index=disclosures.index, dtype="Int64")
+
+    def _announcement_age_trading_days(self, aligned: pd.DataFrame, calendar: pd.DataFrame) -> pd.Series:
+        if aligned.empty or calendar.empty or "ann_date" not in aligned.columns:
+            return pd.Series(pd.NA, index=aligned.index, dtype="Int64")
+        open_dates = (
+            calendar.loc[calendar["is_open"] == "1", "cal_date"]
+            .dropna()
+            .astype(str)
+            .sort_values()
+            .drop_duplicates()
+            .tolist()
+        )
+        rows = []
+        for row in aligned.itertuples():
+            ann_date = str(row.ann_date)
+            trade_date = str(row.trade_date)
+            if not ann_date or ann_date == "<NA>":
+                rows.append(pd.NA)
+                continue
+            age = sum(1 for date in open_dates if ann_date < date <= trade_date)
+            rows.append(age)
+        return pd.Series(rows, index=aligned.index, dtype="Int64")
 
     def _read_cache(self, path: Path) -> pd.DataFrame:
         if not path.exists():

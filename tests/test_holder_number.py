@@ -79,6 +79,28 @@ class HolderNumberTestCase(unittest.TestCase):
 
         self.assertEqual(result.tolist(), [2, 4])
 
+    def test_announcement_age_trading_days_counts_from_announcement_to_signal_date(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            service = AShareHolderNumberService(client=FakeHolderNumberClient(), cache_dir=Path(directory))
+            calendar = pd.DataFrame(
+                {
+                    "exchange": ["SSE"] * 4,
+                    "cal_date": ["20250410", "20250411", "20250414", "20250415"],
+                    "is_open": ["1"] * 4,
+                    "pretrade_date": [""] * 4,
+                }
+            )
+            aligned = pd.DataFrame(
+                {
+                    "trade_date": ["20250410", "20250411", "20250415"],
+                    "ann_date": ["20250410", "20250410", "20250410"],
+                }
+            )
+
+            result = service._announcement_age_trading_days(aligned, calendar)
+
+        self.assertEqual(result.tolist(), [0, 1, 3])
+
     def test_holder_number_cache_metadata_prevents_repeat_fetch(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             client = FakeHolderNumberClient()

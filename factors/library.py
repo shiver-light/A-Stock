@@ -7,6 +7,7 @@ from factors.fundamental import (
     ep_ttm_factor,
     holder_num_change_ratio_negative_factor,
     holder_num_change_ratio_negative_fresh_3d_announced_today_factor,
+    holder_num_change_ratio_negative_fresh_3d_decay_10d_factor,
     holder_num_change_ratio_negative_fresh_3d_factor,
     pb_factor,
     pe_ttm_factor,
@@ -142,6 +143,9 @@ FACTOR_REGISTRY = {
     "holder_num_change_ratio_negative": holder_num_change_ratio_negative_factor,
     "holder_num_change_ratio_negative_fresh_3d_announced_today": (
         holder_num_change_ratio_negative_fresh_3d_announced_today_factor
+    ),
+    "holder_num_change_ratio_negative_fresh_3d_decay_10d": (
+        holder_num_change_ratio_negative_fresh_3d_decay_10d_factor
     ),
     "holder_num_change_ratio_negative_fresh_3d": holder_num_change_ratio_negative_fresh_3d_factor,
 }
