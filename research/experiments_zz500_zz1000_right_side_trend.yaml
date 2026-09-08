@@ -1,0 +1,231 @@
+global:
+  # Right-side trend-following research.
+  # Signal time: T close. Execution time: T+1 open.
+  # The model confirms trend strength first, then uses mild volume expansion,
+  # turnover bounds, and risk controls. This is not a bottom-fishing strategy.
+  start_date: "20250101"
+  end_date: "20260608"
+  rebalance_frequency: "daily"
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 10
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 300000.0
+    position_exit_policy:
+      enabled: true
+      min_hold_days: 2
+      max_hold_days: 10
+      exit_filters:
+        - factor: "ma20_slope_1d"
+          op: "gte"
+          value: -0.003
+        - factor: "close_to_high_20d"
+          op: "gte"
+          value: 0.55
+
+experiments:
+  - name: "rside_01_zz500_trend_top20"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    top_n: 20
+    signal_filters:
+      - factor: "ma20_slope_1d"
+        op: "gte"
+        value: 0.0
+      - factor: "ma5_ma10_breakout"
+        op: "gte"
+        value: 0.0
+      - factor: "close_to_high_20d"
+        op: "gte"
+        value: 0.70
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 1.2
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 2.0
+        max_value: 12.0
+      - factor: "daily_return"
+        op: "between"
+        min_value: -0.02
+        max_value: 0.08
+    factor_config:
+      ma20_slope_1d: 0.20
+      close_to_high_20d: 0.20
+      return_20d: 0.20
+      volume_ratio_5d: 0.15
+      turnover_rate_f: 0.10
+      volatility_20d_negative: 0.15
+
+  - name: "rside_02_zz500_trend_top30"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    top_n: 30
+    signal_filters:
+      - factor: "ma20_slope_1d"
+        op: "gte"
+        value: 0.0
+      - factor: "ma5_ma10_breakout"
+        op: "gte"
+        value: 0.0
+      - factor: "close_to_high_20d"
+        op: "gte"
+        value: 0.70
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 1.2
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 2.0
+        max_value: 12.0
+      - factor: "daily_return"
+        op: "between"
+        min_value: -0.02
+        max_value: 0.08
+    factor_config:
+      ma20_slope_1d: 0.20
+      close_to_high_20d: 0.20
+      return_20d: 0.20
+      volume_ratio_5d: 0.15
+      turnover_rate_f: 0.10
+      volatility_20d_negative: 0.15
+
+  - name: "rside_03_zz500_mild_volume_top30"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    top_n: 30
+    signal_filters:
+      - factor: "ma20_slope_1d"
+        op: "gte"
+        value: -0.001
+      - factor: "ma5_ma10_breakout"
+        op: "gte"
+        value: 0.0
+      - factor: "close_to_high_20d"
+        op: "gte"
+        value: 0.60
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 1.0
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 1.5
+        max_value: 12.0
+      - factor: "daily_return"
+        op: "between"
+        min_value: -0.02
+        max_value: 0.08
+    factor_config:
+      ma20_slope_1d: 0.20
+      close_to_high_20d: 0.25
+      return_20d: 0.20
+      volume_ratio_5d: 0.10
+      turnover_rate_f: 0.10
+      volatility_20d_negative: 0.15
+
+  - name: "rside_04_zz1000_trend_top30"
+    universe_name: "zz1000"
+    benchmark_code: "000852.SH"
+    top_n: 30
+    signal_filters:
+      - factor: "ma20_slope_1d"
+        op: "gte"
+        value: 0.0
+      - factor: "ma5_ma10_breakout"
+        op: "gte"
+        value: 0.0
+      - factor: "close_to_high_20d"
+        op: "gte"
+        value: 0.70
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 1.2
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 2.0
+        max_value: 12.0
+      - factor: "daily_return"
+        op: "between"
+        min_value: -0.02
+        max_value: 0.08
+    factor_config:
+      ma20_slope_1d: 0.20
+      close_to_high_20d: 0.20
+      return_20d: 0.20
+      volume_ratio_5d: 0.15
+      turnover_rate_f: 0.10
+      volatility_20d_negative: 0.15
+
+  - name: "rside_05_zz1000_trend_top50"
+    universe_name: "zz1000"
+    benchmark_code: "000852.SH"
+    top_n: 50
+    signal_filters:
+      - factor: "ma20_slope_1d"
+        op: "gte"
+        value: 0.0
+      - factor: "ma5_ma10_breakout"
+        op: "gte"
+        value: 0.0
+      - factor: "close_to_high_20d"
+        op: "gte"
+        value: 0.70
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 1.2
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 2.0
+        max_value: 12.0
+      - factor: "daily_return"
+        op: "between"
+        min_value: -0.02
+        max_value: 0.08
+    factor_config:
+      ma20_slope_1d: 0.20
+      close_to_high_20d: 0.20
+      return_20d: 0.20
+      volume_ratio_5d: 0.15
+      turnover_rate_f: 0.10
+      volatility_20d_negative: 0.15
+
+  - name: "rside_06_zz1000_mild_volume_top50"
+    universe_name: "zz1000"
+    benchmark_code: "000852.SH"
+    top_n: 50
+    signal_filters:
+      - factor: "ma20_slope_1d"
+        op: "gte"
+        value: -0.001
+      - factor: "ma5_ma10_breakout"
+        op: "gte"
+        value: 0.0
+      - factor: "close_to_high_20d"
+        op: "gte"
+        value: 0.60
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 1.0
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 1.5
+        max_value: 12.0
+      - factor: "daily_return"
+        op: "between"
+        min_value: -0.02
+        max_value: 0.08
+    factor_config:
+      ma20_slope_1d: 0.20
+      close_to_high_20d: 0.25
+      return_20d: 0.20
+      volume_ratio_5d: 0.10
+      turnover_rate_f: 0.10
+      volatility_20d_negative: 0.15
