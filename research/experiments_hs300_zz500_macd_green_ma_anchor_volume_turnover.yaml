@@ -1,0 +1,172 @@
+global:
+  # MACD green-bar shrink + MA5 crossing above MA10 anchor research.
+  # Anchor factor uses only T and earlier daily qfq close data. The anchor day
+  # and next 10 trading days are eligible with linear recency decay.
+  # Entry trigger is same-day volume_ratio_5d >= 2.5 and turnover_rate_f in
+  # [3%, 10%]. Signal time: T close. Execution time: T+1 open.
+  start_date: "20250101"
+  end_date: "20260608"
+  rebalance_frequency: "daily"
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 10
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 300000.0
+    position_exit_policy:
+      enabled: true
+      min_hold_days: 2
+      max_hold_days: 7
+      exit_filters:
+        - factor: "ma20_slope_1d"
+          op: "gte"
+          value: -0.005
+        - factor: "price_position_120d"
+          op: "lte"
+          value: 0.65
+
+experiments:
+  - name: "mgma_01_hs300_strict_vr25_turn3_10_top10"
+    universe_name: "hs300"
+    benchmark_code: "000300.SH"
+    top_n: 10
+    signal_filters:
+      - factor: "macd_green_shrink_ma5_cross_10d"
+        op: "gte"
+        value: 0.001
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 2.5
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 3.0
+        max_value: 10.0
+    factor_config:
+      macd_green_shrink_ma5_cross_10d: 0.35
+      volume_ratio_5d: 0.25
+      turnover_rate_f: 0.15
+      ma20_slope_1d: 0.15
+      low_position_120d: 0.10
+
+  - name: "mgma_02_hs300_strict_vr25_turn3_10_top20"
+    universe_name: "hs300"
+    benchmark_code: "000300.SH"
+    top_n: 20
+    signal_filters:
+      - factor: "macd_green_shrink_ma5_cross_10d"
+        op: "gte"
+        value: 0.001
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 2.5
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 3.0
+        max_value: 10.0
+    factor_config:
+      macd_green_shrink_ma5_cross_10d: 0.35
+      volume_ratio_5d: 0.25
+      turnover_rate_f: 0.15
+      ma20_slope_1d: 0.15
+      low_position_120d: 0.10
+
+  - name: "mgma_03_hs300_lowpos_vr25_turn3_10_top10"
+    universe_name: "hs300"
+    benchmark_code: "000300.SH"
+    top_n: 10
+    signal_filters:
+      - factor: "macd_green_shrink_ma5_cross_10d"
+        op: "gte"
+        value: 0.001
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 2.5
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 3.0
+        max_value: 10.0
+      - factor: "price_position_120d"
+        op: "lte"
+        value: 0.50
+    factor_config:
+      macd_green_shrink_ma5_cross_10d: 0.30
+      volume_ratio_5d: 0.20
+      turnover_rate_f: 0.15
+      ma20_slope_1d: 0.15
+      low_position_120d: 0.20
+
+  - name: "mgma_04_zz500_strict_vr25_turn3_10_top20"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    top_n: 20
+    signal_filters:
+      - factor: "macd_green_shrink_ma5_cross_10d"
+        op: "gte"
+        value: 0.001
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 2.5
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 3.0
+        max_value: 10.0
+    factor_config:
+      macd_green_shrink_ma5_cross_10d: 0.35
+      volume_ratio_5d: 0.25
+      turnover_rate_f: 0.15
+      ma20_slope_1d: 0.15
+      low_position_120d: 0.10
+
+  - name: "mgma_05_zz500_strict_vr25_turn3_10_top30"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    top_n: 30
+    signal_filters:
+      - factor: "macd_green_shrink_ma5_cross_10d"
+        op: "gte"
+        value: 0.001
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 2.5
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 3.0
+        max_value: 10.0
+    factor_config:
+      macd_green_shrink_ma5_cross_10d: 0.35
+      volume_ratio_5d: 0.25
+      turnover_rate_f: 0.15
+      ma20_slope_1d: 0.15
+      low_position_120d: 0.10
+
+  - name: "mgma_06_zz500_lowpos_vr25_turn3_10_top20"
+    universe_name: "zz500"
+    benchmark_code: "000905.SH"
+    top_n: 20
+    signal_filters:
+      - factor: "macd_green_shrink_ma5_cross_10d"
+        op: "gte"
+        value: 0.001
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 2.5
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 3.0
+        max_value: 10.0
+      - factor: "price_position_120d"
+        op: "lte"
+        value: 0.50
+    factor_config:
+      macd_green_shrink_ma5_cross_10d: 0.30
+      volume_ratio_5d: 0.20
+      turnover_rate_f: 0.15
+      ma20_slope_1d: 0.15
+      low_position_120d: 0.20

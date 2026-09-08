@@ -38,6 +38,7 @@ from factors.technical import (
     kdj_low_zone_cross_factor,
     liquidity_improvement_20d_factor,
     low_position_120d_factor,
+    macd_green_shrink_ma5_cross_10d_factor,
     macd_hist_slope_5d_factor,
     macd_zero_axis_strength_factor,
     max_drawdown_60d_negative_factor,
@@ -1433,6 +1434,38 @@ class TechnicalFactorsTestCase(unittest.TestCase):
         self.assertAlmostEqual(result.iloc[2]["factor_value"], 0.18 / 6.0)
         self.assertTrue(pd.isna(result.iloc[3]["factor_value"]))
 
+    @patch("factors.technical._append_macd_columns")
+    @patch("factors.technical._load_qfq_daily")
+    def test_macd_green_shrink_ma5_cross_10d_factor(self, mock_load_qfq_daily, mock_append_macd_columns) -> None:
+        dates = self._date_range(22)
+        closes = [10.0] * 10 + [12.0] * 12
+        hist = [-0.3] * 10 + [-0.1] + [-0.2] * 11
+        mock_load_qfq_daily.return_value = pd.DataFrame(
+            {
+                "trade_date": dates,
+                "ts_code": ["000001.SZ"] * 22,
+                "close": closes,
+            }
+        )
+
+        def append_macd_columns(data: pd.DataFrame) -> pd.DataFrame:
+            result = data.copy()
+            result["macd_hist"] = hist
+            return result
+
+        mock_append_macd_columns.side_effect = append_macd_columns
+
+        result = macd_green_shrink_ma5_cross_10d_factor(
+            ts_code="000001.SZ",
+            start_date=dates[10],
+            end_date=dates[-1],
+        )
+
+        self.assertAlmostEqual(result.iloc[0]["factor_value"], 1.0)
+        self.assertAlmostEqual(result.iloc[1]["factor_value"], 10.0 / 11.0)
+        self.assertAlmostEqual(result.iloc[10]["factor_value"], 1.0 / 11.0)
+        self.assertTrue(pd.isna(result.iloc[11]["factor_value"]))
+
     def test_factor_library_registers_new_technical_factors(self) -> None:
         self.assertIs(get_factor_function("return_60d"), return_60d_factor)
         self.assertIs(get_factor_function("return_120d"), return_120d_factor)
@@ -1461,6 +1494,10 @@ class TechnicalFactorsTestCase(unittest.TestCase):
         self.assertIs(get_factor_function("kdj_golden_cross"), kdj_golden_cross_factor)
         self.assertIs(get_factor_function("kdj_golden_cross_3d"), kdj_golden_cross_3d_factor)
         self.assertIs(get_factor_function("daily_macd_golden_cross_2d"), daily_macd_golden_cross_2d_factor)
+        self.assertIs(
+            get_factor_function("macd_green_shrink_ma5_cross_10d"),
+            macd_green_shrink_ma5_cross_10d_factor,
+        )
         self.assertIs(get_factor_function("macd_hist_slope_5d"), macd_hist_slope_5d_factor)
         self.assertIs(get_factor_function("macd_zero_axis_strength"), macd_zero_axis_strength_factor)
         self.assertIs(get_factor_function("weekly_kdj_golden_cross_2d"), weekly_kdj_golden_cross_2d_factor)

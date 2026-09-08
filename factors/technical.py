@@ -841,6 +841,43 @@ def ma5_ma10_breakout_3d_factor(*, ts_code: str, start_date: str, end_date: str,
     return build_factor_output(data, "ma5_ma10_breakout_3d", "ma5_ma10_breakout_3d")
 
 
+def macd_green_shrink_ma5_cross_10d_factor(
+    *,
+    ts_code: str,
+    start_date: str,
+    end_date: str,
+    refresh: bool = False,
+) -> pd.DataFrame:
+    """MACD green-bar shrink plus MA5 crossing above MA10, valid for 10 later trading days.
+
+    Green-bar shrink means MACD histogram is below zero but less negative than
+    the prior trading day. The anchor day and next 10 trading days are eligible,
+    with linear recency decay. The factor does not include volume or turnover
+    triggers; those should be applied as same-day signal filters.
+    """
+
+    data = _load_qfq_daily(ts_code, start_date, end_date, refresh, lookback_days=160)
+    validate_factor_input(data, ["trade_date", "ts_code", "close"])
+    data = _append_macd_columns(data)
+    grouped_close = data.groupby("ts_code")["close"]
+    ma5 = grouped_close.rolling(5).mean().reset_index(level=0, drop=True)
+    ma10 = grouped_close.rolling(10).mean().reset_index(level=0, drop=True)
+    previous_ma5 = ma5.groupby(data["ts_code"]).shift(1)
+    previous_ma10 = ma10.groupby(data["ts_code"]).shift(1)
+    previous_hist = data.groupby("ts_code")["macd_hist"].shift(1)
+
+    green_shrink = (data["macd_hist"] < 0) & (previous_hist < 0) & (data["macd_hist"] > previous_hist)
+    ma_cross = (previous_ma5 <= previous_ma10) & (ma5 > ma10)
+    raw_signal = pd.Series(np.where(green_shrink & ma_cross, 1.0, np.nan), index=data.index, dtype="float64")
+    data["macd_green_shrink_ma5_cross_10d"] = _trailing_decay_max(
+        raw_signal,
+        data["ts_code"],
+        decay_weights=tuple((11.0 - offset) / 11.0 for offset in range(11)),
+    )
+    data = _clip_dates(data, start_date, end_date)
+    return build_factor_output(data, "macd_green_shrink_ma5_cross_10d", "macd_green_shrink_ma5_cross_10d")
+
+
 def gap_risk_20d_negative_factor(
     *,
     ts_code: str,
