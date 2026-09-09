@@ -1,0 +1,190 @@
+global:
+  # ZZ2000 right-side trend-following research.
+  # Universe excludes BJ, ChiNext, and STAR stocks to avoid current adj_factor
+  # gaps and stricter board-specific trading constraints. Signal time: T close.
+  # Execution time: T+1 open.
+  start_date: "20250101"
+  end_date: "20260608"
+  benchmark_code: "000985.CSI"
+  universe_name: "zz2000_ex_bj_ex_chinext_star"
+  rebalance_frequency: "daily"
+  enable_factor_diagnostics: true
+  analysis_horizons:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 10
+  backtest_config:
+    slippage_bps: 15.0
+    block_suspended: true
+    block_limit_up_buy: true
+    block_limit_down_sell: true
+    min_amount: 300000.0
+    position_exit_policy:
+      enabled: true
+      min_hold_days: 2
+      max_hold_days: 10
+      exit_filters:
+        - factor: "ma20_slope_1d"
+          op: "gte"
+          value: -0.003
+        - factor: "close_to_high_20d"
+          op: "gte"
+          value: 0.55
+
+experiments:
+  - name: "z20rside_01_trend_top50"
+    top_n: 50
+    signal_filters:
+      - factor: "ma20_slope_1d"
+        op: "gte"
+        value: 0.0
+      - factor: "ma5_ma10_breakout"
+        op: "gte"
+        value: 0.0
+      - factor: "close_to_high_20d"
+        op: "gte"
+        value: 0.70
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 1.2
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 2.0
+        max_value: 12.0
+      - factor: "daily_return"
+        op: "between"
+        min_value: -0.02
+        max_value: 0.08
+    factor_config:
+      ma20_slope_1d: 0.20
+      close_to_high_20d: 0.20
+      return_20d: 0.20
+      volume_ratio_5d: 0.15
+      turnover_rate_f: 0.10
+      volatility_20d_negative: 0.15
+
+  - name: "z20rside_02_trend_top80"
+    top_n: 80
+    signal_filters:
+      - factor: "ma20_slope_1d"
+        op: "gte"
+        value: 0.0
+      - factor: "ma5_ma10_breakout"
+        op: "gte"
+        value: 0.0
+      - factor: "close_to_high_20d"
+        op: "gte"
+        value: 0.70
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 1.2
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 2.0
+        max_value: 12.0
+      - factor: "daily_return"
+        op: "between"
+        min_value: -0.02
+        max_value: 0.08
+    factor_config:
+      ma20_slope_1d: 0.20
+      close_to_high_20d: 0.20
+      return_20d: 0.20
+      volume_ratio_5d: 0.15
+      turnover_rate_f: 0.10
+      volatility_20d_negative: 0.15
+
+  - name: "z20rside_03_mild_volume_top80"
+    top_n: 80
+    signal_filters:
+      - factor: "ma20_slope_1d"
+        op: "gte"
+        value: -0.001
+      - factor: "ma5_ma10_breakout"
+        op: "gte"
+        value: 0.0
+      - factor: "close_to_high_20d"
+        op: "gte"
+        value: 0.60
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 1.0
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 1.5
+        max_value: 12.0
+      - factor: "daily_return"
+        op: "between"
+        min_value: -0.02
+        max_value: 0.08
+    factor_config:
+      ma20_slope_1d: 0.20
+      close_to_high_20d: 0.25
+      return_20d: 0.20
+      volume_ratio_5d: 0.10
+      turnover_rate_f: 0.10
+      volatility_20d_negative: 0.15
+
+  - name: "z20rside_04_trend_lowvol_top80"
+    top_n: 80
+    signal_filters:
+      - factor: "ma20_slope_1d"
+        op: "gte"
+        value: 0.0
+      - factor: "ma5_ma10_breakout"
+        op: "gte"
+        value: 0.0
+      - factor: "close_to_high_20d"
+        op: "gte"
+        value: 0.65
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 1.0
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 1.5
+        max_value: 10.0
+      - factor: "daily_return"
+        op: "between"
+        min_value: -0.02
+        max_value: 0.07
+    factor_config:
+      ma20_slope_1d: 0.20
+      close_to_high_20d: 0.20
+      return_20d: 0.15
+      volume_ratio_5d: 0.10
+      turnover_rate_f: 0.10
+      volatility_20d_negative: 0.25
+
+  - name: "z20rside_05_strong_momentum_top50"
+    top_n: 50
+    signal_filters:
+      - factor: "ma20_slope_1d"
+        op: "gte"
+        value: 0.0
+      - factor: "ma5_ma10_breakout"
+        op: "gte"
+        value: 0.0
+      - factor: "close_to_high_20d"
+        op: "gte"
+        value: 0.70
+      - factor: "volume_ratio_5d"
+        op: "gte"
+        value: 1.0
+      - factor: "turnover_rate_f"
+        op: "between"
+        min_value: 1.5
+        max_value: 12.0
+      - factor: "daily_return"
+        op: "between"
+        min_value: -0.02
+        max_value: 0.08
+    factor_config:
+      ma20_slope_1d: 0.15
+      close_to_high_20d: 0.20
+      return_20d: 0.30
+      volume_ratio_5d: 0.10
+      turnover_rate_f: 0.10
+      volatility_20d_negative: 0.15
