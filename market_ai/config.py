@@ -50,11 +50,20 @@ class NewsScoringConfig:
 
     default_authority_score: float = 50.0
     authority_scores: dict[str, float] = field(default_factory=dict)
+    core_event_top_n: int = 10
+    min_core_event_score: float = 60.0
+    require_core_theme_match: bool = True
 
     def __post_init__(self) -> None:
         default_score = float(self.default_authority_score)
         if not 0.0 <= default_score <= 100.0:
             raise ValueError("news_scoring.default_authority_score must be between 0 and 100.")
+        min_score = float(self.min_core_event_score)
+        if not 0.0 <= min_score <= 100.0:
+            raise ValueError("news_scoring.min_core_event_score must be between 0 and 100.")
+        top_n = int(self.core_event_top_n)
+        if top_n <= 0:
+            raise ValueError("news_scoring.core_event_top_n must be positive.")
         scores = {str(source).strip(): float(score) for source, score in self.authority_scores.items()}
         if any(not source for source in scores):
             raise ValueError("news_scoring.authority_scores source must not be empty.")
@@ -62,6 +71,9 @@ class NewsScoringConfig:
             raise ValueError("news_scoring.authority_scores must be between 0 and 100.")
         object.__setattr__(self, "default_authority_score", default_score)
         object.__setattr__(self, "authority_scores", scores)
+        object.__setattr__(self, "core_event_top_n", top_n)
+        object.__setattr__(self, "min_core_event_score", min_score)
+        object.__setattr__(self, "require_core_theme_match", bool(self.require_core_theme_match))
 
 
 @dataclass(frozen=True)
@@ -159,6 +171,9 @@ def _build_radar_config(payload: dict[str, Any]) -> RadarConfig:
         news_scoring=NewsScoringConfig(
             default_authority_score=float(news_scoring.get("default_authority_score", 50.0)),
             authority_scores=dict(news_scoring.get("authority_scores", {}) or {}),
+            core_event_top_n=int(news_scoring.get("core_event_top_n", 10)),
+            min_core_event_score=float(news_scoring.get("min_core_event_score", 60.0)),
+            require_core_theme_match=bool(news_scoring.get("require_core_theme_match", True)),
         ),
         theme_score=ThemeScoreConfig(
             weights=dict(theme_score.get("weights", DEFAULT_THEME_SCORE_WEIGHTS) or DEFAULT_THEME_SCORE_WEIGHTS)

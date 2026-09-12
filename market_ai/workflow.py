@@ -11,7 +11,7 @@ from market_ai.lifecycle import classify_theme_lifecycle
 from market_ai.models import DailyRadarReport
 from market_ai.providers.market import MarketProvider
 from market_ai.providers.news import NewsProvider
-from market_ai.scoring import calculate_theme_scores
+from market_ai.scoring import calculate_theme_scores, select_core_news_events
 from market_ai.themes import RuleBasedThemeNormalizer, ThemeTaxonomy, normalize_news_items
 from market_ai.themes import load_stock_theme_labels, merge_theme_normalizations, stock_codes_from_market_rows
 
@@ -57,6 +57,7 @@ def build_daily_radar_report(
     normalizations = merge_theme_normalizations(label_normalizations, rule_normalizations)
 
     news_events = []
+    news_items = []
     if news_provider is not None:
         news_end = news_end_time or datetime.now()
         news_start = news_start_time or news_end - timedelta(hours=config.news.lookback_hours)
@@ -76,11 +77,21 @@ def build_daily_radar_report(
         core_themes = classify_theme_lifecycle(core_themes, theme_score_history, trade_date=trade_date)
     news_themes = {theme for event in news_events for theme in event.themes}
     unexplained_strength = [theme for theme in core_themes if theme.theme not in news_themes and theme.score >= 50.0]
+    core_news_events = select_core_news_events(
+        news_events,
+        news_items=news_items,
+        core_themes=[theme.theme for theme in core_themes],
+        authority_scores=config.news_scoring.authority_scores,
+        default_authority_score=config.news_scoring.default_authority_score,
+        min_score=config.news_scoring.min_core_event_score,
+        top_n=config.news_scoring.core_event_top_n,
+        require_core_theme_match=config.news_scoring.require_core_theme_match,
+    )
 
     return DailyRadarReport(
         trade_date=trade_date,
         core_themes=core_themes,
-        news_events=news_events,
+        news_events=core_news_events,
         unexplained_strength=unexplained_strength,
         stock_roles=[],
         next_day_observations=_build_observations(core_themes),
@@ -90,7 +101,9 @@ def build_daily_radar_report(
             "normalized_stock_count": len(normalizations),
             "stock_theme_label_count": len(label_normalizations),
             "rule_theme_label_count": len(rule_normalizations),
-            "news_event_count": len(news_events),
+            "news_event_total_count": len(news_events),
+            "core_news_event_count": len(core_news_events),
+            "news_event_count": len(core_news_events),
         },
     )
 

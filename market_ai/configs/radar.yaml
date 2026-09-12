@@ -13,6 +13,9 @@ news:
 
 news_scoring:
   default_authority_score: 50
+  core_event_top_n: 10
+  min_core_event_score: 60
+  require_core_theme_match: true
   authority_scores:
     新华社: 95
     证监会: 95
