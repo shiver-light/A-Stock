@@ -62,6 +62,31 @@ SUMMARY_NEWS_KEYWORDS = (
     "港股收盘",
     "海外研选",
 )
+SINGLE_STOCK_EVENT_KEYWORDS = (
+    "*st",
+    "st",
+    "控制权",
+    "董事长",
+    "实控人",
+    "股东",
+    "刑事立案",
+    "问询函",
+    "监管函",
+    "业绩会",
+    "直击业绩会",
+    "公司公告",
+    "单股",
+    "涨停背后",
+)
+THEME_BREADTH_KEYWORDS = (
+    "多股涨停",
+    "涨停潮",
+    "板块",
+    "产业链",
+    "行业",
+    "政策",
+    "扩散",
+)
 
 
 @dataclass(frozen=True)
@@ -71,6 +96,7 @@ class NewsSemanticScore:
     directness_score: float
     impact_score: float
     noise_penalty: float
+    stock_event_penalty: float
     reason: list[str]
 
     def to_dict(self) -> dict[str, object]:
@@ -78,6 +104,7 @@ class NewsSemanticScore:
             "directness_score": self.directness_score,
             "impact_score": self.impact_score,
             "noise_penalty": self.noise_penalty,
+            "stock_event_penalty": self.stock_event_penalty,
             "reason": self.reason,
         }
 
@@ -89,6 +116,8 @@ def calculate_news_semantic_score(event: NewsEventAnalysis, news_item: NewsItem 
     impact_hits = [keyword for keyword in IMPACT_KEYWORDS if keyword in text]
     low_direct_hits = [keyword for keyword in LOW_DIRECTNESS_KEYWORDS if keyword in text]
     summary_hits = [keyword for keyword in SUMMARY_NEWS_KEYWORDS if keyword in text]
+    single_stock_hits = [keyword for keyword in SINGLE_STOCK_EVENT_KEYWORDS if keyword in text]
+    breadth_hits = [keyword for keyword in THEME_BREADTH_KEYWORDS if keyword in text]
 
     directness = min(100.0, 35.0 + 15.0 * len(direct_hits))
     if low_direct_hits and not direct_hits:
@@ -100,6 +129,9 @@ def calculate_news_semantic_score(event: NewsEventAnalysis, news_item: NewsItem 
     noise_penalty = min(80.0, 25.0 * len(summary_hits) + 20.0 * len(low_direct_hits))
     if direct_hits and impact_hits:
         noise_penalty = max(0.0, noise_penalty - 20.0)
+    stock_event_penalty = min(80.0, 25.0 * len(single_stock_hits))
+    if breadth_hits:
+        stock_event_penalty = max(0.0, stock_event_penalty - 35.0)
     reason = []
     if direct_hits:
         reason.append("direct_market_terms=" + ",".join(direct_hits[:5]))
@@ -109,10 +141,15 @@ def calculate_news_semantic_score(event: NewsEventAnalysis, news_item: NewsItem 
         reason.append("low_directness_terms=" + ",".join(low_direct_hits[:5]))
     if summary_hits:
         reason.append("summary_terms=" + ",".join(summary_hits[:5]))
+    if single_stock_hits:
+        reason.append("single_stock_terms=" + ",".join(single_stock_hits[:5]))
+    if breadth_hits:
+        reason.append("breadth_terms=" + ",".join(breadth_hits[:5]))
     return NewsSemanticScore(
         directness_score=round(directness, 6),
         impact_score=round(impact, 6),
         noise_penalty=round(noise_penalty, 6),
+        stock_event_penalty=round(stock_event_penalty, 6),
         reason=reason,
     )
 

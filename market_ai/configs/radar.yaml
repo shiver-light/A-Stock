@@ -23,6 +23,7 @@ news_scoring:
     directness: 0.15
     impact: 0.10
     noise_penalty: 0.20
+    stock_event_penalty: 0.25
   authority_scores:
     新华社: 95
     证监会: 95

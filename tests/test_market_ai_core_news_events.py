@@ -155,6 +155,87 @@ class MarketAiCoreNewsEventsTestCase(unittest.TestCase):
         self.assertEqual(ranked[0].event.event, "A股PCB板块多股涨停")
         self.assertGreater(ranked[1].noise_penalty, 0.0)
 
+    def test_rank_core_news_events_penalizes_single_stock_event(self) -> None:
+        news_items = [
+            NewsItem(
+                news_id="n1",
+                source="财联社",
+                title="揭秘*ST高科控制权之争：前董事长被刑事立案",
+                published_at="2026-09-11T10:00:00+08:00",
+            ),
+            NewsItem(
+                news_id="n2",
+                source="财联社",
+                title="A股半导体板块多股涨停",
+                published_at="2026-09-11T15:01:00+08:00",
+                content="政策推动产业链订单增长。",
+            ),
+        ]
+        events = [
+            NewsEventAnalysis(
+                event="揭秘*ST高科控制权之争：前董事长被刑事立案",
+                event_type="news",
+                event_time="2026-09-11T10:00:00+08:00",
+                themes=["半导体国产替代"],
+                source_news_ids=["n1"],
+            ),
+            NewsEventAnalysis(
+                event="A股半导体板块多股涨停",
+                event_type="news",
+                event_time="2026-09-11T15:01:00+08:00",
+                themes=["半导体国产替代"],
+                source_news_ids=["n2"],
+            ),
+        ]
+
+        ranked = rank_core_news_events(
+            events,
+            news_items=news_items,
+            core_themes=["半导体国产替代"],
+            authority_scores={"财联社": 80.0},
+        )
+
+        self.assertEqual(ranked[0].event.event, "A股半导体板块多股涨停")
+        self.assertGreater(ranked[1].stock_event_penalty, 0.0)
+
+    def test_penalty_weights_do_not_dilute_positive_score_components(self) -> None:
+        news_items = [
+            NewsItem(
+                news_id="n1",
+                source="财联社",
+                title="A股PCB板块多股涨停",
+                published_at="2026-09-11T15:01:00+08:00",
+                content="AI服务器订单增长，产业链公司扩产。",
+            )
+        ]
+        events = [
+            NewsEventAnalysis(
+                event="A股PCB板块多股涨停",
+                event_type="news",
+                event_time="2026-09-11T15:01:00+08:00",
+                themes=["PCB服务器液冷电源"],
+                source_news_ids=["n1"],
+            )
+        ]
+
+        ranked = rank_core_news_events(
+            events,
+            news_items=news_items,
+            core_themes=["PCB服务器液冷电源"],
+            authority_scores={"财联社": 80.0},
+            semantic_weights={
+                "authority": 0.3,
+                "core_theme": 0.3,
+                "theme_match": 0.15,
+                "directness": 0.15,
+                "impact": 0.1,
+                "noise_penalty": 0.9,
+                "stock_event_penalty": 0.9,
+            },
+        )
+
+        self.assertGreaterEqual(ranked[0].score, 60.0)
+
 
 if __name__ == "__main__":
     unittest.main()

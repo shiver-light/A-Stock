@@ -56,6 +56,33 @@ class MarketAiNewsSemanticTestCase(unittest.TestCase):
         self.assertGreater(score.noise_penalty, 0.0)
         self.assertTrue(any(reason.startswith("summary_terms=") for reason in score.reason))
 
+    def test_single_stock_dispute_news_has_stock_event_penalty(self) -> None:
+        event = NewsEventAnalysis(
+            event="揭秘*ST高科控制权之争：前董事长被刑事立案",
+            event_type="news",
+            event_time="2026-09-11T10:00:00+08:00",
+            themes=["半导体国产替代"],
+            source_news_ids=["n1"],
+        )
+
+        score = calculate_news_semantic_score(event)
+
+        self.assertGreaterEqual(score.stock_event_penalty, 50.0)
+        self.assertTrue(any(reason.startswith("single_stock_terms=") for reason in score.reason))
+
+    def test_theme_breadth_reduces_single_stock_penalty(self) -> None:
+        event = NewsEventAnalysis(
+            event="PCB板块多股涨停 公司公告显示产业链订单增长",
+            event_type="news",
+            event_time="2026-09-11T10:00:00+08:00",
+            themes=["PCB服务器液冷电源"],
+            source_news_ids=["n1"],
+        )
+
+        score = calculate_news_semantic_score(event)
+
+        self.assertLess(score.stock_event_penalty, 25.0)
+
 
 if __name__ == "__main__":
     unittest.main()

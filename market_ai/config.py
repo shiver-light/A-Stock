@@ -29,6 +29,7 @@ DEFAULT_NEWS_SEMANTIC_WEIGHTS = {
     "directness": 0.15,
     "impact": 0.10,
     "noise_penalty": 0.20,
+    "stock_event_penalty": 0.25,
 }
 
 

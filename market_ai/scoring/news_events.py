@@ -21,6 +21,7 @@ class CoreNewsEventScore:
     directness_score: float
     impact_score: float
     noise_penalty: float
+    stock_event_penalty: float
     source: str
 
     def to_dict(self) -> dict[str, object]:
@@ -33,6 +34,7 @@ class CoreNewsEventScore:
             "directness_score": self.directness_score,
             "impact_score": self.impact_score,
             "noise_penalty": self.noise_penalty,
+            "stock_event_penalty": self.stock_event_penalty,
             "source": self.source,
         }
 
@@ -86,6 +88,7 @@ def rank_core_news_events(
         }
         score = sum(components[key] * weights.get(key, 0.0) for key in components)
         score -= semantic.noise_penalty * weights.get("noise_penalty", 0.0)
+        score -= semantic.stock_event_penalty * weights.get("stock_event_penalty", 0.0)
         results.append(
             CoreNewsEventScore(
                 event=event,
@@ -96,6 +99,7 @@ def rank_core_news_events(
                 directness_score=round(semantic.directness_score, 6),
                 impact_score=round(semantic.impact_score, 6),
                 noise_penalty=round(semantic.noise_penalty, 6),
+                stock_event_penalty=round(semantic.stock_event_penalty, 6),
                 source=source,
             )
         )
@@ -146,7 +150,11 @@ def _event_news_item(event: NewsEventAnalysis, news_by_id: dict[str, NewsItem]) 
 
 def _normalize_weights(weights: dict[str, float]) -> dict[str, float]:
     cleaned = {str(key).strip(): float(value) for key, value in weights.items() if float(value) > 0.0}
-    if not cleaned:
+    positive = {key: value for key, value in cleaned.items() if not key.endswith("_penalty")}
+    penalties = {key: value for key, value in cleaned.items() if key.endswith("_penalty")}
+    if not positive:
         raise ValueError("News semantic weights must contain at least one positive value.")
-    total = sum(cleaned.values())
-    return {key: value / total for key, value in cleaned.items()}
+    total = sum(positive.values())
+    normalized = {key: value / total for key, value in positive.items()}
+    normalized.update(penalties)
+    return normalized
