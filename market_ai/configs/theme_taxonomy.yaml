@@ -1,0 +1,135 @@
+# 标准题材 taxonomy。
+# aliases 用于把涨停原因、新闻标题、公告摘要中的同义词映射到统一主题。
+# 该文件只做语义归一，不参与交易信号生成，避免改变现有回测假设。
+themes:
+  - theme: AI算力
+    parent: 科技
+    description: AI 基础设施与数据中心算力链。
+    aliases:
+      - AI服务器
+      - AIDC
+      - 数据中心
+      - 算力中心
+      - 智算中心
+      - 算力租赁
+      - GPU服务器
+      - 液冷服务器
+      - 东数西算
+
+  - theme: CPO光通信
+    parent: 科技
+    description: AI 数据中心高速互联相关光通信链。
+    aliases:
+      - CPO
+      - 光模块
+      - 光通信
+      - 硅光
+      - LPO
+      - 800G
+      - 1.6T
+      - 光芯片
+      - 光器件
+
+  - theme: PCB服务器液冷电源
+    parent: 科技
+    description: AI 基建上游硬件、散热和电源环节。
+    aliases:
+      - PCB
+      - 高速PCB
+      - AI服务器电源
+      - 服务器电源
+      - 液冷
+      - 电源
+      - UPS
+      - 连接器
+      - 铜缆高速连接
+
+  - theme: 半导体国产替代
+    parent: 科技
+    description: 自主可控、设备、材料、设计、封测和先进封装。
+    aliases:
+      - 半导体
+      - 国产替代
+      - 芯片
+      - 芯片设计
+      - 半导体设备
+      - 半导体材料
+      - 光刻胶
+      - 先进封装
+      - Chiplet
+      - HBM
+      - 存储
+
+  - theme: 机器人具身智能
+    parent: 科技
+    description: 人形机器人、执行器、传感器和物理 AI。
+    aliases:
+      - 机器人
+      - 具身智能
+      - 人形机器人
+      - 物理AI
+      - 机器视觉
+      - 伺服系统
+      - 减速器
+      - 丝杠
+      - 灵巧手
+
+  - theme: 低空经济
+    parent: 科技
+    description: 无人机、eVTOL、空管和低空基础设施。
+    aliases:
+      - 低空经济
+      - 无人机
+      - eVTOL
+      - 飞控
+      - 空管
+      - 低空基础设施
+      - 通航
+
+  - theme: 端侧AI消费电子
+    parent: 科技
+    description: AI 手机、AI PC、智能眼镜和消费电子终端。
+    aliases:
+      - 端侧AI
+      - AI手机
+      - AI PC
+      - AI眼镜
+      - 智能眼镜
+      - AR
+      - XR
+      - NPU
+      - 消费电子
+
+  - theme: 卫星互联网商业航天
+    parent: 科技
+    description: 卫星通信、商业航天、6G 和北斗产业链。
+    aliases:
+      - 卫星互联网
+      - 商业航天
+      - 卫星通信
+      - 北斗
+      - 商业火箭
+      - 6G
+      - 相控阵雷达
+
+  - theme: 脑机接口
+    parent: 科技
+    description: 脑机接口、神经电极和医疗康复设备。
+    aliases:
+      - 脑机接口
+      - 神经电极
+      - 神经解码
+      - 康复机器人
+
+  - theme: 量子科技新材料
+    parent: 科技
+    description: 量子科技、可控核聚变和先进材料。
+    aliases:
+      - 量子科技
+      - 量子通信
+      - 量子计算
+      - 可控核聚变
+      - 新材料
+      - 超导
+      - 碳纤维
+      - 第三代半导体
