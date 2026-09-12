@@ -1,0 +1,4 @@
+news_id,source,title,published_at,url,content
+n001,sample_news,工信部推动智算中心和液冷数据中心建设,2026-09-12T15:30:00+08:00,https://example.com/news/n001,政策提出加快 AIDC、液冷服务器和算力中心基础设施建设。
+n002,sample_news,海外云厂商上调 AI 数据中心资本开支,2026-09-12T08:45:00+08:00,https://example.com/news/n002,市场关注 CPO、光模块、PCB 和服务器电源需求。
+n003,sample_news,机器人产业链订单边际改善,2026-09-11T19:20:00+08:00,https://example.com/news/n003,人形机器人、伺服系统和减速器方向受到关注。

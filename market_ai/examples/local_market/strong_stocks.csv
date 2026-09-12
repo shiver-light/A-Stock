@@ -1,0 +1,5 @@
+trade_date,stock_code,stock_name,close,pct_chg,amount,turnover_rate,volume_ratio,industry,concepts,source
+20260912,000001.SZ,样本算力D,17.52,8.72,720000000,6.3,1.8,IT服务,AIDC|算力租赁|智算中心,sample
+20260912,000002.SZ,样本半导体E,32.80,7.45,540000000,5.2,1.6,半导体,半导体设备|国产替代|先进封装,sample
+20260912,000003.SZ,样本低空F,11.46,7.12,280000000,4.1,1.4,航空装备,低空经济|无人机|飞控,sample
+20260912,000004.SZ,样本消费G,9.80,6.80,190000000,3.2,1.1,食品饮料,消费复苏,sample
