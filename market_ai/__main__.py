@@ -13,7 +13,7 @@ from market_ai.config import load_market_radar_config
 from data.tushare_client import TushareClient
 from market_ai.lifecycle import load_theme_score_history
 from market_ai.providers.market import LocalCsvMarketProvider, TushareDailyMarketProvider, TushareLimitMarketProvider
-from market_ai.providers.news import LocalCsvNewsProvider
+from market_ai.providers.news import LocalCsvNewsProvider, TushareMajorNewsProvider
 from market_ai.providers.news.importer import import_news_csvs
 from market_ai.reports import render_daily_radar_report_markdown
 from market_ai.themes.enrichment import enrich_stock_theme_labels
@@ -110,6 +110,29 @@ def main(argv: list[str] | None = None) -> int:
     import_news_parser.add_argument("--theme-score-history", default=None, help="Theme score history used by rerun-radar.")
     import_news_parser.add_argument("--output-dir", default=None, help="Output directory used by rerun-radar.")
 
+    collect_news_parser = subparsers.add_parser("collect-news", help="Collect news into a radar-compatible CSV.")
+    collect_news_parser.add_argument("--start-date", required=True, help="Start trade date, for example 20260907.")
+    collect_news_parser.add_argument("--end-date", required=True, help="End trade date, for example 20260911.")
+    collect_news_parser.add_argument("--provider", default="tushare_major_news", choices=["tushare_major_news"])
+    collect_news_parser.add_argument("--output-file", required=True, help="Output normalized news CSV path.")
+    collect_news_parser.add_argument("--config", default=None, help="Radar YAML config path.")
+    collect_news_parser.add_argument("--refresh", action="store_true", help="Refresh provider cache.")
+    collect_news_parser.add_argument("--cache-dir", default=None, help="Optional provider cache directory.")
+    collect_news_parser.add_argument("--slice-hours", type=int, default=6, help="Tushare request window size in hours.")
+    collect_news_parser.add_argument("--rerun-radar", action="store_true", help="Rerun radar reports after collecting news.")
+    collect_news_parser.add_argument("--taxonomy", default=None, help="Theme taxonomy YAML path used by rerun-radar.")
+    collect_news_parser.add_argument(
+        "--market-provider",
+        default="tushare_limit",
+        choices=["tushare_daily", "tushare_limit"],
+        help="Market provider used by rerun-radar.",
+    )
+    collect_news_parser.add_argument("--universe-name", default=None, help="Optional universe filter used by rerun-radar.")
+    collect_news_parser.add_argument("--stock-theme-labels", default=None, help="Stock theme label CSV used by rerun-radar.")
+    collect_news_parser.add_argument("--min-stock-theme-confidence", type=float, default=0.0)
+    collect_news_parser.add_argument("--theme-score-history", default=None, help="Theme score history used by rerun-radar.")
+    collect_news_parser.add_argument("--output-dir", default=None, help="Output directory used by rerun-radar.")
+
     args = parser.parse_args(argv)
     if args.command == "run":
         return _run(args)
@@ -119,6 +142,8 @@ def main(argv: list[str] | None = None) -> int:
         return _enrich_themes(args)
     if args.command == "import-news":
         return _import_news(args)
+    if args.command == "collect-news":
+        return _collect_news(args)
     raise ValueError(f"Unsupported command: {args.command}")
 
 
@@ -181,6 +206,31 @@ def _import_news(args: argparse.Namespace) -> int:
     if args.rerun_radar:
         rerun_args = argparse.Namespace(**vars(args))
         rerun_args.news_csv = args.output_file
+        return _run_range(rerun_args)
+    return 0
+
+
+def _collect_news(args: argparse.Namespace) -> int:
+    if args.start_date > args.end_date:
+        raise ValueError("--start-date must be earlier than or equal to --end-date.")
+    config = load_market_radar_config(args.config)
+    start_time = _trade_date_close_time(args.start_date) - timedelta(hours=config.news.lookback_hours)
+    end_time = _trade_date_close_time(args.end_date)
+    if args.provider != "tushare_major_news":
+        raise ValueError(f"Unsupported news provider: {args.provider}")
+    cache_dir = args.cache_dir or config.output.cache_dir + "/news/tushare_major_news"
+    provider = TushareMajorNewsProvider(cache_dir=cache_dir, refresh=args.refresh, slice_hours=args.slice_hours)
+    data = provider.fetch_news_frame(start_time=start_time, end_time=end_time)
+    output_path = Path(args.output_file)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    data.to_csv(output_path, index=False)
+    print(f"wrote collected news: {output_path}")
+    print(f"news_rows={len(data)}")
+    if not data.empty:
+        print(f"sources={data['source'].nunique()} first={data['published_at'].min()} last={data['published_at'].max()}")
+    if args.rerun_radar:
+        rerun_args = argparse.Namespace(**vars(args))
+        rerun_args.news_csv = str(output_path)
         return _run_range(rerun_args)
     return 0
 

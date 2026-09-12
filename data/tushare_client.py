@@ -344,6 +344,27 @@ class TushareClient:
             fields=fields,
         )
 
+    def major_news(
+        self,
+        *,
+        src: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        fields: str | None = None,
+    ) -> pd.DataFrame:
+        """Fetch Tushare major_news rows.
+
+        Tushare document id 195: single request limit is 400 rows and the
+        interface requires separate news-data permission.
+        """
+        return self._call_with_retry(
+            self._pro.major_news,
+            src=src,
+            start_date=start_date,
+            end_date=end_date,
+            fields=fields,
+        )
+
     def trade_cal(
         self,
         *,
