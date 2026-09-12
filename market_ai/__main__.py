@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from market_ai.config import load_market_radar_config
-from market_ai.providers.market import LocalCsvMarketProvider
+from market_ai.providers.market import LocalCsvMarketProvider, TushareDailyMarketProvider
 from market_ai.providers.news import LocalCsvNewsProvider
 from market_ai.reports import render_daily_radar_report_markdown
 from market_ai.themes import load_theme_taxonomy
@@ -26,8 +26,10 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument("--trade-date", required=True, help="Trade date, for example 20260912.")
     run_parser.add_argument("--config", default=None, help="Radar YAML config path.")
     run_parser.add_argument("--taxonomy", default=None, help="Theme taxonomy YAML path.")
-    run_parser.add_argument("--market-provider", default="local_csv", choices=["local_csv"])
-    run_parser.add_argument("--market-data-dir", required=True, help="Directory containing local market CSV files.")
+    run_parser.add_argument("--market-provider", default="local_csv", choices=["local_csv", "tushare_daily"])
+    run_parser.add_argument("--market-data-dir", default=None, help="Directory containing local market CSV files.")
+    run_parser.add_argument("--universe-name", default=None, help="Optional universe filter for tushare_daily.")
+    run_parser.add_argument("--refresh", action="store_true", help="Refresh provider cache when supported.")
     run_parser.add_argument("--news-csv", default=None, help="Optional local news CSV path.")
     run_parser.add_argument("--output-dir", default=None, help="Output directory for .json and .md reports.")
 
@@ -40,7 +42,12 @@ def main(argv: list[str] | None = None) -> int:
 def _run(args: argparse.Namespace) -> int:
     config = load_market_radar_config(args.config)
     taxonomy = load_theme_taxonomy(args.taxonomy)
-    market_provider = LocalCsvMarketProvider(args.market_data_dir)
+    if args.market_provider == "local_csv":
+        if not args.market_data_dir:
+            raise ValueError("--market-data-dir is required when --market-provider local_csv.")
+        market_provider = LocalCsvMarketProvider(args.market_data_dir)
+    else:
+        market_provider = TushareDailyMarketProvider(universe_name=args.universe_name, refresh=args.refresh)
     news_provider = LocalCsvNewsProvider(args.news_csv) if args.news_csv else None
     output_dir = Path(args.output_dir or config.output.report_dir)
 
