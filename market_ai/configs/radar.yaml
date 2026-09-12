@@ -1,0 +1,30 @@
+# Default config for the A-share daily market theme radar.
+# Do not put API tokens or secrets in this file. Use environment variables or
+# local config/settings.yaml for provider-specific credentials.
+
+providers:
+  market: tushare
+  news:
+    - local_csv
+  llm: none
+
+news:
+  lookback_hours: 36
+
+theme_score:
+  weights:
+    LimitUpStrength: 0.25
+    Breadth: 0.20
+    LeaderStrength: 0.15
+    NewsCatalyst: 0.15
+    VolumeExpansion: 0.10
+    Persistence: 0.10
+    Novelty: 0.05
+
+output:
+  base_dir: market_ai_runs
+  report_dir: reports/market_radar
+  cache_dir: data/cache/market_ai
+
+strong_stock_min_pct_chg: 7.0
+top_theme_count: 5
