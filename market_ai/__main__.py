@@ -35,6 +35,8 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument("--universe-name", default=None, help="Optional universe filter for tushare_daily.")
     run_parser.add_argument("--refresh", action="store_true", help="Refresh provider cache when supported.")
     run_parser.add_argument("--news-csv", default=None, help="Optional local news CSV path.")
+    run_parser.add_argument("--stock-theme-labels", default=None, help="Optional stock theme label CSV path.")
+    run_parser.add_argument("--min-stock-theme-confidence", type=float, default=0.0)
     run_parser.add_argument("--output-dir", default=None, help="Output directory for .json and .md reports.")
 
     args = parser.parse_args(argv)
@@ -67,6 +69,8 @@ def _run(args: argparse.Namespace) -> int:
         news_provider=news_provider,
         news_start_time=news_start,
         news_end_time=news_end,
+        stock_theme_labels_path=args.stock_theme_labels,
+        min_stock_theme_confidence=args.min_stock_theme_confidence,
     )
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / f"{args.trade_date}.json"

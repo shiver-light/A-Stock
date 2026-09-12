@@ -10,6 +10,7 @@ from market_ai.providers.market import MarketProvider
 from market_ai.providers.news import NewsProvider
 from market_ai.scoring import calculate_theme_scores
 from market_ai.themes import RuleBasedThemeNormalizer, ThemeTaxonomy, normalize_news_items
+from market_ai.themes import load_stock_theme_labels, merge_theme_normalizations, stock_codes_from_market_rows
 
 
 def build_daily_radar_report(
@@ -21,6 +22,8 @@ def build_daily_radar_report(
     news_provider: NewsProvider | None = None,
     news_start_time: datetime | None = None,
     news_end_time: datetime | None = None,
+    stock_theme_labels_path: str | None = None,
+    min_stock_theme_confidence: float = 0.0,
 ) -> DailyRadarReport:
     """Build a daily radar report from provider data available by trade date close."""
     limit_stocks = market_provider.get_limit_stocks(trade_date=trade_date)
@@ -30,17 +33,24 @@ def build_daily_radar_report(
     )
 
     normalizer = RuleBasedThemeNormalizer(taxonomy)
-    normalizations = []
-    normalizations.extend(
+    rule_normalizations = []
+    rule_normalizations.extend(
         result
         for result in (normalizer.normalize_limit_stock(stock) for stock in limit_stocks)
         if result is not None
     )
-    normalizations.extend(
+    rule_normalizations.extend(
         result
         for result in (normalizer.normalize_strong_stock(stock) for stock in strong_stocks)
         if result is not None
     )
+    label_normalizations = load_stock_theme_labels(
+        stock_theme_labels_path,
+        trade_date=trade_date,
+        stock_codes=stock_codes_from_market_rows(limit_stocks, strong_stocks),
+        min_confidence=min_stock_theme_confidence,
+    )
+    normalizations = merge_theme_normalizations(label_normalizations, rule_normalizations)
 
     news_events = []
     if news_provider is not None:
@@ -72,6 +82,8 @@ def build_daily_radar_report(
             "limit_stock_count": len(limit_stocks),
             "strong_stock_count": len(strong_stocks),
             "normalized_stock_count": len(normalizations),
+            "stock_theme_label_count": len(label_normalizations),
+            "rule_theme_label_count": len(rule_normalizations),
             "news_event_count": len(news_events),
         },
     )

@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import unittest
 from datetime import datetime, timedelta, timezone
+import tempfile
+from pathlib import Path
+
+import pandas as pd
 
 from market_ai.config import RadarConfig
 from market_ai.models import LimitStock, NewsItem, StrongStock
@@ -81,6 +85,32 @@ class MarketAiWorkflowTestCase(unittest.TestCase):
         self.assertEqual(report.metadata["limit_stock_count"], 1)
         self.assertEqual(report.metadata["strong_stock_count"], 1)
         self.assertTrue(report.next_day_observations)
+
+    def test_stock_theme_labels_feed_theme_scores(self) -> None:
+        taxonomy = ThemeTaxonomy([ThemeDefinition(theme="AI算力", aliases=("AI服务器",))])
+        with tempfile.TemporaryDirectory() as directory:
+            labels_path = Path(directory) / "labels.csv"
+            pd.DataFrame(
+                {
+                    "trade_date": ["20260912"],
+                    "stock_code": ["000002.SZ"],
+                    "primary_theme": ["CPO光通信"],
+                    "confidence": [0.9],
+                    "source": ["manual"],
+                }
+            ).to_csv(labels_path, index=False)
+
+            report = build_daily_radar_report(
+                trade_date="20260912",
+                market_provider=FakeMarketProvider(),
+                taxonomy=taxonomy,
+                config=RadarConfig(),
+                stock_theme_labels_path=str(labels_path),
+            )
+
+        themes = {theme.theme for theme in report.core_themes}
+        self.assertIn("CPO光通信", themes)
+        self.assertEqual(report.metadata["stock_theme_label_count"], 1)
 
 
 if __name__ == "__main__":

@@ -34,6 +34,7 @@ Tushare 涨停专题示例：
   --market-provider tushare_limit \
   --universe-name zz500 \
   --news-csv market_ai/examples/news.csv \
+  --stock-theme-labels output/market_ai_theme_labels/20260911/limit_up_theme_labels.csv \
   --output-dir output/market_radar_tushare_limit
 ```
 
@@ -96,10 +97,41 @@ Tushare 涨停专题示例：
 
 `published_at` 建议使用带时区的 ISO 格式，例如 `2026-09-12T15:30:00+08:00`。
 
+## 股票主题标签 CSV
+
+`--stock-theme-labels` 可接入人工、概念成分或 LLM 校验后的个股主题标签。该标签优先级高于规则 taxonomy 匹配。
+
+必需列：
+
+- `stock_code`
+- `primary_theme`
+
+可选列：
+
+- `trade_date`
+- `secondary_themes`
+- `related_theme`
+- `related_entities`
+- `source`
+- `confidence`
+- `event_driven`
+- `effective_start`
+- `effective_end`
+
+示例：
+
+```csv
+trade_date,stock_code,stock_name,primary_theme,secondary_themes,related_theme,source,confidence
+20260911,000823.SZ,超声电子,PCB服务器液冷电源,PCB/覆铜板,AI算力,manual,0.9
+```
+
+如果 `trade_date` 为空，则视为长期标签；如果设置 `effective_start/effective_end`，则只在有效期内参与当日归因。
+
 ## 当前假设
 
 - 当前入口只做盘后复盘，不生成买卖建议。
 - 题材归一化优先使用 `market_ai/configs/theme_taxonomy.yaml` 的确定性规则。
+- 如果传入 `--stock-theme-labels`，则个股主题标签优先于 taxonomy 规则结果。
 - ThemeScore 当前只使用当日行情证据和可选新闻事件。
 - `tushare_daily` provider 使用 `daily(trade_date=...)` 和 `daily_basic(trade_date=...)`，涨停池暂按 `pct_chg >= 9.8` 近似。
 - `tushare_daily` provider 暂不能识别炸板、盘中触板、首次封板时间、最后封板时间、开板次数、封单金额和涨停原因。
