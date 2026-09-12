@@ -26,6 +26,17 @@ Tushare 日线行情示例：
   --output-dir output/market_radar_tushare_daily
 ```
 
+Tushare 涨停专题示例：
+
+```bash
+/Users/raymond/src/aquant/venv/bin/python -m market_ai run \
+  --trade-date 20260912 \
+  --market-provider tushare_limit \
+  --universe-name zz500 \
+  --news-csv market_ai/examples/news.csv \
+  --output-dir output/market_radar_tushare_limit
+```
+
 运行后会生成：
 
 - `output/market_radar_sample/20260912.json`
@@ -92,6 +103,8 @@ Tushare 日线行情示例：
 - ThemeScore 当前只使用当日行情证据和可选新闻事件。
 - `tushare_daily` provider 使用 `daily(trade_date=...)` 和 `daily_basic(trade_date=...)`，涨停池暂按 `pct_chg >= 9.8` 近似。
 - `tushare_daily` provider 暂不能识别炸板、盘中触板、首次封板时间、最后封板时间、开板次数、封单金额和涨停原因。
+- `tushare_limit` provider 使用 Tushare `limit_list_d` 获取涨跌停和炸板数据；该接口数据从 2020 年开始，字段可用性取决于账号权限。
+- `tushare_limit` provider 的强势股仍复用 `daily` / `daily_basic`，涨停原因字段暂未接入。
 - `Persistence` 暂未接历史多日序列，当前为 0。
 - `VolumeExpansion` 当前用当日题材成交额横截面强弱近似，后续应接 20 日均额。
 

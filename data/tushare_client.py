@@ -178,6 +178,24 @@ class TushareClient:
             fields=fields,
         )
 
+    def limit_list_d(
+        self,
+        *,
+        trade_date: str | None = None,
+        ts_code: str | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        fields: str | None = None,
+    ) -> pd.DataFrame:
+        return self._call_with_retry(
+            self._pro.limit_list_d,
+            trade_date=trade_date,
+            ts_code=ts_code,
+            start_date=start_date,
+            end_date=end_date,
+            fields=fields,
+        )
+
     def index_daily(
         self,
         *,
