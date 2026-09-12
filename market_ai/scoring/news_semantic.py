@@ -50,6 +50,18 @@ LOW_DIRECTNESS_KEYWORDS = (
     "meta",
     "openai",
 )
+SUMMARY_NEWS_KEYWORDS = (
+    "早报",
+    "午报",
+    "收评",
+    "收盘",
+    "复盘",
+    "研选日报",
+    "环球市场",
+    "港股早报",
+    "港股收盘",
+    "海外研选",
+)
 
 
 @dataclass(frozen=True)
@@ -58,12 +70,14 @@ class NewsSemanticScore:
 
     directness_score: float
     impact_score: float
+    noise_penalty: float
     reason: list[str]
 
     def to_dict(self) -> dict[str, object]:
         return {
             "directness_score": self.directness_score,
             "impact_score": self.impact_score,
+            "noise_penalty": self.noise_penalty,
             "reason": self.reason,
         }
 
@@ -74,6 +88,7 @@ def calculate_news_semantic_score(event: NewsEventAnalysis, news_item: NewsItem 
     direct_hits = [keyword for keyword in DIRECT_MARKET_KEYWORDS if keyword in text]
     impact_hits = [keyword for keyword in IMPACT_KEYWORDS if keyword in text]
     low_direct_hits = [keyword for keyword in LOW_DIRECTNESS_KEYWORDS if keyword in text]
+    summary_hits = [keyword for keyword in SUMMARY_NEWS_KEYWORDS if keyword in text]
 
     directness = min(100.0, 35.0 + 15.0 * len(direct_hits))
     if low_direct_hits and not direct_hits:
@@ -82,6 +97,9 @@ def calculate_news_semantic_score(event: NewsEventAnalysis, news_item: NewsItem 
         directness = max(35.0, directness - 25.0)
 
     impact = min(100.0, 30.0 + 12.0 * len(impact_hits) + 8.0 * max(0, len(event.themes) - 1))
+    noise_penalty = min(80.0, 25.0 * len(summary_hits) + 20.0 * len(low_direct_hits))
+    if direct_hits and impact_hits:
+        noise_penalty = max(0.0, noise_penalty - 20.0)
     reason = []
     if direct_hits:
         reason.append("direct_market_terms=" + ",".join(direct_hits[:5]))
@@ -89,9 +107,12 @@ def calculate_news_semantic_score(event: NewsEventAnalysis, news_item: NewsItem 
         reason.append("impact_terms=" + ",".join(impact_hits[:5]))
     if low_direct_hits:
         reason.append("low_directness_terms=" + ",".join(low_direct_hits[:5]))
+    if summary_hits:
+        reason.append("summary_terms=" + ",".join(summary_hits[:5]))
     return NewsSemanticScore(
         directness_score=round(directness, 6),
         impact_score=round(impact, 6),
+        noise_penalty=round(noise_penalty, 6),
         reason=reason,
     )
 

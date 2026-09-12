@@ -40,6 +40,21 @@ class MarketAiNewsSemanticTestCase(unittest.TestCase):
         score = calculate_news_semantic_score(event)
 
         self.assertEqual(score.directness_score, 20.0)
+        self.assertGreater(score.noise_penalty, 0.0)
+
+    def test_market_summary_news_has_noise_penalty(self) -> None:
+        event = NewsEventAnalysis(
+            event="【早报】美股科技股上涨 A股算力板块关注度提升",
+            event_type="news",
+            event_time="2026-09-11T08:00:00+08:00",
+            themes=["AI算力"],
+            source_news_ids=["n1"],
+        )
+
+        score = calculate_news_semantic_score(event)
+
+        self.assertGreater(score.noise_penalty, 0.0)
+        self.assertTrue(any(reason.startswith("summary_terms=") for reason in score.reason))
 
 
 if __name__ == "__main__":

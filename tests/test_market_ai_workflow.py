@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from market_ai.config import RadarConfig
+from market_ai.config import NewsScoringConfig, RadarConfig
 from market_ai.models import LimitStock, NewsItem, StrongStock
 from market_ai.providers.market import MarketProvider
 from market_ai.providers.news import NewsProvider
@@ -54,8 +54,9 @@ class FakeNewsProvider(NewsProvider):
             NewsItem(
                 news_id="n1",
                 source="local",
-                title="AI服务器政策催化",
+                title="A股AI服务器板块政策催化",
                 published_at=end_time.isoformat(),
+                content="政策推动算力产业链订单增长，多股涨停。",
             )
         ]
 
@@ -73,7 +74,7 @@ class MarketAiWorkflowTestCase(unittest.TestCase):
             trade_date="20260912",
             market_provider=FakeMarketProvider(),
             taxonomy=taxonomy,
-            config=RadarConfig(),
+            config=RadarConfig(news_scoring=NewsScoringConfig(authority_scores={"local": 80.0})),
             news_provider=FakeNewsProvider(),
             news_start_time=datetime(2026, 9, 12, 9, 0, tzinfo=CN_TZ),
             news_end_time=datetime(2026, 9, 12, 16, 30, tzinfo=CN_TZ),

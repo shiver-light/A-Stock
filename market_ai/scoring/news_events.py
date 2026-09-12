@@ -20,6 +20,7 @@ class CoreNewsEventScore:
     core_theme_score: float
     directness_score: float
     impact_score: float
+    noise_penalty: float
     source: str
 
     def to_dict(self) -> dict[str, object]:
@@ -31,6 +32,7 @@ class CoreNewsEventScore:
             "core_theme_score": self.core_theme_score,
             "directness_score": self.directness_score,
             "impact_score": self.impact_score,
+            "noise_penalty": self.noise_penalty,
             "source": self.source,
         }
 
@@ -83,6 +85,7 @@ def rank_core_news_events(
             "impact": semantic.impact_score,
         }
         score = sum(components[key] * weights.get(key, 0.0) for key in components)
+        score -= semantic.noise_penalty * weights.get("noise_penalty", 0.0)
         results.append(
             CoreNewsEventScore(
                 event=event,
@@ -92,6 +95,7 @@ def rank_core_news_events(
                 core_theme_score=round(core_theme_score, 6),
                 directness_score=round(semantic.directness_score, 6),
                 impact_score=round(semantic.impact_score, 6),
+                noise_penalty=round(semantic.noise_penalty, 6),
                 source=source,
             )
         )

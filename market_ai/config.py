@@ -28,6 +28,7 @@ DEFAULT_NEWS_SEMANTIC_WEIGHTS = {
     "theme_match": 0.15,
     "directness": 0.15,
     "impact": 0.10,
+    "noise_penalty": 0.20,
 }
 
 

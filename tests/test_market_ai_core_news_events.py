@@ -111,6 +111,50 @@ class MarketAiCoreNewsEventsTestCase(unittest.TestCase):
         self.assertGreater(ranked[0].directness_score, ranked[1].directness_score)
         self.assertGreater(ranked[0].impact_score, ranked[1].impact_score)
 
+    def test_rank_core_news_events_penalizes_summary_news(self) -> None:
+        news_items = [
+            NewsItem(
+                news_id="n1",
+                source="财联社",
+                title="【早报】美股科技股上涨 A股PCB板块受关注",
+                published_at="2026-09-11T08:00:00+08:00",
+                content="AI服务器产业链受关注。",
+            ),
+            NewsItem(
+                news_id="n2",
+                source="财联社",
+                title="A股PCB板块多股涨停",
+                published_at="2026-09-11T15:01:00+08:00",
+                content="AI服务器订单增长，产业链公司扩产。",
+            ),
+        ]
+        events = [
+            NewsEventAnalysis(
+                event="【早报】美股科技股上涨 A股PCB板块受关注",
+                event_type="news",
+                event_time="2026-09-11T08:00:00+08:00",
+                themes=["PCB服务器液冷电源"],
+                source_news_ids=["n1"],
+            ),
+            NewsEventAnalysis(
+                event="A股PCB板块多股涨停",
+                event_type="news",
+                event_time="2026-09-11T15:01:00+08:00",
+                themes=["PCB服务器液冷电源"],
+                source_news_ids=["n2"],
+            ),
+        ]
+
+        ranked = rank_core_news_events(
+            events,
+            news_items=news_items,
+            core_themes=["PCB服务器液冷电源"],
+            authority_scores={"财联社": 80.0},
+        )
+
+        self.assertEqual(ranked[0].event.event, "A股PCB板块多股涨停")
+        self.assertGreater(ranked[1].noise_penalty, 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
