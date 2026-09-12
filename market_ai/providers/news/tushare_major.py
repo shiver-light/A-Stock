@@ -12,6 +12,7 @@ from data.tushare_client import TushareClient
 from market_ai.models import NewsItem, RawNews
 from market_ai.providers.news.base import NewsProvider
 from market_ai.providers.news.cleaning import clean_news_items
+from market_ai.providers.news.dedup import deduplicate_news_items
 
 
 CN_TZ = timezone(timedelta(hours=8))
@@ -145,23 +146,27 @@ def _normalize_major_news(data: pd.DataFrame, *, include_cleaning: bool = False)
     if not include_cleaning:
         return result
 
-    cleaned = clean_news_items(
-        [
-            RawNews(
-                news_id=str(row.news_id),
-                source=str(row.source),
-                title=str(row.title),
-                published_at=str(row.published_at),
-                url=str(row.url),
-                content=str(row.content),
-            )
-            for row in result.itertuples(index=False)
-        ]
+    cleaned = deduplicate_news_items(
+        clean_news_items(
+            [
+                RawNews(
+                    news_id=str(row.news_id),
+                    source=str(row.source),
+                    title=str(row.title),
+                    published_at=str(row.published_at),
+                    url=str(row.url),
+                    content=str(row.content),
+                )
+                for row in result.itertuples(index=False)
+            ]
+        )
     )
     audit = pd.DataFrame(
         [
             {
                 "news_id": item.news_id,
+                "source_news_ids": "|".join(item.source_news_ids),
+                "sources": "|".join(item.sources),
                 "normalized_title": item.normalized_title,
                 "normalized_content": item.normalized_content,
                 "content_hash": item.content_hash,
@@ -169,9 +174,19 @@ def _normalize_major_news(data: pd.DataFrame, *, include_cleaning: bool = False)
                 "filter_reason": item.filter_reason,
             }
             for item in cleaned
-        ]
+        ],
+        columns=[
+            "news_id",
+            "source_news_ids",
+            "sources",
+            "normalized_title",
+            "normalized_content",
+            "content_hash",
+            "is_filtered",
+            "filter_reason",
+        ],
     )
-    return result.merge(audit, on="news_id", how="left")
+    return result.loc[result["news_id"].isin(audit["news_id"])].merge(audit, on="news_id", how="left")
 
 
 def _iter_time_slices(start: pd.Timestamp, end: pd.Timestamp, slice_hours: int) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
