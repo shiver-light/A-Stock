@@ -15,6 +15,7 @@ from market_ai.lifecycle import load_theme_score_history
 from market_ai.providers.market import LocalCsvMarketProvider, TushareDailyMarketProvider, TushareLimitMarketProvider
 from market_ai.providers.news import LocalCsvNewsProvider
 from market_ai.reports import render_daily_radar_report_markdown
+from market_ai.themes.enrichment import enrich_stock_theme_labels
 from market_ai.themes import load_theme_taxonomy
 from market_ai.workflow import build_daily_radar_report
 
@@ -62,11 +63,32 @@ def main(argv: list[str] | None = None) -> int:
     range_parser.add_argument("--theme-score-history", default=None, help="Optional historical theme score CSV path.")
     range_parser.add_argument("--output-dir", default=None, help="Output directory for .json and .md reports.")
 
+    enrich_parser = subparsers.add_parser("enrich-themes", help="Build reusable stock theme label CSVs.")
+    enrich_parser.add_argument("--start-date", required=True, help="Start trade date, for example 20260907.")
+    enrich_parser.add_argument("--end-date", required=True, help="End trade date, for example 20260911.")
+    enrich_parser.add_argument("--taxonomy", default=None, help="Theme taxonomy YAML path.")
+    enrich_parser.add_argument(
+        "--base-labels",
+        action="append",
+        default=[],
+        help="Existing stock theme label CSV. Can be supplied multiple times.",
+    )
+    enrich_parser.add_argument(
+        "--reason-csv",
+        action="append",
+        default=[],
+        help="CSV containing limit/news/announcement reasons to classify. Can be supplied multiple times.",
+    )
+    enrich_parser.add_argument("--input-dir", default=None, help="Reserved for compatibility; existing reports are not mutated.")
+    enrich_parser.add_argument("--output-file", required=True, help="Output stock theme label CSV path.")
+
     args = parser.parse_args(argv)
     if args.command == "run":
         return _run(args)
     if args.command == "run-range":
         return _run_range(args)
+    if args.command == "enrich-themes":
+        return _enrich_themes(args)
     raise ValueError(f"Unsupported command: {args.command}")
 
 
@@ -86,6 +108,35 @@ def _run_range(args: argparse.Namespace) -> int:
         _run_one_report(args=args, trade_date=trade_date)
     print(f"completed market radar range: {trade_dates[0]} to {trade_dates[-1]}, days={len(trade_dates)}")
     return 0
+
+
+def _enrich_themes(args: argparse.Namespace) -> int:
+    if args.start_date > args.end_date:
+        raise ValueError("--start-date must be earlier than or equal to --end-date.")
+    taxonomy = load_theme_taxonomy(args.taxonomy)
+    base_label_paths = list(args.base_labels)
+    if not base_label_paths and not args.reason_csv and args.input_dir:
+        base_label_paths = _discover_stock_theme_label_files(Path(args.input_dir))
+    result = enrich_stock_theme_labels(
+        start_date=args.start_date,
+        end_date=args.end_date,
+        output_file=args.output_file,
+        taxonomy=taxonomy,
+        base_label_paths=base_label_paths,
+        reason_csv_paths=args.reason_csv,
+    )
+    print(f"wrote stock theme labels: {args.output_file}")
+    print(f"label_rows={len(result)}")
+    if not result.empty:
+        print(f"trade_dates={result['trade_date'].nunique()} unique_stocks={result['stock_code'].nunique()}")
+    return 0
+
+
+def _discover_stock_theme_label_files(input_dir: Path) -> list[Path]:
+    """Find existing generated stock theme label CSVs under an output directory."""
+    if not input_dir.exists():
+        return []
+    return sorted(input_dir.glob("theme_labels*/limit_up_stock_theme_labels*.csv"))
 
 
 def _run_one_report(*, args: argparse.Namespace, trade_date: str) -> None:
