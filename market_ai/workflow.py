@@ -85,6 +85,7 @@ def build_daily_radar_report(
         default_authority_score=config.news_scoring.default_authority_score,
         min_score=config.news_scoring.min_core_event_score,
         top_n=config.news_scoring.core_event_top_n,
+        semantic_weights=config.news_scoring.semantic_weights,
         require_core_theme_match=config.news_scoring.require_core_theme_match,
     )
 

@@ -16,6 +16,12 @@ news_scoring:
   core_event_top_n: 10
   min_core_event_score: 60
   require_core_theme_match: true
+  semantic_weights:
+    authority: 0.30
+    core_theme: 0.30
+    theme_match: 0.15
+    directness: 0.15
+    impact: 0.10
   authority_scores:
     新华社: 95
     证监会: 95

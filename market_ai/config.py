@@ -22,6 +22,13 @@ DEFAULT_THEME_SCORE_WEIGHTS = {
     "Persistence": 0.10,
     "Novelty": 0.05,
 }
+DEFAULT_NEWS_SEMANTIC_WEIGHTS = {
+    "authority": 0.30,
+    "core_theme": 0.30,
+    "theme_match": 0.15,
+    "directness": 0.15,
+    "impact": 0.10,
+}
 
 
 @dataclass(frozen=True)
@@ -53,6 +60,7 @@ class NewsScoringConfig:
     core_event_top_n: int = 10
     min_core_event_score: float = 60.0
     require_core_theme_match: bool = True
+    semantic_weights: dict[str, float] = field(default_factory=lambda: dict(DEFAULT_NEWS_SEMANTIC_WEIGHTS))
 
     def __post_init__(self) -> None:
         default_score = float(self.default_authority_score)
@@ -69,11 +77,19 @@ class NewsScoringConfig:
             raise ValueError("news_scoring.authority_scores source must not be empty.")
         if any(score < 0.0 or score > 100.0 for score in scores.values()):
             raise ValueError("news_scoring.authority_scores must be between 0 and 100.")
+        semantic_weights = {str(key).strip(): float(value) for key, value in self.semantic_weights.items()}
+        if any(not key for key in semantic_weights):
+            raise ValueError("news_scoring.semantic_weights key must not be empty.")
+        if any(value < 0.0 for value in semantic_weights.values()):
+            raise ValueError("news_scoring.semantic_weights must be non-negative.")
+        if sum(semantic_weights.values()) <= 0.0:
+            raise ValueError("news_scoring.semantic_weights sum must be positive.")
         object.__setattr__(self, "default_authority_score", default_score)
         object.__setattr__(self, "authority_scores", scores)
         object.__setattr__(self, "core_event_top_n", top_n)
         object.__setattr__(self, "min_core_event_score", min_score)
         object.__setattr__(self, "require_core_theme_match", bool(self.require_core_theme_match))
+        object.__setattr__(self, "semantic_weights", semantic_weights)
 
 
 @dataclass(frozen=True)
@@ -174,6 +190,7 @@ def _build_radar_config(payload: dict[str, Any]) -> RadarConfig:
             core_event_top_n=int(news_scoring.get("core_event_top_n", 10)),
             min_core_event_score=float(news_scoring.get("min_core_event_score", 60.0)),
             require_core_theme_match=bool(news_scoring.get("require_core_theme_match", True)),
+            semantic_weights=dict(news_scoring.get("semantic_weights", DEFAULT_NEWS_SEMANTIC_WEIGHTS) or DEFAULT_NEWS_SEMANTIC_WEIGHTS),
         ),
         theme_score=ThemeScoreConfig(
             weights=dict(theme_score.get("weights", DEFAULT_THEME_SCORE_WEIGHTS) or DEFAULT_THEME_SCORE_WEIGHTS)
