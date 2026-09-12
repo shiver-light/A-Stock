@@ -9,6 +9,7 @@ import pandas as pd
 
 from market_ai.__main__ import _append_theme_score_history, _discover_stock_theme_label_files, _get_a_share_trade_dates, main
 from market_ai.models import ThemeScoreResult
+from market_ai.providers.news.importer import import_news_csvs
 from market_ai.themes import ThemeDefinition, ThemeTaxonomy
 from market_ai.themes.enrichment import enrich_stock_theme_labels
 
@@ -136,6 +137,69 @@ class MarketAiCliTestCase(unittest.TestCase):
             files = _discover_stock_theme_label_files(input_dir)
 
         self.assertEqual(files, [expected])
+
+    def test_import_news_csvs_normalizes_aliases_and_filters_window(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            input_path = Path(directory) / "raw_news.csv"
+            output_path = Path(directory) / "news.csv"
+            pd.DataFrame(
+                {
+                    "来源": ["财联社", "东方财富", ""],
+                    "标题": ["PCB板块多股涨停", "窗口外消息", "机器人公告催化"],
+                    "发布时间": [
+                        "2026-09-11 15:20:00",
+                        "2026-09-05 09:00:00",
+                        "2026-09-10T08:30:00+08:00",
+                    ],
+                    "链接": ["https://example.com/1", "https://example.com/2", ""],
+                    "摘要": ["AI服务器、液冷方向活跃", "旧消息", "减速器订单增长"],
+                }
+            ).to_csv(input_path, index=False)
+
+            result = import_news_csvs(
+                [input_path],
+                output_file=output_path,
+                start_date="20260911",
+                end_date="20260911",
+                lookback_hours=36,
+                default_source="manual",
+            )
+
+        self.assertEqual(len(result), 2)
+        self.assertEqual(set(result["source"]), {"财联社", "manual"})
+        self.assertTrue(result["news_id"].str.startswith("news_").all())
+        self.assertTrue(result["published_at"].str.endswith("+08:00").all())
+
+    def test_import_news_cli_writes_normalized_file(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            input_path = Path(directory) / "raw_news.csv"
+            output_path = Path(directory) / "news.csv"
+            pd.DataFrame(
+                {
+                    "source": ["cls"],
+                    "title": ["液冷服务器需求提升"],
+                    "published_at": ["2026-09-11T15:30:00+08:00"],
+                }
+            ).to_csv(input_path, index=False)
+
+            code = main(
+                [
+                    "import-news",
+                    "--start-date",
+                    "20260911",
+                    "--end-date",
+                    "20260911",
+                    "--input-csv",
+                    str(input_path),
+                    "--output-file",
+                    str(output_path),
+                ]
+            )
+            data = pd.read_csv(output_path)
+
+        self.assertEqual(code, 0)
+        self.assertEqual(len(data), 1)
+        self.assertEqual(list(data.columns), ["news_id", "source", "title", "published_at", "url", "content"])
 
 
 if __name__ == "__main__":

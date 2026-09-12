@@ -14,6 +14,7 @@ from data.tushare_client import TushareClient
 from market_ai.lifecycle import load_theme_score_history
 from market_ai.providers.market import LocalCsvMarketProvider, TushareDailyMarketProvider, TushareLimitMarketProvider
 from market_ai.providers.news import LocalCsvNewsProvider
+from market_ai.providers.news.importer import import_news_csvs
 from market_ai.reports import render_daily_radar_report_markdown
 from market_ai.themes.enrichment import enrich_stock_theme_labels
 from market_ai.themes import load_theme_taxonomy
@@ -82,6 +83,33 @@ def main(argv: list[str] | None = None) -> int:
     enrich_parser.add_argument("--input-dir", default=None, help="Reserved for compatibility; existing reports are not mutated.")
     enrich_parser.add_argument("--output-file", required=True, help="Output stock theme label CSV path.")
 
+    import_news_parser = subparsers.add_parser("import-news", help="Normalize external news CSVs for radar reports.")
+    import_news_parser.add_argument("--start-date", required=True, help="Start trade date, for example 20260907.")
+    import_news_parser.add_argument("--end-date", required=True, help="End trade date, for example 20260911.")
+    import_news_parser.add_argument(
+        "--input-csv",
+        action="append",
+        required=True,
+        help="External news or announcement CSV. Can be supplied multiple times.",
+    )
+    import_news_parser.add_argument("--output-file", required=True, help="Output normalized news CSV path.")
+    import_news_parser.add_argument("--config", default=None, help="Radar YAML config path.")
+    import_news_parser.add_argument("--default-source", default="manual", help="Source used when input source is empty.")
+    import_news_parser.add_argument("--rerun-radar", action="store_true", help="Rerun radar reports after importing news.")
+    import_news_parser.add_argument("--taxonomy", default=None, help="Theme taxonomy YAML path used by rerun-radar.")
+    import_news_parser.add_argument(
+        "--market-provider",
+        default="tushare_limit",
+        choices=["tushare_daily", "tushare_limit"],
+        help="Market provider used by rerun-radar.",
+    )
+    import_news_parser.add_argument("--universe-name", default=None, help="Optional universe filter used by rerun-radar.")
+    import_news_parser.add_argument("--refresh", action="store_true", help="Refresh provider cache when rerun-radar is used.")
+    import_news_parser.add_argument("--stock-theme-labels", default=None, help="Stock theme label CSV used by rerun-radar.")
+    import_news_parser.add_argument("--min-stock-theme-confidence", type=float, default=0.0)
+    import_news_parser.add_argument("--theme-score-history", default=None, help="Theme score history used by rerun-radar.")
+    import_news_parser.add_argument("--output-dir", default=None, help="Output directory used by rerun-radar.")
+
     args = parser.parse_args(argv)
     if args.command == "run":
         return _run(args)
@@ -89,6 +117,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_range(args)
     if args.command == "enrich-themes":
         return _enrich_themes(args)
+    if args.command == "import-news":
+        return _import_news(args)
     raise ValueError(f"Unsupported command: {args.command}")
 
 
@@ -129,6 +159,29 @@ def _enrich_themes(args: argparse.Namespace) -> int:
     print(f"label_rows={len(result)}")
     if not result.empty:
         print(f"trade_dates={result['trade_date'].nunique()} unique_stocks={result['stock_code'].nunique()}")
+    return 0
+
+
+def _import_news(args: argparse.Namespace) -> int:
+    if args.start_date > args.end_date:
+        raise ValueError("--start-date must be earlier than or equal to --end-date.")
+    config = load_market_radar_config(args.config)
+    result = import_news_csvs(
+        args.input_csv,
+        output_file=args.output_file,
+        start_date=args.start_date,
+        end_date=args.end_date,
+        lookback_hours=config.news.lookback_hours,
+        default_source=args.default_source,
+    )
+    print(f"wrote normalized news: {args.output_file}")
+    print(f"news_rows={len(result)}")
+    if not result.empty:
+        print(f"sources={result['source'].nunique()} first={result['published_at'].min()} last={result['published_at'].max()}")
+    if args.rerun_radar:
+        rerun_args = argparse.Namespace(**vars(args))
+        rerun_args.news_csv = args.output_file
+        return _run_range(rerun_args)
     return 0
 
 
