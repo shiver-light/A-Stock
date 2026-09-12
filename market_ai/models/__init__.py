@@ -10,12 +10,17 @@ from market_ai.models.core import (
     ThemeNormalization,
     ThemeScoreResult,
 )
+from market_ai.models.news import EventCluster, MarketEvent, NormalizedNews, RawNews
 
 __all__ = [
     "DailyRadarReport",
+    "EventCluster",
     "LimitStock",
+    "MarketEvent",
     "NewsEventAnalysis",
     "NewsItem",
+    "NormalizedNews",
+    "RawNews",
     "StockRole",
     "StrongStock",
     "ThemeNormalization",
