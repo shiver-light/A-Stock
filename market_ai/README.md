@@ -38,6 +38,19 @@ Tushare 涨停专题示例：
   --output-dir output/market_radar_tushare_limit
 ```
 
+批量跑日期区间：
+
+```bash
+/Users/raymond/src/aquant/venv/bin/python -m market_ai run-range \
+  --start-date 20260831 \
+  --end-date 20260911 \
+  --market-provider tushare_limit \
+  --stock-theme-labels data/cache/market_ai/stock_theme_labels/limit_up_stock_theme_labels_20260831_20260911.csv \
+  --output-dir output/market_radar_20260831_20260911_all_a_with_labels
+```
+
+`run-range` 会通过 A 股交易日历跳过周末和节假日，并在同一个输出目录维护 `theme_scores.csv`，用于后续生命周期判断。
+
 运行后会生成：
 
 - `output/market_radar_sample/20260912.json`
