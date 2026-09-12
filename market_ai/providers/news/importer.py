@@ -8,8 +8,25 @@ from pathlib import Path
 
 import pandas as pd
 
+from market_ai.models import RawNews
+from market_ai.providers.news.cleaning import clean_news_items
+from market_ai.providers.news.dedup import deduplicate_news_items
 
-OUTPUT_COLUMNS = ["news_id", "source", "title", "published_at", "url", "content"]
+OUTPUT_COLUMNS = [
+    "news_id",
+    "source",
+    "title",
+    "published_at",
+    "url",
+    "content",
+    "source_news_ids",
+    "sources",
+    "normalized_title",
+    "normalized_content",
+    "content_hash",
+    "is_filtered",
+    "filter_reason",
+]
 
 ALIASES = {
     "id": "news_id",
@@ -81,7 +98,23 @@ def _read_news_csv(path: str | Path, *, default_source: str) -> pd.DataFrame:
     normalized_time = normalized_time.loc[data.index]
     data["published_at"] = normalized_time.map(lambda value: value.isoformat())
     data.loc[data["news_id"].eq(""), "news_id"] = data.loc[data["news_id"].eq("")].apply(_build_news_id, axis=1)
-    return data[OUTPUT_COLUMNS].copy()
+    cleaned = deduplicate_news_items(
+        clean_news_items(
+            [
+                RawNews(
+                    news_id=str(row.news_id),
+                    source=str(row.source),
+                    title=str(row.title),
+                    published_at=str(row.published_at),
+                    url=str(row.url),
+                    content=str(row.content),
+                )
+                for row in data[["news_id", "source", "title", "published_at", "url", "content"]].itertuples(index=False)
+            ]
+        )
+    )
+    audit = pd.DataFrame([_cleaned_news_row(item) for item in cleaned], columns=OUTPUT_COLUMNS)
+    return audit.copy()
 
 
 def _apply_aliases(data: pd.DataFrame) -> pd.DataFrame:
@@ -137,3 +170,21 @@ def _build_news_id(row: pd.Series) -> str:
     raw = "|".join(str(row.get(column, "")) for column in ["source", "published_at", "title", "url"])
     digest = hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
     return f"news_{digest}"
+
+
+def _cleaned_news_row(item) -> dict[str, object]:
+    return {
+        "news_id": item.news_id,
+        "source": item.source,
+        "title": item.title,
+        "published_at": item.published_at,
+        "url": item.url,
+        "content": item.content,
+        "source_news_ids": "|".join(item.source_news_ids),
+        "sources": "|".join(item.sources),
+        "normalized_title": item.normalized_title,
+        "normalized_content": item.normalized_content,
+        "content_hash": item.content_hash,
+        "is_filtered": item.is_filtered,
+        "filter_reason": item.filter_reason,
+    }

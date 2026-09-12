@@ -12,7 +12,7 @@ from market_ai.models import NewsItem
 from market_ai.providers.news.base import NewsProvider
 
 REQUIRED_COLUMNS = ["news_id", "source", "title", "published_at"]
-OPTIONAL_COLUMNS = ["url", "content"]
+OPTIONAL_COLUMNS = ["url", "content", "is_filtered", "filter_reason", "content_hash"]
 
 
 class LocalCsvNewsProvider(NewsProvider):
@@ -46,6 +46,8 @@ class LocalCsvNewsProvider(NewsProvider):
 
         published_at = pd.to_datetime(data["published_at"], errors="coerce", utc=True)
         keep = published_at.notna() & (published_at >= start_ts) & (published_at <= end_ts)
+        if "is_filtered" in data.columns:
+            keep &= ~data["is_filtered"].map(_bool_value)
         if sources is not None:
             source_set = {str(source).strip() for source in sources if str(source).strip()}
             keep &= data["source"].isin(source_set)
@@ -109,3 +111,8 @@ def _optional_value(value: object) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _bool_value(value: object) -> bool:
+    text = str(value or "").strip().lower()
+    return text in {"1", "true", "yes", "y", "是"}

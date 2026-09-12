@@ -199,7 +199,8 @@ class MarketAiCliTestCase(unittest.TestCase):
 
         self.assertEqual(code, 0)
         self.assertEqual(len(data), 1)
-        self.assertEqual(list(data.columns), ["news_id", "source", "title", "published_at", "url", "content"])
+        self.assertTrue({"news_id", "source", "title", "published_at", "url", "content"}.issubset(data.columns))
+        self.assertTrue({"content_hash", "is_filtered", "filter_reason"}.issubset(data.columns))
 
 
 if __name__ == "__main__":
