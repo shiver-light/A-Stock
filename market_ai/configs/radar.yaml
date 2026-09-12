@@ -11,6 +11,21 @@ providers:
 news:
   lookback_hours: 36
 
+news_scoring:
+  default_authority_score: 50
+  authority_scores:
+    新华社: 95
+    证监会: 95
+    上交所: 95
+    深交所: 95
+    财联社: 80
+    第一财经: 78
+    华尔街见闻: 76
+    中证网: 75
+    同花顺: 70
+    东方财富: 70
+    新浪财经: 65
+
 theme_score:
   weights:
     LimitUpStrength: 0.25

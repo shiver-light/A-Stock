@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from market_ai.config import DEFAULT_THEME_SCORE_WEIGHTS, ThemeScoreConfig, load_market_radar_config
+from market_ai.config import DEFAULT_THEME_SCORE_WEIGHTS, NewsScoringConfig, ThemeScoreConfig, load_market_radar_config
 
 
 class MarketAiConfigTestCase(unittest.TestCase):
@@ -14,6 +14,8 @@ class MarketAiConfigTestCase(unittest.TestCase):
         self.assertEqual(config.providers.market, "tushare")
         self.assertEqual(config.providers.news, ["local_csv"])
         self.assertEqual(config.news.lookback_hours, 36)
+        self.assertEqual(config.news_scoring.default_authority_score, 50.0)
+        self.assertIn("财联社", config.news_scoring.authority_scores)
         self.assertEqual(config.top_theme_count, 5)
         self.assertEqual(config.theme_score.weights, DEFAULT_THEME_SCORE_WEIGHTS)
 
@@ -28,6 +30,10 @@ providers:
   llm: fake_llm
 news:
   lookback_hours: 24
+news_scoring:
+  default_authority_score: 45
+  authority_scores:
+    财联社: 80
 theme_score:
   weights:
     LimitUpStrength: 2
@@ -48,6 +54,8 @@ top_theme_count: 3
         self.assertEqual(config.providers.news, ["local_csv", "announcements"])
         self.assertEqual(config.providers.llm, "fake_llm")
         self.assertEqual(config.news.lookback_hours, 24)
+        self.assertEqual(config.news_scoring.default_authority_score, 45.0)
+        self.assertEqual(config.news_scoring.authority_scores["财联社"], 80.0)
         self.assertEqual(config.theme_score.normalized_weights(), {"LimitUpStrength": 2 / 3, "NewsCatalyst": 1 / 3})
         self.assertEqual(config.output.base_dir, "tmp_runs")
         self.assertEqual(config.strong_stock_min_pct_chg, 8.0)
@@ -58,6 +66,12 @@ top_theme_count: 3
             ThemeScoreConfig(weights={"LimitUpStrength": -1.0})
         with self.assertRaisesRegex(ValueError, "sum must be positive"):
             ThemeScoreConfig(weights={"LimitUpStrength": 0.0})
+
+    def test_news_scoring_rejects_invalid_values(self) -> None:
+        with self.assertRaisesRegex(ValueError, "default_authority_score"):
+            NewsScoringConfig(default_authority_score=120)
+        with self.assertRaisesRegex(ValueError, "authority_scores"):
+            NewsScoringConfig(authority_scores={"财联社": -1})
 
     def test_missing_config_file_raises_clear_error(self) -> None:
         with self.assertRaisesRegex(FileNotFoundError, "Market radar config file not found"):

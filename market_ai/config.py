@@ -45,6 +45,26 @@ class NewsWindowConfig:
 
 
 @dataclass(frozen=True)
+class NewsScoringConfig:
+    """Configurable deterministic news scoring parameters."""
+
+    default_authority_score: float = 50.0
+    authority_scores: dict[str, float] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        default_score = float(self.default_authority_score)
+        if not 0.0 <= default_score <= 100.0:
+            raise ValueError("news_scoring.default_authority_score must be between 0 and 100.")
+        scores = {str(source).strip(): float(score) for source, score in self.authority_scores.items()}
+        if any(not source for source in scores):
+            raise ValueError("news_scoring.authority_scores source must not be empty.")
+        if any(score < 0.0 or score > 100.0 for score in scores.values()):
+            raise ValueError("news_scoring.authority_scores must be between 0 and 100.")
+        object.__setattr__(self, "default_authority_score", default_score)
+        object.__setattr__(self, "authority_scores", scores)
+
+
+@dataclass(frozen=True)
 class ThemeScoreConfig:
     """Configurable ThemeScore weights."""
 
@@ -80,6 +100,7 @@ class RadarConfig:
 
     providers: ProviderConfig = field(default_factory=ProviderConfig)
     news: NewsWindowConfig = field(default_factory=NewsWindowConfig)
+    news_scoring: NewsScoringConfig = field(default_factory=NewsScoringConfig)
     theme_score: ThemeScoreConfig = field(default_factory=ThemeScoreConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
     strong_stock_min_pct_chg: float = 7.0
@@ -114,12 +135,15 @@ def load_market_radar_config(path: str | Path | None = None) -> RadarConfig:
 def _build_radar_config(payload: dict[str, Any]) -> RadarConfig:
     providers = payload.get("providers", {}) or {}
     news = payload.get("news", {}) or {}
+    news_scoring = payload.get("news_scoring", {}) or {}
     theme_score = payload.get("theme_score", {}) or {}
     output = payload.get("output", {}) or {}
     if not isinstance(providers, dict):
         raise ValueError("providers must be a mapping.")
     if not isinstance(news, dict):
         raise ValueError("news must be a mapping.")
+    if not isinstance(news_scoring, dict):
+        raise ValueError("news_scoring must be a mapping.")
     if not isinstance(theme_score, dict):
         raise ValueError("theme_score must be a mapping.")
     if not isinstance(output, dict):
@@ -132,6 +156,10 @@ def _build_radar_config(payload: dict[str, Any]) -> RadarConfig:
             llm=str(providers.get("llm", "none")),
         ),
         news=NewsWindowConfig(lookback_hours=int(news.get("lookback_hours", 36))),
+        news_scoring=NewsScoringConfig(
+            default_authority_score=float(news_scoring.get("default_authority_score", 50.0)),
+            authority_scores=dict(news_scoring.get("authority_scores", {}) or {}),
+        ),
         theme_score=ThemeScoreConfig(
             weights=dict(theme_score.get("weights", DEFAULT_THEME_SCORE_WEIGHTS) or DEFAULT_THEME_SCORE_WEIGHTS)
         ),
