@@ -7,7 +7,10 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import pandas as pd
+
 from market_ai.config import load_market_radar_config
+from market_ai.lifecycle import load_theme_score_history
 from market_ai.providers.market import LocalCsvMarketProvider, TushareDailyMarketProvider, TushareLimitMarketProvider
 from market_ai.providers.news import LocalCsvNewsProvider
 from market_ai.reports import render_daily_radar_report_markdown
@@ -37,6 +40,7 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument("--news-csv", default=None, help="Optional local news CSV path.")
     run_parser.add_argument("--stock-theme-labels", default=None, help="Optional stock theme label CSV path.")
     run_parser.add_argument("--min-stock-theme-confidence", type=float, default=0.0)
+    run_parser.add_argument("--theme-score-history", default=None, help="Optional historical theme score CSV path.")
     run_parser.add_argument("--output-dir", default=None, help="Output directory for .json and .md reports.")
 
     args = parser.parse_args(argv)
@@ -61,6 +65,8 @@ def _run(args: argparse.Namespace) -> int:
 
     news_end = _trade_date_close_time(args.trade_date)
     news_start = news_end - timedelta(hours=config.news.lookback_hours)
+    history_path = Path(args.theme_score_history) if args.theme_score_history else output_dir / "theme_scores.csv"
+    theme_score_history = load_theme_score_history(history_path)
     report = build_daily_radar_report(
         trade_date=args.trade_date,
         market_provider=market_provider,
@@ -71,6 +77,7 @@ def _run(args: argparse.Namespace) -> int:
         news_end_time=news_end,
         stock_theme_labels_path=args.stock_theme_labels,
         min_stock_theme_confidence=args.min_stock_theme_confidence,
+        theme_score_history=theme_score_history,
     )
     output_dir.mkdir(parents=True, exist_ok=True)
     json_path = output_dir / f"{args.trade_date}.json"
@@ -80,6 +87,7 @@ def _run(args: argparse.Namespace) -> int:
         encoding="utf-8",
     )
     md_path.write_text(render_daily_radar_report_markdown(report), encoding="utf-8")
+    _append_theme_score_history(history_path, report.core_themes)
 
     print(f"wrote market radar report: {md_path}")
     print(f"wrote structured report: {json_path}")
@@ -88,6 +96,35 @@ def _run(args: argparse.Namespace) -> int:
 
 def _trade_date_close_time(trade_date: str) -> datetime:
     return datetime.strptime(str(trade_date), "%Y%m%d").replace(hour=16, minute=30, tzinfo=CN_TZ)
+
+
+def _append_theme_score_history(path: Path, themes: list) -> None:
+    if not themes:
+        return
+    rows = [
+        {
+            "trade_date": theme.trade_date,
+            "theme": theme.theme,
+            "score": theme.score,
+            "rank": theme.rank,
+            "lifecycle_stage": theme.lifecycle_stage,
+        }
+        for theme in themes
+    ]
+    current = pd.DataFrame(rows)
+    if path.exists():
+        existing = pd.read_csv(path)
+        combined = pd.concat([existing, current], ignore_index=True)
+    else:
+        combined = current
+    combined["trade_date"] = combined["trade_date"].astype(str).str.replace(r"\\.0$", "", regex=True)
+    combined = (
+        combined.sort_values(["trade_date", "theme"])
+        .drop_duplicates(subset=["trade_date", "theme"], keep="last")
+        .reset_index(drop=True)
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    combined.to_csv(path, index=False)
 
 
 if __name__ == "__main__":

@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
+import pandas as pd
+
 from market_ai.config import RadarConfig
+from market_ai.lifecycle import classify_theme_lifecycle
 from market_ai.models import DailyRadarReport
 from market_ai.providers.market import MarketProvider
 from market_ai.providers.news import NewsProvider
@@ -24,6 +27,7 @@ def build_daily_radar_report(
     news_end_time: datetime | None = None,
     stock_theme_labels_path: str | None = None,
     min_stock_theme_confidence: float = 0.0,
+    theme_score_history: pd.DataFrame | None = None,
 ) -> DailyRadarReport:
     """Build a daily radar report from provider data available by trade date close."""
     limit_stocks = market_provider.get_limit_stocks(trade_date=trade_date)
@@ -68,6 +72,8 @@ def build_daily_radar_report(
         weights=config.theme_score.weights,
         top_n=config.top_theme_count,
     )
+    if theme_score_history is not None:
+        core_themes = classify_theme_lifecycle(core_themes, theme_score_history, trade_date=trade_date)
     news_themes = {theme for event in news_events for theme in event.themes}
     unexplained_strength = [theme for theme in core_themes if theme.theme not in news_themes and theme.score >= 50.0]
 
