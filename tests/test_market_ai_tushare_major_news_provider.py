@@ -44,7 +44,8 @@ class TushareMajorNewsProviderTestCase(unittest.TestCase):
             )
 
         self.assertEqual(len(data), 2)
-        self.assertEqual(list(data.columns), ["news_id", "source", "title", "published_at", "url", "content"])
+        self.assertTrue({"news_id", "source", "title", "published_at", "url", "content"}.issubset(data.columns))
+        self.assertTrue({"content_hash", "is_filtered", "filter_reason"}.issubset(data.columns))
         self.assertEqual(set(data["source"]), {"财联社", "同花顺"})
         self.assertTrue(data["news_id"].str.startswith("tushare_major_").all())
         self.assertTrue(data["published_at"].str.endswith("+08:00").all())

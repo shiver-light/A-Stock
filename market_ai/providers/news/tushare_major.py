@@ -9,8 +9,9 @@ from typing import Iterable
 import pandas as pd
 
 from data.tushare_client import TushareClient
-from market_ai.models import NewsItem
+from market_ai.models import NewsItem, RawNews
 from market_ai.providers.news.base import NewsProvider
+from market_ai.providers.news.cleaning import clean_news_items
 
 
 CN_TZ = timezone(timedelta(hours=8))
@@ -76,7 +77,7 @@ class TushareMajorNewsProvider(NewsProvider):
         if not frames:
             return pd.DataFrame(columns=["news_id", "source", "title", "published_at", "url", "content"])
         data = pd.concat(frames, ignore_index=True)
-        data = _normalize_major_news(data)
+        data = _normalize_major_news(data, include_cleaning=True)
         if data.empty:
             return data
         published_at = pd.to_datetime(data["published_at"], errors="coerce", utc=True).dt.tz_convert(CN_TZ)
@@ -110,7 +111,7 @@ class TushareMajorNewsProvider(NewsProvider):
         return self.cache_dir / filename
 
 
-def _normalize_major_news(data: pd.DataFrame) -> pd.DataFrame:
+def _normalize_major_news(data: pd.DataFrame, *, include_cleaning: bool = False) -> pd.DataFrame:
     columns = ["news_id", "source", "title", "published_at", "url", "content"]
     if data is None or data.empty:
         return pd.DataFrame(columns=columns)
@@ -140,7 +141,37 @@ def _normalize_major_news(data: pd.DataFrame) -> pd.DataFrame:
         lambda row: _news_id(row["source"], row["published_at"], row["title"], row["content"]),
         axis=1,
     )
-    return result[columns]
+    result = result[columns]
+    if not include_cleaning:
+        return result
+
+    cleaned = clean_news_items(
+        [
+            RawNews(
+                news_id=str(row.news_id),
+                source=str(row.source),
+                title=str(row.title),
+                published_at=str(row.published_at),
+                url=str(row.url),
+                content=str(row.content),
+            )
+            for row in result.itertuples(index=False)
+        ]
+    )
+    audit = pd.DataFrame(
+        [
+            {
+                "news_id": item.news_id,
+                "normalized_title": item.normalized_title,
+                "normalized_content": item.normalized_content,
+                "content_hash": item.content_hash,
+                "is_filtered": item.is_filtered,
+                "filter_reason": item.filter_reason,
+            }
+            for item in cleaned
+        ]
+    )
+    return result.merge(audit, on="news_id", how="left")
 
 
 def _iter_time_slices(start: pd.Timestamp, end: pd.Timestamp, slice_hours: int) -> list[tuple[pd.Timestamp, pd.Timestamp]]:
