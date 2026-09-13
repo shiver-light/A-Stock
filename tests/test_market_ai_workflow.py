@@ -90,6 +90,8 @@ class MarketAiWorkflowTestCase(unittest.TestCase):
         self.assertEqual(report.metadata["limit_stock_count"], 1)
         self.assertEqual(report.metadata["strong_stock_count"], 1)
         self.assertTrue(report.next_day_observations)
+        self.assertIn("ThemeScore", report.next_day_observations[0])
+        self.assertIn("消息确认", report.next_day_observations[0])
 
     def test_stock_theme_labels_feed_theme_scores(self) -> None:
         taxonomy = ThemeTaxonomy([ThemeDefinition(theme="AI算力", aliases=("AI服务器",))])

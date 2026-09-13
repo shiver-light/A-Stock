@@ -8,6 +8,7 @@ import pandas as pd
 
 from market_ai.config import RadarConfig
 from market_ai.lifecycle import classify_theme_lifecycle
+from market_ai.lifecycle.rules import STAGE_NAMES as LIFECYCLE_STAGE_NAMES
 from market_ai.models import DailyRadarReport
 from market_ai.providers.market import MarketProvider
 from market_ai.providers.news import NewsProvider
@@ -107,7 +108,7 @@ def build_daily_radar_report(
         theme_catalysts=theme_catalysts,
         unexplained_strength=unexplained_strength,
         stock_roles=[],
-        next_day_observations=_build_observations(core_themes),
+        next_day_observations=_build_observations(core_themes, theme_catalysts),
         metadata={
             "limit_stock_count": len(limit_stocks),
             "strong_stock_count": len(strong_stocks),
@@ -122,8 +123,48 @@ def build_daily_radar_report(
     )
 
 
-def _build_observations(core_themes: list) -> list[str]:
+def _build_observations(core_themes: list, theme_catalysts: list | None = None) -> list[str]:
     observations = []
+    catalysts = {item.theme: item for item in theme_catalysts or []}
     for theme in core_themes[:5]:
-        observations.append(f"{theme.theme} 是否继续扩散、龙头是否晋级、成交额是否维持。")
+        catalyst = catalysts.get(theme.theme)
+        observations.append(_theme_observation(theme, catalyst))
     return observations
+
+
+def _theme_observation(theme, catalyst) -> str:
+    theme_name = str(theme.theme)
+    stage = theme.lifecycle_stage
+    stage_name = LIFECYCLE_STAGE_NAMES.get(stage, "未判定")
+    score = float(theme.score)
+    rank = theme.rank or "N/A"
+    if stage == 1:
+        base = f"{theme_name}处于{stage_name}，观察是否从首日启动扩散到更多涨停/强势股"
+    elif stage == 2:
+        base = f"{theme_name}处于{stage_name}，观察排名和成交额强度是否继续维持"
+    elif stage == 3:
+        base = f"{theme_name}处于{stage_name}，观察龙头是否晋级、中军是否继续放量承接"
+    elif stage == 4:
+        base = f"{theme_name}处于{stage_name}，观察炸板率和高位分歧是否扩大"
+    elif stage == 5:
+        base = f"{theme_name}处于{stage_name}，观察前排是否修复、后排是否继续掉队"
+    elif stage == 6:
+        base = f"{theme_name}处于{stage_name}，观察是否形成二次走强和资金回补"
+    elif stage == 7:
+        base = f"{theme_name}处于{stage_name}，观察是否继续降温，原则上降低优先级"
+    else:
+        base = f"{theme_name}处于{stage_name}，观察是否重新进入活跃扩散"
+
+    confirmation = _confirmation_text(catalyst)
+    return f"{base}；当前排名 {rank}，ThemeScore={score:.2f}；{confirmation}。"
+
+
+def _confirmation_text(catalyst) -> str:
+    if catalyst is None:
+        return "暂无消息催化聚合"
+    if catalyst.confirmed_event_count > 0:
+        event = f"，主催化：{catalyst.primary_event}" if catalyst.primary_event else ""
+        return f"消息确认 {catalyst.confirmed_event_count} 条{event}"
+    if catalyst.related_event_count > 0:
+        return "有相关消息但缺少直接确认，需人工复核催化归因"
+    return "暂无核心消息直接验证，更多依赖资金行为"
