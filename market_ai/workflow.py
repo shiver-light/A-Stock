@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import warnings
 from datetime import datetime, timedelta
 
 import pandas as pd
 
 from market_ai.analysis import identify_stock_roles
-from market_ai.ai import OpenAICompatibleLLMProvider, analyze_news_items_with_llm
+from market_ai.ai import OpenAICompatibleLLMProvider, analyze_news_items_with_llm_with_warnings
 from market_ai.config import RadarConfig
 from market_ai.lifecycle import classify_theme_lifecycle
 from market_ai.lifecycle.rules import STAGE_NAMES as LIFECYCLE_STAGE_NAMES
@@ -66,13 +67,24 @@ def build_daily_radar_report(
 
     news_events = []
     news_items = []
+    llm_warnings = []
     if news_provider is not None:
         news_end = news_end_time or datetime.now()
         news_start = news_start_time or news_end - timedelta(hours=config.news.lookback_hours)
         news_items = news_provider.fetch_news(start_time=news_start, end_time=news_end)
         llm_provider = OpenAICompatibleLLMProvider(config.llm) if config.llm.enabled else None
         if llm_provider is not None:
-            news_events = analyze_news_items_with_llm(news_items, taxonomy, provider=llm_provider)
+            news_events, llm_warnings = analyze_news_items_with_llm_with_warnings(
+                news_items,
+                taxonomy,
+                provider=llm_provider,
+            )
+            for item in llm_warnings:
+                warnings.warn(
+                    f"LLM news analysis fallback for news_id={item.news_id}: {item.reason}",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
         else:
             news_events = normalize_news_items(news_items, taxonomy)
 
@@ -136,6 +148,8 @@ def build_daily_radar_report(
             "llm_provider": config.llm.provider if config.llm.enabled else "none",
             "llm_model": config.llm.model if config.llm.enabled else "",
             "llm_prompt_version": config.llm.prompt_version if config.llm.enabled else "",
+            "llm_warning_count": len(llm_warnings),
+            "llm_warnings": [item.to_dict() for item in llm_warnings],
         },
     )
 

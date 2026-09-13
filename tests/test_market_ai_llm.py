@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import unittest
 
-from market_ai.ai.provider import _coerce_news_event, _extract_json_object, analyze_news_items_with_llm
+from market_ai.ai.provider import (
+    _coerce_news_event,
+    _extract_json_object,
+    analyze_news_items_with_llm,
+    analyze_news_items_with_llm_with_warnings,
+)
 from market_ai.models import NewsEventAnalysis, NewsItem
 from market_ai.themes import ThemeDefinition, ThemeTaxonomy
 
@@ -66,6 +71,42 @@ class MarketAiLLMTestCase(unittest.TestCase):
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0].themes, ["AI算力"])
         self.assertLessEqual(events[0].confidence, 0.8)
+
+    def test_analyze_news_items_returns_warning_when_llm_fails(self) -> None:
+        taxonomy = ThemeTaxonomy([ThemeDefinition(theme="AI算力", aliases=("算力",))])
+        news = NewsItem(
+            news_id="n1",
+            source="local",
+            title="算力产业链多股涨停",
+            published_at="2026-09-11T16:00:00+08:00",
+        )
+
+        events, warnings = analyze_news_items_with_llm_with_warnings(
+            [news],
+            taxonomy,
+            provider=FakeLLMProvider(should_fail=True),
+        )
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(len(warnings), 1)
+        self.assertEqual(warnings[0].news_id, "n1")
+        self.assertIn("llm failed", warnings[0].reason)
+        self.assertTrue(warnings[0].fallback_used)
+
+    def test_analyze_news_items_warns_when_llm_returns_unknown_theme(self) -> None:
+        taxonomy = ThemeTaxonomy([ThemeDefinition(theme="AI算力", aliases=("算力",))])
+        news = NewsItem(news_id="n1", source="local", title="未知消息", published_at="2026-09-11T16:00:00+08:00")
+
+        events, warnings = analyze_news_items_with_llm_with_warnings(
+            [news],
+            taxonomy,
+            provider=FakeLLMProvider(event=None),
+        )
+
+        self.assertEqual(events, [])
+        self.assertEqual(len(warnings), 1)
+        self.assertFalse(warnings[0].fallback_used)
+        self.assertIn("known-theme", warnings[0].reason)
 
     def test_analyze_news_items_uses_llm_event_when_valid(self) -> None:
         taxonomy = ThemeTaxonomy([ThemeDefinition(theme="AI算力", aliases=("算力",))])

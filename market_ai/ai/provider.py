@@ -23,6 +23,24 @@ importance和novelty取1到5的整数，confidence取0到1。
 
 
 @dataclass(frozen=True)
+class LLMNewsAnalysisWarning:
+    """Auditable LLM fallback warning for one news item."""
+
+    news_id: str
+    title: str
+    reason: str
+    fallback_used: bool
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "news_id": self.news_id,
+            "title": self.title,
+            "reason": self.reason,
+            "fallback_used": self.fallback_used,
+        }
+
+
+@dataclass(frozen=True)
 class OpenAICompatibleLLMProvider:
     """Minimal OpenAI-compatible chat completions client."""
 
@@ -69,20 +87,53 @@ def analyze_news_items_with_llm(
     provider: OpenAICompatibleLLMProvider | None,
 ) -> list[NewsEventAnalysis]:
     """Analyze news with an optional LLM and fall back to deterministic taxonomy rules."""
+    events, _warnings = analyze_news_items_with_llm_with_warnings(news_items, taxonomy, provider=provider)
+    return events
+
+
+def analyze_news_items_with_llm_with_warnings(
+    news_items: list[NewsItem],
+    taxonomy: ThemeTaxonomy,
+    *,
+    provider: OpenAICompatibleLLMProvider | None,
+) -> tuple[list[NewsEventAnalysis], list[LLMNewsAnalysisWarning]]:
+    """Analyze news with LLM and return explicit fallback warnings."""
     rule_normalizer = RuleBasedThemeNormalizer(taxonomy)
     events = []
+    warnings = []
     for news in news_items:
         event = None
         if provider is not None:
             try:
                 event = provider.analyze_news_item(news, taxonomy)
-            except RuntimeError:
-                event = None
-        if event is None:
+                if event is None:
+                    fallback = rule_normalizer.normalize_news_item(news)
+                    warnings.append(
+                        LLMNewsAnalysisWarning(
+                            news_id=news.news_id,
+                            title=news.title,
+                            reason="LLM output did not produce a valid known-theme event.",
+                            fallback_used=fallback is not None,
+                        )
+                    )
+                    event = fallback
+            except RuntimeError as exc:
+                fallback = rule_normalizer.normalize_news_item(news)
+                warnings.append(
+                    LLMNewsAnalysisWarning(
+                        news_id=news.news_id,
+                        title=news.title,
+                        reason=str(exc),
+                        fallback_used=fallback is not None,
+                    )
+                )
+                event = fallback
+        else:
             event = rule_normalizer.normalize_news_item(news)
-        if event is not None:
-            events.append(event)
-    return events
+        if event is None:
+            continue
+        events.append(event)
+    return events, warnings
 
 
 def _build_news_prompt(news: NewsItem, taxonomy: ThemeTaxonomy) -> str:

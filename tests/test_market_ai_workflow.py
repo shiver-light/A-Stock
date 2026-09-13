@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import unittest
+import warnings
 from datetime import datetime, timedelta, timezone
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pandas as pd
 
-from market_ai.config import NewsScoringConfig, RadarConfig
+from market_ai.config import LLMConfig, NewsScoringConfig, RadarConfig
 from market_ai.models import LimitStock, NewsItem, StrongStock
 from market_ai.providers.market import MarketProvider
 from market_ai.providers.news import NewsProvider
@@ -61,6 +63,14 @@ class FakeNewsProvider(NewsProvider):
         ]
 
 
+class FailingLLMProvider:
+    def __init__(self, config) -> None:
+        self.config = config
+
+    def analyze_news_item(self, news: NewsItem, taxonomy: ThemeTaxonomy):
+        raise RuntimeError("local ollama unavailable")
+
+
 class MarketAiWorkflowTestCase(unittest.TestCase):
     def test_build_daily_radar_report(self) -> None:
         taxonomy = ThemeTaxonomy(
@@ -94,6 +104,32 @@ class MarketAiWorkflowTestCase(unittest.TestCase):
         self.assertTrue(report.next_day_observations)
         self.assertIn("ThemeScore", report.next_day_observations[0])
         self.assertIn("消息确认", report.next_day_observations[0])
+
+    def test_build_daily_radar_report_warns_when_llm_falls_back(self) -> None:
+        taxonomy = ThemeTaxonomy([ThemeDefinition(theme="AI算力", aliases=("AI服务器", "算力"))])
+        config = RadarConfig(
+            news_scoring=NewsScoringConfig(authority_scores={"local": 80.0}),
+            llm=LLMConfig(enabled=True, provider="ollama_openai"),
+        )
+
+        with patch("market_ai.workflow.OpenAICompatibleLLMProvider", FailingLLMProvider):
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                report = build_daily_radar_report(
+                    trade_date="20260912",
+                    market_provider=FakeMarketProvider(),
+                    taxonomy=taxonomy,
+                    config=config,
+                    news_provider=FakeNewsProvider(),
+                    news_start_time=datetime(2026, 9, 12, 9, 0, tzinfo=CN_TZ),
+                    news_end_time=datetime(2026, 9, 12, 16, 30, tzinfo=CN_TZ),
+                )
+
+        self.assertTrue(any("LLM news analysis fallback" in str(item.message) for item in caught))
+        self.assertEqual(report.metadata["llm_warning_count"], 1)
+        self.assertEqual(report.metadata["llm_warnings"][0]["news_id"], "n1")
+        self.assertTrue(report.metadata["llm_warnings"][0]["fallback_used"])
+        self.assertEqual(report.news_events[0].themes, ["AI算力"])
 
     def test_stock_theme_labels_feed_theme_scores(self) -> None:
         taxonomy = ThemeTaxonomy([ThemeDefinition(theme="AI算力", aliases=("AI服务器",))])
