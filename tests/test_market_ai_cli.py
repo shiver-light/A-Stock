@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
@@ -13,6 +15,7 @@ from market_ai.__main__ import (
     _append_theme_score_history,
     _discover_stock_theme_label_files,
     _get_a_share_trade_dates,
+    _print_report_warnings,
     build_theme_watchlist,
     main,
     summarize_theme_daily_snapshot,
@@ -139,6 +142,40 @@ class MarketAiCliTestCase(unittest.TestCase):
         self.assertEqual(row["role"], "space_leader")
         self.assertEqual(float(row["confidence"]), 0.9)
         self.assertEqual(row["reason"], "连板高度最高")
+
+    def test_print_report_warnings_outputs_llm_fallback_summary(self) -> None:
+        report = DailyRadarReport(
+            trade_date="20260901",
+            metadata={
+                "llm_warning_count": 1,
+                "llm_warnings": [
+                    {
+                        "news_id": "n1",
+                        "reason": "LLM request failed",
+                        "fallback_used": True,
+                    }
+                ],
+            },
+        )
+        buffer = StringIO()
+
+        with redirect_stdout(buffer):
+            _print_report_warnings(report)
+
+        output = buffer.getvalue()
+        self.assertIn("WARNING: LLM news analysis fallback count=1", output)
+        self.assertIn("news_id=n1", output)
+        self.assertIn("fallback_used=True", output)
+        self.assertIn("LLM request failed", output)
+
+    def test_print_report_warnings_is_quiet_without_warnings(self) -> None:
+        report = DailyRadarReport(trade_date="20260901", metadata={"llm_warning_count": 0})
+        buffer = StringIO()
+
+        with redirect_stdout(buffer):
+            _print_report_warnings(report)
+
+        self.assertEqual(buffer.getvalue(), "")
 
     def test_summarize_theme_daily_snapshot_uses_as_of_and_lookback(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -572,6 +572,7 @@ def _run_one_report(*, args: argparse.Namespace, trade_date: str) -> None:
 
     print(f"wrote market radar report: {md_path}")
     print(f"wrote structured report: {json_path}")
+    _print_report_warnings(report)
 
 
 def _trade_date_close_time(trade_date: str) -> datetime:
@@ -699,6 +700,22 @@ def _append_stock_role_snapshot(path: Path, report) -> None:
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     combined.to_csv(path, index=False)
+
+
+def _print_report_warnings(report) -> None:
+    """Print concise runtime warnings that are also stored in report metadata."""
+    metadata = getattr(report, "metadata", {}) or {}
+    llm_warning_count = int(metadata.get("llm_warning_count") or 0)
+    if llm_warning_count <= 0:
+        return
+    print(f"WARNING: LLM news analysis fallback count={llm_warning_count}")
+    for item in list(metadata.get("llm_warnings") or [])[:5]:
+        if not isinstance(item, dict):
+            continue
+        news_id = str(item.get("news_id") or "").strip()
+        reason = str(item.get("reason") or "").strip()
+        fallback_used = bool(item.get("fallback_used"))
+        print(f"WARNING: news_id={news_id} fallback_used={fallback_used} reason={reason}")
 
 
 if __name__ == "__main__":
