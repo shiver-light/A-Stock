@@ -15,6 +15,15 @@ LIFECYCLE_STAGE_NAMES = {
     6: "回流",
     7: "退潮",
 }
+ROLE_PRIORITY = {
+    "space_leader": 1,
+    "capacity_leader": 2,
+    "turnover_leader": 3,
+    "core_frontline": 4,
+    "catch_up": 5,
+    "elasticity_stock": 6,
+    "follower": 7,
+}
 
 
 def render_daily_radar_report_markdown(report: DailyRadarReport) -> str:
@@ -143,7 +152,7 @@ def _render_stock_roles(roles: list[StockRole]) -> list[str]:
         "| 题材 | 股票 | 角色 | 置信度 | 原因 |",
         "| --- | --- | --- | ---: | --- |",
     ]
-    for role in sorted(roles, key=lambda item: (item.theme, item.role, item.stock_code)):
+    for role in sorted(roles, key=lambda item: (item.theme, ROLE_PRIORITY.get(item.role, 99), item.stock_code)):
         lines.append(
             "| {theme} | {stock_name}({stock_code}) | {role} | {confidence:.2f} | {reason} |".format(
                 theme=role.theme,

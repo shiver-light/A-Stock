@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
+from market_ai.analysis import identify_stock_roles
 from market_ai.config import RadarConfig
 from market_ai.lifecycle import classify_theme_lifecycle
 from market_ai.lifecycle.rules import STAGE_NAMES as LIFECYCLE_STAGE_NAMES
@@ -100,6 +101,13 @@ def build_daily_radar_report(
         core_themes=core_themes,
         news_events=core_news_events,
     )
+    stock_roles = identify_stock_roles(
+        trade_date=trade_date,
+        core_themes=core_themes,
+        limit_stocks=limit_stocks,
+        strong_stocks=strong_stocks,
+        normalizations=normalizations,
+    )
 
     return DailyRadarReport(
         trade_date=trade_date,
@@ -107,7 +115,7 @@ def build_daily_radar_report(
         news_events=core_news_events,
         theme_catalysts=theme_catalysts,
         unexplained_strength=unexplained_strength,
-        stock_roles=[],
+        stock_roles=stock_roles,
         next_day_observations=_build_observations(core_themes, theme_catalysts),
         metadata={
             "limit_stock_count": len(limit_stocks),

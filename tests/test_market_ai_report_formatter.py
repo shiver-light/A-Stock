@@ -83,6 +83,15 @@ class MarketRadarReportFormatterTestCase(unittest.TestCase):
                     role="capacity_leader",
                     confidence=0.86,
                     reason=["板块成交额第一"],
+                ),
+                StockRole(
+                    trade_date="20260912",
+                    theme="AI算力",
+                    stock_code="000002.SZ",
+                    stock_name="空间龙",
+                    role="space_leader",
+                    confidence=0.90,
+                    reason=["题材内最高连板 3 板"],
                 )
             ],
             next_day_observations=["AI算力是否继续扩散到首板。"],
@@ -100,6 +109,7 @@ class MarketRadarReportFormatterTestCase(unittest.TestCase):
         self.assertIn("验证原因：命中核心题材: AI算力; 最高 ThemeScore=86.50", text)
         self.assertIn("机器人具身智能", text)
         self.assertIn("样本股份(000001.SZ)", text)
+        self.assertLess(text.index("空间龙(000002.SZ)"), text.index("样本股份(000001.SZ)"))
         self.assertIn("AI算力是否继续扩散到首板。", text)
         self.assertIn("- source: fixture", text)
 

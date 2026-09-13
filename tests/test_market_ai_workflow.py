@@ -86,6 +86,8 @@ class MarketAiWorkflowTestCase(unittest.TestCase):
         self.assertEqual(report.news_events[0].validation_state, "confirmed_catalyst")
         self.assertGreaterEqual(report.news_events[0].market_confirm_score or 0.0, 50.0)
         self.assertEqual(report.theme_catalysts[0].theme, "AI算力")
+        self.assertTrue(report.stock_roles)
+        self.assertEqual(report.stock_roles[0].theme, "AI算力")
         self.assertEqual(report.metadata["theme_catalyst_count"], len(report.theme_catalysts))
         self.assertEqual(report.metadata["limit_stock_count"], 1)
         self.assertEqual(report.metadata["strong_stock_count"], 1)
