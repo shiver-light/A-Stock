@@ -36,6 +36,25 @@ class FakeTradeCalendarClient:
         )
 
 
+class FakeCollectedNewsProvider:
+    def __init__(self, *, cache_dir=None, refresh=False, slice_hours=6) -> None:
+        self.cache_dir = cache_dir
+        self.refresh = refresh
+        self.slice_hours = slice_hours
+
+    def fetch_news_frame(self, *, start_time, end_time) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "news_id": ["n1"],
+                "source": ["local"],
+                "title": ["算力政策"],
+                "published_at": [end_time.isoformat()],
+                "url": [""],
+                "content": ["AI服务器产业链政策催化"],
+            }
+        )
+
+
 class MarketAiCliTestCase(unittest.TestCase):
     def test_get_a_share_trade_dates_returns_sorted_open_dates(self) -> None:
         with patch("market_ai.__main__.TushareClient", return_value=FakeTradeCalendarClient()):
@@ -286,6 +305,43 @@ class MarketAiCliTestCase(unittest.TestCase):
             code = main(["theme-watchlist", "--snapshot", str(path), "--output", "json"])
 
         self.assertEqual(code, 0)
+
+    def test_run_with_news_collects_news_then_runs_range(self) -> None:
+        captured = {}
+
+        def fake_run_range(args):
+            captured["news_csv"] = args.news_csv
+            captured["start_date"] = args.start_date
+            captured["end_date"] = args.end_date
+            return 0
+
+        with tempfile.TemporaryDirectory() as directory:
+            news_path = Path(directory) / "news.csv"
+            with patch("market_ai.__main__.TushareMajorNewsProvider", FakeCollectedNewsProvider):
+                with patch("market_ai.__main__._run_range", fake_run_range):
+                    code = main(
+                        [
+                            "run-with-news",
+                            "--start-date",
+                            "20260910",
+                            "--end-date",
+                            "20260911",
+                            "--config",
+                            "market_ai/configs/radar.yaml",
+                            "--news-output-file",
+                            str(news_path),
+                            "--output-dir",
+                            str(Path(directory) / "radar"),
+                        ]
+                    )
+            data = pd.read_csv(news_path)
+
+        self.assertEqual(code, 0)
+        self.assertEqual(captured["news_csv"], str(news_path))
+        self.assertEqual(captured["start_date"], "20260910")
+        self.assertEqual(captured["end_date"], "20260911")
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data.iloc[0]["news_id"], "n1")
 
     def test_enrich_theme_labels_filters_and_prefers_reason_rows(self) -> None:
         taxonomy = ThemeTaxonomy(

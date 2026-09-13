@@ -64,6 +64,29 @@ def main(argv: list[str] | None = None) -> int:
     range_parser.add_argument("--theme-score-history", default=None, help="Optional historical theme score CSV path.")
     range_parser.add_argument("--output-dir", default=None, help="Output directory for .json and .md reports.")
 
+    run_with_news_parser = subparsers.add_parser(
+        "run-with-news",
+        help="Collect Tushare news, then generate market radar reports for a date range.",
+    )
+    run_with_news_parser.add_argument("--start-date", required=True, help="Start trade date, for example 20260907.")
+    run_with_news_parser.add_argument("--end-date", required=True, help="End trade date, for example 20260911.")
+    run_with_news_parser.add_argument("--config", default=None, help="Radar YAML config path.")
+    run_with_news_parser.add_argument("--taxonomy", default=None, help="Theme taxonomy YAML path.")
+    run_with_news_parser.add_argument(
+        "--market-provider",
+        default="tushare_limit",
+        choices=["tushare_daily", "tushare_limit"],
+    )
+    run_with_news_parser.add_argument("--universe-name", default=None, help="Optional universe filter.")
+    run_with_news_parser.add_argument("--refresh", action="store_true", help="Refresh provider cache when supported.")
+    run_with_news_parser.add_argument("--stock-theme-labels", default=None, help="Optional stock theme label CSV path.")
+    run_with_news_parser.add_argument("--min-stock-theme-confidence", type=float, default=0.0)
+    run_with_news_parser.add_argument("--theme-score-history", default=None, help="Optional historical theme score CSV path.")
+    run_with_news_parser.add_argument("--output-dir", default=None, help="Output directory for .json and .md reports.")
+    run_with_news_parser.add_argument("--news-output-file", default=None, help="Collected news CSV path.")
+    run_with_news_parser.add_argument("--news-cache-dir", default=None, help="Optional Tushare news provider cache directory.")
+    run_with_news_parser.add_argument("--slice-hours", type=int, default=6, help="Tushare request window size in hours.")
+
     enrich_parser = subparsers.add_parser("enrich-themes", help="Build reusable stock theme label CSVs.")
     enrich_parser.add_argument("--start-date", required=True, help="Start trade date, for example 20260907.")
     enrich_parser.add_argument("--end-date", required=True, help="End trade date, for example 20260911.")
@@ -163,6 +186,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run(args)
     if args.command == "run-range":
         return _run_range(args)
+    if args.command == "run-with-news":
+        return _run_with_news(args)
     if args.command == "enrich-themes":
         return _enrich_themes(args)
     if args.command == "import-news":
@@ -192,6 +217,28 @@ def _run_range(args: argparse.Namespace) -> int:
         _run_one_report(args=args, trade_date=trade_date)
     print(f"completed market radar range: {trade_dates[0]} to {trade_dates[-1]}, days={len(trade_dates)}")
     return 0
+
+
+def _run_with_news(args: argparse.Namespace) -> int:
+    if args.start_date > args.end_date:
+        raise ValueError("--start-date must be earlier than or equal to --end-date.")
+    config = load_market_radar_config(args.config)
+    output_file = Path(args.news_output_file) if args.news_output_file else _default_news_output_file(config, args.start_date, args.end_date)
+    start_time = _trade_date_close_time(args.start_date) - timedelta(hours=config.news.lookback_hours)
+    end_time = _trade_date_close_time(args.end_date)
+    cache_dir = args.news_cache_dir or config.output.cache_dir + "/news/tushare_major_news"
+    provider = TushareMajorNewsProvider(cache_dir=cache_dir, refresh=args.refresh, slice_hours=args.slice_hours)
+    news_data = provider.fetch_news_frame(start_time=start_time, end_time=end_time)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    news_data.to_csv(output_file, index=False)
+    print(f"wrote collected news: {output_file}")
+    print(f"news_rows={len(news_data)}")
+    if not news_data.empty:
+        print(f"sources={news_data['source'].nunique()} first={news_data['published_at'].min()} last={news_data['published_at'].max()}")
+
+    rerun_args = argparse.Namespace(**vars(args))
+    rerun_args.news_csv = str(output_file)
+    return _run_range(rerun_args)
 
 
 def _enrich_themes(args: argparse.Namespace) -> int:
@@ -577,6 +624,10 @@ def _run_one_report(*, args: argparse.Namespace, trade_date: str) -> None:
 
 def _trade_date_close_time(trade_date: str) -> datetime:
     return datetime.strptime(str(trade_date), "%Y%m%d").replace(hour=16, minute=30, tzinfo=CN_TZ)
+
+
+def _default_news_output_file(config, start_date: str, end_date: str) -> Path:
+    return Path(config.output.cache_dir) / "news" / f"tushare_major_news_{start_date}_{end_date}.csv"
 
 
 def _get_a_share_trade_dates(start_date: str, end_date: str) -> list[str]:

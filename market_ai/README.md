@@ -87,6 +87,20 @@ llm:
 
 LLM 只用于新闻事件结构化增强。若本地模型不可用、返回非法 JSON 或输出未命中已知题材，系统会回退到原有 taxonomy 规则归因。
 
+集成入口：
+
+```bash
+/Users/raymond/src/aquant/venv/bin/python -m market_ai run-with-news \
+  --config config/market_radar_ollama.yaml \
+  --start-date 20260907 \
+  --end-date 20260911 \
+  --market-provider tushare_limit \
+  --stock-theme-labels data/cache/market_ai/stock_theme_labels/limit_up_cross_theme_labels_recent.csv \
+  --output-dir output/market_radar_llm
+```
+
+`run-with-news` 会先拉取 Tushare `major_news` 到 `data/cache/market_ai/news/tushare_major_news_<start>_<end>.csv`，再用该新闻文件生成区间 radar 报告。是否启用 LLM 由 `--config` 里的 `llm.enabled` 控制。
+
 运行后会生成：
 
 - `output/market_radar_sample/20260912.json`
