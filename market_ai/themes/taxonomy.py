@@ -23,16 +23,26 @@ class ThemeDefinition:
     aliases: tuple[str, ...] = field(default_factory=tuple)
     parent: str = ""
     description: str = ""
+    include_keywords: tuple[str, ...] = field(default_factory=tuple)
+    exclude_keywords: tuple[str, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
         theme = str(self.theme).strip()
         if not theme:
             raise ValueError("theme is required.")
         aliases = tuple(dict.fromkeys(_clean_text(alias) for alias in self.aliases if _clean_text(alias)))
+        include_keywords = tuple(
+            dict.fromkeys(_clean_text(keyword) for keyword in self.include_keywords if _clean_text(keyword))
+        )
+        exclude_keywords = tuple(
+            dict.fromkeys(_clean_text(keyword) for keyword in self.exclude_keywords if _clean_text(keyword))
+        )
         object.__setattr__(self, "theme", theme)
         object.__setattr__(self, "aliases", aliases)
         object.__setattr__(self, "parent", str(self.parent).strip())
         object.__setattr__(self, "description", str(self.description).strip())
+        object.__setattr__(self, "include_keywords", include_keywords)
+        object.__setattr__(self, "exclude_keywords", exclude_keywords)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -74,6 +84,8 @@ class ThemeTaxonomy:
         for alias, theme in self.alias_to_theme.items():
             if alias in normalized_text:
                 definition = self.definitions[theme]
+                if not _passes_theme_filters(definition, normalized_text):
+                    continue
                 matches.append(
                     ThemeMatch(
                         theme=theme,
@@ -124,6 +136,8 @@ def load_theme_taxonomy(path: str | Path | None = None) -> ThemeTaxonomy:
                 aliases=tuple(item.get("aliases", []) or []),
                 parent=str(item.get("parent", "") or ""),
                 description=str(item.get("description", "") or ""),
+                include_keywords=tuple(item.get("include_keywords", []) or []),
+                exclude_keywords=tuple(item.get("exclude_keywords", []) or []),
             )
         )
     return ThemeTaxonomy(definitions)
@@ -146,3 +160,11 @@ def _build_alias_index(definitions: list[ThemeDefinition]) -> dict[str, str]:
 
 def _clean_text(value: object) -> str:
     return str(value).strip().lower().replace(" ", "")
+
+
+def _passes_theme_filters(definition: ThemeDefinition, normalized_text: str) -> bool:
+    if definition.include_keywords and not any(keyword in normalized_text for keyword in definition.include_keywords):
+        return False
+    if definition.exclude_keywords and any(keyword in normalized_text for keyword in definition.exclude_keywords):
+        return False
+    return True
