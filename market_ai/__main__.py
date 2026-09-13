@@ -281,6 +281,7 @@ def _run_one_report(*, args: argparse.Namespace, trade_date: str) -> None:
     )
     md_path.write_text(render_daily_radar_report_markdown(report), encoding="utf-8")
     _append_theme_score_history(history_path, report.core_themes)
+    _append_theme_daily_snapshot(output_dir / "theme_daily_snapshot.csv", report)
 
     print(f"wrote market radar report: {md_path}")
     print(f"wrote structured report: {json_path}")
@@ -326,6 +327,54 @@ def _append_theme_score_history(path: Path, themes: list) -> None:
     combined["trade_date"] = combined["trade_date"].astype(str).str.replace(r"\\.0$", "", regex=True)
     combined = (
         combined.sort_values(["trade_date", "theme"])
+        .drop_duplicates(subset=["trade_date", "theme"], keep="last")
+        .reset_index(drop=True)
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    combined.to_csv(path, index=False)
+
+
+def _append_theme_daily_snapshot(path: Path, report) -> None:
+    """Append one report's theme snapshot with idempotent trade_date/theme upsert."""
+    if not report.core_themes:
+        return
+    catalysts = {item.theme: item for item in report.theme_catalysts}
+    rows = []
+    for theme in report.core_themes:
+        catalyst = catalysts.get(theme.theme)
+        components = dict(theme.components or {})
+        rows.append(
+            {
+                "trade_date": report.trade_date,
+                "theme": theme.theme,
+                "rank": theme.rank,
+                "score": theme.score,
+                "lifecycle_stage": theme.lifecycle_stage,
+                "validation_state": theme.validation_state or "",
+                "limit_up_strength": components.get("LimitUpStrength", 0.0),
+                "breadth": components.get("Breadth", 0.0),
+                "leader_strength": components.get("LeaderStrength", 0.0),
+                "news_catalyst": components.get("NewsCatalyst", 0.0),
+                "volume_expansion": components.get("VolumeExpansion", 0.0),
+                "persistence": components.get("Persistence", 0.0),
+                "novelty": components.get("Novelty", 0.0),
+                "confirmed_event_count": catalyst.confirmed_event_count if catalyst else 0,
+                "unconfirmed_event_count": catalyst.unconfirmed_event_count if catalyst else 0,
+                "related_event_count": catalyst.related_event_count if catalyst else 0,
+                "primary_event": catalyst.primary_event if catalyst else "",
+                "catalyst_conclusion": catalyst.conclusion if catalyst else "",
+                "reason": " | ".join(theme.reasons or []),
+            }
+        )
+    current = pd.DataFrame(rows)
+    if path.exists():
+        existing = pd.read_csv(path)
+        combined = pd.concat([existing, current], ignore_index=True)
+    else:
+        combined = current
+    combined["trade_date"] = combined["trade_date"].astype(str).str.replace(r"\\.0$", "", regex=True)
+    combined = (
+        combined.sort_values(["trade_date", "rank", "theme"])
         .drop_duplicates(subset=["trade_date", "theme"], keep="last")
         .reset_index(drop=True)
     )

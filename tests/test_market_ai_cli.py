@@ -7,8 +7,14 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from market_ai.__main__ import _append_theme_score_history, _discover_stock_theme_label_files, _get_a_share_trade_dates, main
-from market_ai.models import ThemeScoreResult
+from market_ai.__main__ import (
+    _append_theme_daily_snapshot,
+    _append_theme_score_history,
+    _discover_stock_theme_label_files,
+    _get_a_share_trade_dates,
+    main,
+)
+from market_ai.models import DailyRadarReport, ThemeCatalystSummary, ThemeScoreResult
 from market_ai.providers.news.importer import import_news_csvs
 from market_ai.themes import ThemeDefinition, ThemeTaxonomy
 from market_ai.themes.enrichment import enrich_stock_theme_labels
@@ -56,6 +62,47 @@ class MarketAiCliTestCase(unittest.TestCase):
         self.assertEqual(len(data), 1)
         self.assertEqual(float(data.iloc[0]["score"]), 60.0)
         self.assertEqual(int(data.iloc[0]["lifecycle_stage"]), 2)
+
+    def test_append_theme_daily_snapshot_upserts_theme_catalysts(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "theme_daily_snapshot.csv"
+            report = DailyRadarReport(
+                trade_date="20260901",
+                core_themes=[
+                    ThemeScoreResult(
+                        trade_date="20260901",
+                        theme="AI算力",
+                        score=50.0,
+                        rank=1,
+                        lifecycle_stage=1,
+                        components={"LimitUpStrength": 80.0, "NewsCatalyst": 60.0},
+                        reasons=["涨停/触板股票 3 只"],
+                    )
+                ],
+                theme_catalysts=[
+                    ThemeCatalystSummary(
+                        trade_date="20260901",
+                        theme="AI算力",
+                        primary_event="算力政策发布",
+                        confirmed_event_count=1,
+                        related_event_count=2,
+                        conclusion="消息与资金形成确认。",
+                    )
+                ],
+            )
+            _append_theme_daily_snapshot(path, report)
+            report.core_themes[0].score = 65.0
+            _append_theme_daily_snapshot(path, report)
+
+            data = pd.read_csv(path)
+
+        self.assertEqual(len(data), 1)
+        row = data.iloc[0]
+        self.assertEqual(row["theme"], "AI算力")
+        self.assertEqual(float(row["score"]), 65.0)
+        self.assertEqual(int(row["confirmed_event_count"]), 1)
+        self.assertEqual(row["primary_event"], "算力政策发布")
+        self.assertEqual(float(row["limit_up_strength"]), 80.0)
 
     def test_enrich_theme_labels_filters_and_prefers_reason_rows(self) -> None:
         taxonomy = ThemeTaxonomy(
