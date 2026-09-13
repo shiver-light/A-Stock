@@ -7,6 +7,7 @@ from market_ai.models.core import (
     NewsItem,
     StockRole,
     StrongStock,
+    ThemeCatalystSummary,
     ThemeNormalization,
     ThemeScoreResult,
 )
@@ -23,6 +24,7 @@ __all__ = [
     "RawNews",
     "StockRole",
     "StrongStock",
+    "ThemeCatalystSummary",
     "ThemeNormalization",
     "ThemeScoreResult",
 ]

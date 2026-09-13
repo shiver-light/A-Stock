@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from market_ai.models import DailyRadarReport, NewsEventAnalysis, StockRole, ThemeScoreResult
+from market_ai.models import DailyRadarReport, NewsEventAnalysis, StockRole, ThemeCatalystSummary, ThemeScoreResult
 
 
 LIFECYCLE_STAGE_NAMES = {
@@ -27,6 +27,8 @@ def render_daily_radar_report_markdown(report: DailyRadarReport) -> str:
         "## 核心板块",
     ]
     lines.extend(_render_core_themes(report.core_themes))
+    lines.extend(["", "## 核心题材催化"])
+    lines.extend(_render_theme_catalysts(report.theme_catalysts))
     lines.extend(["", "## 今日核心消息"])
     lines.extend(_render_news_events(report.news_events))
     lines.extend(["", "## 异常资金"])
@@ -87,6 +89,27 @@ def _render_news_events(events: list[NewsEventAnalysis]) -> list[str]:
                 f"  - 影响范围：{event.scope or 'N/A'}",
                 f"  - 预期持续性：{event.expected_duration or 'N/A'}",
             ]
+        )
+    return lines
+
+
+def _render_theme_catalysts(catalysts: list[ThemeCatalystSummary]) -> list[str]:
+    if not catalysts:
+        return ["暂无核心题材催化聚合。"]
+    lines = [
+        "| 题材 | 主催化 | 已确认/未确认 | 证据事件 | 结论 |",
+        "| --- | --- | ---: | --- | --- |",
+    ]
+    for item in catalysts:
+        lines.append(
+            "| {theme} | {primary_event} | {confirmed}/{unconfirmed} | {events} | {conclusion} |".format(
+                theme=item.theme,
+                primary_event=item.primary_event or "N/A",
+                confirmed=item.confirmed_event_count,
+                unconfirmed=item.unconfirmed_event_count,
+                events="<br>".join(item.evidence_events) if item.evidence_events else "N/A",
+                conclusion=item.conclusion or "N/A",
+            )
         )
     return lines
 

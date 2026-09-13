@@ -242,12 +242,37 @@ class StockRole(JsonModel):
 
 
 @dataclass
+class ThemeCatalystSummary(JsonModel):
+    """Rule-based catalyst summary for one core theme."""
+
+    trade_date: str
+    theme: str
+    primary_event: str = ""
+    confirmed_event_count: int = 0
+    unconfirmed_event_count: int = 0
+    related_event_count: int = 0
+    evidence_events: list[str] = field(default_factory=list)
+    conclusion: str = ""
+
+    def __post_init__(self) -> None:
+        self.trade_date = _require_text(self.trade_date, "trade_date")
+        self.theme = _require_text(self.theme, "theme")
+        self.primary_event = _optional_text(self.primary_event) or ""
+        self.confirmed_event_count = int(self.confirmed_event_count)
+        self.unconfirmed_event_count = int(self.unconfirmed_event_count)
+        self.related_event_count = int(self.related_event_count)
+        self.evidence_events = _text_list(self.evidence_events)
+        self.conclusion = _optional_text(self.conclusion) or ""
+
+
+@dataclass
 class DailyRadarReport(JsonModel):
     """Complete structured daily radar report before Markdown rendering."""
 
     trade_date: str
     core_themes: list[ThemeScoreResult] = field(default_factory=list)
     news_events: list[NewsEventAnalysis] = field(default_factory=list)
+    theme_catalysts: list[ThemeCatalystSummary] = field(default_factory=list)
     unexplained_strength: list[ThemeScoreResult] = field(default_factory=list)
     stock_roles: list[StockRole] = field(default_factory=list)
     next_day_observations: list[str] = field(default_factory=list)

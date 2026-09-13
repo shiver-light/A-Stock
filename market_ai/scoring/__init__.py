@@ -9,6 +9,7 @@ from market_ai.scoring.news_confirmation import (
 from market_ai.scoring.news_events import CoreNewsEventScore, rank_core_news_events, select_core_news_events
 from market_ai.scoring.news_semantic import NewsSemanticScore, calculate_news_semantic_score
 from market_ai.scoring.theme_score import calculate_theme_scores
+from market_ai.scoring.theme_catalysts import aggregate_theme_catalysts
 
 __all__ = [
     "AuthorityScoreResult",
@@ -20,6 +21,7 @@ __all__ = [
     "calculate_news_semantic_score",
     "calculate_theme_scores",
     "classify_news_market_confirmation",
+    "aggregate_theme_catalysts",
     "rank_core_news_events",
     "select_core_news_events",
 ]

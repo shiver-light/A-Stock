@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from market_ai.models import DailyRadarReport, NewsEventAnalysis, StockRole, ThemeScoreResult
+from market_ai.models import DailyRadarReport, NewsEventAnalysis, StockRole, ThemeCatalystSummary, ThemeScoreResult
 from market_ai.reports import render_daily_radar_report_markdown
 
 
@@ -46,6 +46,17 @@ class MarketRadarReportFormatterTestCase(unittest.TestCase):
                     validation_reason=["命中核心题材: AI算力", "最高 ThemeScore=86.50"],
                 )
             ],
+            theme_catalysts=[
+                ThemeCatalystSummary(
+                    trade_date="20260912",
+                    theme="AI算力",
+                    primary_event="算力基础设施政策发布",
+                    confirmed_event_count=1,
+                    related_event_count=1,
+                    evidence_events=["算力基础设施政策发布"],
+                    conclusion="消息与资金形成确认，已确认事件 1 条。",
+                )
+            ],
             unexplained_strength=[
                 ThemeScoreResult(
                     trade_date="20260912",
@@ -73,6 +84,8 @@ class MarketRadarReportFormatterTestCase(unittest.TestCase):
         text = render_daily_radar_report_markdown(report)
 
         self.assertIn("| 1 | AI算力 | 发酵 | 86.50 |", text)
+        self.assertIn("## 核心题材催化", text)
+        self.assertIn("| AI算力 | 算力基础设施政策发布 | 1/0 |", text)
         self.assertIn("算力基础设施政策发布", text)
         self.assertIn("资金验证：confirmed_catalyst / 86.5", text)
         self.assertIn("验证原因：命中核心题材: AI算力; 最高 ThemeScore=86.50", text)

@@ -11,7 +11,12 @@ from market_ai.lifecycle import classify_theme_lifecycle
 from market_ai.models import DailyRadarReport
 from market_ai.providers.market import MarketProvider
 from market_ai.providers.news import NewsProvider
-from market_ai.scoring import calculate_theme_scores, classify_news_market_confirmation, select_core_news_events
+from market_ai.scoring import (
+    aggregate_theme_catalysts,
+    calculate_theme_scores,
+    classify_news_market_confirmation,
+    select_core_news_events,
+)
 from market_ai.themes import RuleBasedThemeNormalizer, ThemeTaxonomy, normalize_news_items
 from market_ai.themes import load_stock_theme_labels, merge_theme_normalizations, stock_codes_from_market_rows
 
@@ -89,11 +94,17 @@ def build_daily_radar_report(
         require_core_theme_match=config.news_scoring.require_core_theme_match,
     )
     core_news_events = classify_news_market_confirmation(core_news_events, core_themes=core_themes)
+    theme_catalysts = aggregate_theme_catalysts(
+        trade_date=trade_date,
+        core_themes=core_themes,
+        news_events=core_news_events,
+    )
 
     return DailyRadarReport(
         trade_date=trade_date,
         core_themes=core_themes,
         news_events=core_news_events,
+        theme_catalysts=theme_catalysts,
         unexplained_strength=unexplained_strength,
         stock_roles=[],
         next_day_observations=_build_observations(core_themes),
@@ -105,6 +116,7 @@ def build_daily_radar_report(
             "rule_theme_label_count": len(rule_normalizations),
             "news_event_total_count": len(news_events),
             "core_news_event_count": len(core_news_events),
+            "theme_catalyst_count": len(theme_catalysts),
             "news_event_count": len(core_news_events),
         },
     )

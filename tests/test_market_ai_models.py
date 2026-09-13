@@ -8,6 +8,7 @@ from market_ai.models import (
     LimitStock,
     NewsEventAnalysis,
     StockRole,
+    ThemeCatalystSummary,
     ThemeNormalization,
     ThemeScoreResult,
 )
@@ -88,6 +89,20 @@ class MarketAiModelsTestCase(unittest.TestCase):
         self.assertEqual(payload["core_themes"][0]["theme"], "机器人")
         self.assertEqual(payload["stock_roles"][0]["role"], "capacity_leader")
         self.assertEqual(json.loads(json.dumps(payload, ensure_ascii=False))["trade_date"], "20260912")
+
+    def test_theme_catalyst_summary_is_json_friendly(self) -> None:
+        catalyst = ThemeCatalystSummary(
+            trade_date="20260912",
+            theme="AI算力",
+            primary_event="算力政策发布",
+            confirmed_event_count=1,
+            evidence_events=["算力政策发布"],
+        )
+
+        payload = catalyst.to_dict()
+
+        self.assertEqual(payload["theme"], "AI算力")
+        self.assertEqual(payload["confirmed_event_count"], 1)
 
     def test_limit_stock_requires_identity_fields(self) -> None:
         with self.assertRaisesRegex(ValueError, "stock_code is required"):
