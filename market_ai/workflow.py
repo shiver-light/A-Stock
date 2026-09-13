@@ -11,7 +11,7 @@ from market_ai.lifecycle import classify_theme_lifecycle
 from market_ai.models import DailyRadarReport
 from market_ai.providers.market import MarketProvider
 from market_ai.providers.news import NewsProvider
-from market_ai.scoring import calculate_theme_scores, select_core_news_events
+from market_ai.scoring import calculate_theme_scores, classify_news_market_confirmation, select_core_news_events
 from market_ai.themes import RuleBasedThemeNormalizer, ThemeTaxonomy, normalize_news_items
 from market_ai.themes import load_stock_theme_labels, merge_theme_normalizations, stock_codes_from_market_rows
 
@@ -88,6 +88,7 @@ def build_daily_radar_report(
         semantic_weights=config.news_scoring.semantic_weights,
         require_core_theme_match=config.news_scoring.require_core_theme_match,
     )
+    core_news_events = classify_news_market_confirmation(core_news_events, core_themes=core_themes)
 
     return DailyRadarReport(
         trade_date=trade_date,

@@ -169,6 +169,9 @@ class NewsEventAnalysis(JsonModel):
     expected_duration: str = ""
     confidence: float = 0.0
     source_news_ids: list[str] = field(default_factory=list)
+    validation_state: str | None = None
+    market_confirm_score: float | None = None
+    validation_reason: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         self.event = _require_text(self.event, "event")
@@ -182,6 +185,10 @@ class NewsEventAnalysis(JsonModel):
         self.expected_duration = _optional_text(self.expected_duration) or ""
         self.confidence = _confidence(self.confidence)
         self.source_news_ids = _text_list(self.source_news_ids)
+        self.validation_state = _optional_text(self.validation_state)
+        if self.market_confirm_score is not None:
+            self.market_confirm_score = _score(self.market_confirm_score, "market_confirm_score")
+        self.validation_reason = _text_list(self.validation_reason)
 
 
 @dataclass

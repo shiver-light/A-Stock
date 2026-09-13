@@ -82,6 +82,8 @@ def _render_news_events(events: list[NewsEventAnalysis]) -> list[str]:
                 f"  - 对应题材：{themes}",
                 f"  - 类型/时间：{event.event_type} / {event.event_time}",
                 f"  - 重要性/新鲜度/置信度：{event.importance} / {event.novelty} / {event.confidence:.2f}",
+                f"  - 资金验证：{event.validation_state or 'N/A'} / {event.market_confirm_score if event.market_confirm_score is not None else 'N/A'}",
+                f"  - 验证原因：{'; '.join(event.validation_reason) if event.validation_reason else 'N/A'}",
                 f"  - 影响范围：{event.scope or 'N/A'}",
                 f"  - 预期持续性：{event.expected_duration or 'N/A'}",
             ]

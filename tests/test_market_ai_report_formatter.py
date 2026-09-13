@@ -41,6 +41,9 @@ class MarketRadarReportFormatterTestCase(unittest.TestCase):
                     scope="产业链",
                     expected_duration="中期",
                     confidence=0.8,
+                    validation_state="confirmed_catalyst",
+                    market_confirm_score=86.5,
+                    validation_reason=["命中核心题材: AI算力", "最高 ThemeScore=86.50"],
                 )
             ],
             unexplained_strength=[
@@ -71,6 +74,8 @@ class MarketRadarReportFormatterTestCase(unittest.TestCase):
 
         self.assertIn("| 1 | AI算力 | 发酵 | 86.50 |", text)
         self.assertIn("算力基础设施政策发布", text)
+        self.assertIn("资金验证：confirmed_catalyst / 86.5", text)
+        self.assertIn("验证原因：命中核心题材: AI算力; 最高 ThemeScore=86.50", text)
         self.assertIn("机器人具身智能", text)
         self.assertIn("样本股份(000001.SZ)", text)
         self.assertIn("AI算力是否继续扩散到首板。", text)
