@@ -13,6 +13,7 @@ from market_ai.__main__ import (
     _discover_stock_theme_label_files,
     _get_a_share_trade_dates,
     main,
+    summarize_theme_daily_snapshot,
 )
 from market_ai.models import DailyRadarReport, ThemeCatalystSummary, ThemeScoreResult
 from market_ai.providers.news.importer import import_news_csvs
@@ -103,6 +104,50 @@ class MarketAiCliTestCase(unittest.TestCase):
         self.assertEqual(int(row["confirmed_event_count"]), 1)
         self.assertEqual(row["primary_event"], "算力政策发布")
         self.assertEqual(float(row["limit_up_strength"]), 80.0)
+
+    def test_summarize_theme_daily_snapshot_uses_as_of_and_lookback(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "theme_daily_snapshot.csv"
+            pd.DataFrame(
+                {
+                    "trade_date": ["20260908", "20260909", "20260910", "20260911", "20260912"],
+                    "theme": ["AI算力", "AI算力", "机器人具身智能", "AI算力", "AI算力"],
+                    "rank": [2, 1, 2, 1, 1],
+                    "score": [50.0, 70.0, 45.0, 80.0, 10.0],
+                    "lifecycle_stage": [1, 2, 1, 3, 7],
+                    "confirmed_event_count": [0, 1, 0, 2, 0],
+                    "unconfirmed_event_count": [1, 0, 0, 1, 0],
+                    "related_event_count": [1, 1, 0, 3, 0],
+                    "primary_event": ["", "算力政策", "", "算力订单", ""],
+                    "catalyst_conclusion": ["", "确认", "", "确认", ""],
+                }
+            ).to_csv(path, index=False)
+
+            summary = summarize_theme_daily_snapshot(path, as_of_date="20260911", lookback_days=2, top_n=10)
+
+        self.assertEqual(summary.iloc[0]["theme"], "AI算力")
+        self.assertEqual(summary.iloc[0]["latest_trade_date"], "20260911")
+        self.assertEqual(int(summary.iloc[0]["latest_stage"]), 3)
+        self.assertEqual(int(summary.iloc[0]["active_days"]), 1)
+        self.assertEqual(float(summary.iloc[0]["latest_score"]), 80.0)
+        self.assertNotIn("20260912", set(summary["latest_trade_date"]))
+
+    def test_theme_summary_cli_prints_json(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "theme_daily_snapshot.csv"
+            pd.DataFrame(
+                {
+                    "trade_date": ["20260911"],
+                    "theme": ["AI算力"],
+                    "rank": [1],
+                    "score": [80.0],
+                    "lifecycle_stage": [3],
+                }
+            ).to_csv(path, index=False)
+
+            code = main(["theme-summary", "--snapshot", str(path), "--output", "json"])
+
+        self.assertEqual(code, 0)
 
     def test_enrich_theme_labels_filters_and_prefers_reason_rows(self) -> None:
         taxonomy = ThemeTaxonomy(

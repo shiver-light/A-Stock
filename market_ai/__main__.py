@@ -133,6 +133,17 @@ def main(argv: list[str] | None = None) -> int:
     collect_news_parser.add_argument("--theme-score-history", default=None, help="Theme score history used by rerun-radar.")
     collect_news_parser.add_argument("--output-dir", default=None, help="Output directory used by rerun-radar.")
 
+    summary_parser = subparsers.add_parser("theme-summary", help="Summarize recent theme snapshots.")
+    summary_parser.add_argument(
+        "--snapshot",
+        default="output/market_radar/theme_daily_snapshot.csv",
+        help="Path to theme_daily_snapshot.csv.",
+    )
+    summary_parser.add_argument("--as-of-date", default=None, help="Optional max trade date, for example 20260911.")
+    summary_parser.add_argument("--lookback-days", type=int, default=5, help="Number of latest trade dates to summarize.")
+    summary_parser.add_argument("--top-n", type=int, default=20, help="Number of summary rows to print.")
+    summary_parser.add_argument("--output", choices=["table", "json"], default="table")
+
     args = parser.parse_args(argv)
     if args.command == "run":
         return _run(args)
@@ -144,6 +155,8 @@ def main(argv: list[str] | None = None) -> int:
         return _import_news(args)
     if args.command == "collect-news":
         return _collect_news(args)
+    if args.command == "theme-summary":
+        return _theme_summary(args)
     raise ValueError(f"Unsupported command: {args.command}")
 
 
@@ -235,11 +248,138 @@ def _collect_news(args: argparse.Namespace) -> int:
     return 0
 
 
+def _theme_summary(args: argparse.Namespace) -> int:
+    summary = summarize_theme_daily_snapshot(
+        args.snapshot,
+        as_of_date=args.as_of_date,
+        lookback_days=args.lookback_days,
+        top_n=args.top_n,
+    )
+    if args.output == "json":
+        print(json.dumps(summary.to_dict(orient="records"), ensure_ascii=False, indent=2))
+    else:
+        if summary.empty:
+            print("no theme snapshot rows found")
+        else:
+            columns = [
+                "theme",
+                "latest_trade_date",
+                "latest_rank",
+                "latest_score",
+                "latest_stage",
+                "active_days",
+                "mean_score",
+                "score_change",
+                "latest_confirmed_events",
+                "latest_primary_event",
+            ]
+            print(summary[columns].to_string(index=False))
+    return 0
+
+
+def summarize_theme_daily_snapshot(
+    snapshot_path: str | Path,
+    *,
+    as_of_date: str | None = None,
+    lookback_days: int = 5,
+    top_n: int = 20,
+) -> pd.DataFrame:
+    """Summarize recent theme strength using only snapshot rows up to as_of_date."""
+    path = Path(snapshot_path)
+    if not path.exists():
+        return pd.DataFrame(columns=_theme_summary_columns())
+    data = pd.read_csv(path)
+    if data.empty:
+        return pd.DataFrame(columns=_theme_summary_columns())
+    required = ["trade_date", "theme", "rank", "score", "lifecycle_stage"]
+    missing = [column for column in required if column not in data.columns]
+    if missing:
+        raise ValueError(f"Theme snapshot missing required columns: {missing}")
+
+    result = data.copy()
+    result["trade_date"] = result["trade_date"].astype(str).str.replace(r"\.0$", "", regex=True).str.strip()
+    result["theme"] = result["theme"].fillna("").astype(str).str.strip()
+    result["rank"] = pd.to_numeric(result["rank"], errors="coerce")
+    result["score"] = pd.to_numeric(result["score"], errors="coerce")
+    result["lifecycle_stage"] = pd.to_numeric(result["lifecycle_stage"], errors="coerce")
+    for column in ["confirmed_event_count", "unconfirmed_event_count", "related_event_count"]:
+        if column not in result.columns:
+            result[column] = 0
+        result[column] = pd.to_numeric(result[column], errors="coerce").fillna(0.0)
+    for column in ["primary_event", "catalyst_conclusion"]:
+        if column not in result.columns:
+            result[column] = ""
+        result[column] = result[column].fillna("").astype(str).str.strip()
+    result = result.loc[result["trade_date"].ne("") & result["theme"].ne("") & result["score"].notna()].copy()
+    if as_of_date:
+        result = result.loc[result["trade_date"].le(str(as_of_date))].copy()
+    if result.empty:
+        return pd.DataFrame(columns=_theme_summary_columns())
+
+    dates = sorted(result["trade_date"].unique())[-max(1, int(lookback_days)) :]
+    result = result.loc[result["trade_date"].isin(dates)].copy()
+    rows = []
+    for theme, group in result.sort_values(["trade_date", "rank", "theme"]).groupby("theme", sort=False):
+        latest = group.sort_values(["trade_date", "rank"]).iloc[-1]
+        first = group.sort_values(["trade_date", "rank"]).iloc[0]
+        rows.append(
+            {
+                "theme": theme,
+                "latest_trade_date": latest["trade_date"],
+                "latest_rank": _nullable_int(latest["rank"]),
+                "latest_score": round(float(latest["score"]), 6),
+                "latest_stage": _nullable_int(latest["lifecycle_stage"]),
+                "active_days": int(group["trade_date"].nunique()),
+                "mean_score": round(float(group["score"].mean()), 6),
+                "max_score": round(float(group["score"].max()), 6),
+                "score_change": round(float(latest["score"]) - float(first["score"]), 6),
+                "best_rank": _nullable_int(group["rank"].min()),
+                "latest_confirmed_events": int(latest["confirmed_event_count"]),
+                "latest_unconfirmed_events": int(latest["unconfirmed_event_count"]),
+                "latest_related_events": int(latest["related_event_count"]),
+                "latest_primary_event": latest["primary_event"],
+                "latest_catalyst_conclusion": latest["catalyst_conclusion"],
+            }
+        )
+    summary = pd.DataFrame(rows, columns=_theme_summary_columns())
+    summary = summary.sort_values(
+        ["latest_trade_date", "latest_rank", "latest_score", "active_days", "mean_score"],
+        ascending=[False, True, False, False, False],
+    ).reset_index(drop=True)
+    return summary.head(max(0, int(top_n)))
+
+
 def _discover_stock_theme_label_files(input_dir: Path) -> list[Path]:
     """Find existing generated stock theme label CSVs under an output directory."""
     if not input_dir.exists():
         return []
     return sorted(input_dir.glob("theme_labels*/limit_up_stock_theme_labels*.csv"))
+
+
+def _theme_summary_columns() -> list[str]:
+    return [
+        "theme",
+        "latest_trade_date",
+        "latest_rank",
+        "latest_score",
+        "latest_stage",
+        "active_days",
+        "mean_score",
+        "max_score",
+        "score_change",
+        "best_rank",
+        "latest_confirmed_events",
+        "latest_unconfirmed_events",
+        "latest_related_events",
+        "latest_primary_event",
+        "latest_catalyst_conclusion",
+    ]
+
+
+def _nullable_int(value: object) -> int | None:
+    if pd.isna(value):
+        return None
+    return int(value)
 
 
 def _run_one_report(*, args: argparse.Namespace, trade_date: str) -> None:
