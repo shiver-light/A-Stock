@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from market_ai.models import NewsEventAnalysis, NewsItem
 from market_ai.scoring.news_authority import calculate_authority_score
+from market_ai.scoring.news_event_type import classify_news_event_type
 from market_ai.scoring.news_semantic import calculate_news_semantic_score
 
 
@@ -20,6 +21,7 @@ class CoreNewsEventScore:
     core_theme_score: float
     directness_score: float
     impact_score: float
+    event_type_score: float
     noise_penalty: float
     stock_event_penalty: float
     source: str
@@ -33,6 +35,7 @@ class CoreNewsEventScore:
             "core_theme_score": self.core_theme_score,
             "directness_score": self.directness_score,
             "impact_score": self.impact_score,
+            "event_type_score": self.event_type_score,
             "noise_penalty": self.noise_penalty,
             "stock_event_penalty": self.stock_event_penalty,
             "source": self.source,
@@ -61,6 +64,7 @@ def rank_core_news_events(
             "theme_match": 0.15,
             "directness": 0.15,
             "impact": 0.10,
+            "event_type": 0.10,
         }
     )
     results = []
@@ -79,25 +83,29 @@ def rank_core_news_events(
         core_theme_score = 100.0 if overlap else 0.0
         news_item = _event_news_item(event, news_by_id)
         semantic = calculate_news_semantic_score(event, news_item)
+        event_type = classify_news_event_type(event, news_item)
+        typed_event = _with_event_type(event, event_type.primary_type)
         components = {
             "authority": authority.score,
             "core_theme": core_theme_score,
             "theme_match": theme_match_score,
             "directness": semantic.directness_score,
             "impact": semantic.impact_score,
+            "event_type": event_type.score,
         }
         score = sum(components[key] * weights.get(key, 0.0) for key in components)
         score -= semantic.noise_penalty * weights.get("noise_penalty", 0.0)
         score -= semantic.stock_event_penalty * weights.get("stock_event_penalty", 0.0)
         results.append(
             CoreNewsEventScore(
-                event=event,
+                event=typed_event,
                 score=round(score, 6),
                 authority_score=round(authority.score, 6),
                 theme_match_score=round(theme_match_score, 6),
                 core_theme_score=round(core_theme_score, 6),
                 directness_score=round(semantic.directness_score, 6),
                 impact_score=round(semantic.impact_score, 6),
+                event_type_score=round(event_type.score, 6),
                 noise_penalty=round(semantic.noise_penalty, 6),
                 stock_event_penalty=round(semantic.stock_event_penalty, 6),
                 source=source,
@@ -146,6 +154,14 @@ def _event_news_item(event: NewsEventAnalysis, news_by_id: dict[str, NewsItem]) 
         if item is not None:
             return item
     return None
+
+
+def _with_event_type(event: NewsEventAnalysis, event_type: str) -> NewsEventAnalysis:
+    from copy import copy
+
+    cloned = copy(event)
+    cloned.event_type = event_type
+    return cloned
 
 
 def _normalize_weights(weights: dict[str, float]) -> dict[str, float]:

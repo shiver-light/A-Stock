@@ -110,6 +110,60 @@ class MarketAiCoreNewsEventsTestCase(unittest.TestCase):
         self.assertEqual(ranked[0].event.event, "A股PCB板块多股涨停")
         self.assertGreater(ranked[0].directness_score, ranked[1].directness_score)
         self.assertGreater(ranked[0].impact_score, ranked[1].impact_score)
+        self.assertEqual(ranked[0].event.event_type, "order")
+        self.assertGreater(ranked[0].event_type_score, ranked[1].event_type_score)
+
+    def test_rank_core_news_events_prefers_hard_catalyst_type(self) -> None:
+        news_items = [
+            NewsItem(
+                news_id="n1",
+                source="财联社",
+                title="AI算力投资逻辑正被重新定义",
+                published_at="2026-09-11T09:00:00+08:00",
+                content="行业专题关注算力产业链。",
+            ),
+            NewsItem(
+                news_id="n2",
+                source="财联社",
+                title="AI服务器订单增长",
+                published_at="2026-09-11T10:00:00+08:00",
+                content="上市公司签订采购合同。",
+            ),
+        ]
+        events = [
+            NewsEventAnalysis(
+                event="AI算力投资逻辑正被重新定义",
+                event_type="news",
+                event_time="2026-09-11T09:00:00+08:00",
+                themes=["AI算力"],
+                source_news_ids=["n1"],
+            ),
+            NewsEventAnalysis(
+                event="AI服务器订单增长",
+                event_type="news",
+                event_time="2026-09-11T10:00:00+08:00",
+                themes=["AI算力"],
+                source_news_ids=["n2"],
+            ),
+        ]
+
+        ranked = rank_core_news_events(
+            events,
+            news_items=news_items,
+            core_themes=["AI算力"],
+            authority_scores={"财联社": 80.0},
+            semantic_weights={
+                "authority": 0.1,
+                "core_theme": 0.1,
+                "theme_match": 0.1,
+                "directness": 0.1,
+                "impact": 0.1,
+                "event_type": 1.0,
+            },
+        )
+
+        self.assertEqual(ranked[0].event.event, "AI服务器订单增长")
+        self.assertEqual(ranked[0].event.event_type, "order")
 
     def test_rank_core_news_events_penalizes_summary_news(self) -> None:
         news_items = [
