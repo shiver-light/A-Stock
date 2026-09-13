@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pandas as pd
 
 from market_ai.__main__ import (
+    _append_stock_role_snapshot,
     _append_theme_daily_snapshot,
     _append_theme_score_history,
     _discover_stock_theme_label_files,
@@ -16,7 +17,7 @@ from market_ai.__main__ import (
     main,
     summarize_theme_daily_snapshot,
 )
-from market_ai.models import DailyRadarReport, ThemeCatalystSummary, ThemeScoreResult
+from market_ai.models import DailyRadarReport, StockRole, ThemeCatalystSummary, ThemeScoreResult
 from market_ai.providers.news.importer import import_news_csvs
 from market_ai.themes import ThemeDefinition, ThemeTaxonomy
 from market_ai.themes.enrichment import enrich_stock_theme_labels
@@ -105,6 +106,39 @@ class MarketAiCliTestCase(unittest.TestCase):
         self.assertEqual(int(row["confirmed_event_count"]), 1)
         self.assertEqual(row["primary_event"], "算力政策发布")
         self.assertEqual(float(row["limit_up_strength"]), 80.0)
+
+    def test_append_stock_role_snapshot_upserts_by_trade_date_theme_stock(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "stock_role_snapshot.csv"
+            report = DailyRadarReport(
+                trade_date="20260901",
+                stock_roles=[
+                    StockRole(
+                        trade_date="20260901",
+                        theme="AI算力",
+                        stock_code="000001.SZ",
+                        stock_name="样本一",
+                        role="capacity_leader",
+                        confidence=0.8,
+                        reason=["板块成交额第一"],
+                    )
+                ],
+            )
+            _append_stock_role_snapshot(path, report)
+            report.stock_roles[0].role = "space_leader"
+            report.stock_roles[0].confidence = 0.9
+            report.stock_roles[0].reason = ["连板高度最高"]
+            _append_stock_role_snapshot(path, report)
+
+            data = pd.read_csv(path)
+
+        self.assertEqual(len(data), 1)
+        row = data.iloc[0]
+        self.assertEqual(row["theme"], "AI算力")
+        self.assertEqual(row["stock_code"], "000001.SZ")
+        self.assertEqual(row["role"], "space_leader")
+        self.assertEqual(float(row["confidence"]), 0.9)
+        self.assertEqual(row["reason"], "连板高度最高")
 
     def test_summarize_theme_daily_snapshot_uses_as_of_and_lookback(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

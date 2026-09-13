@@ -568,6 +568,7 @@ def _run_one_report(*, args: argparse.Namespace, trade_date: str) -> None:
     md_path.write_text(render_daily_radar_report_markdown(report), encoding="utf-8")
     _append_theme_score_history(history_path, report.core_themes)
     _append_theme_daily_snapshot(output_dir / "theme_daily_snapshot.csv", report)
+    _append_stock_role_snapshot(output_dir / "stock_role_snapshot.csv", report)
 
     print(f"wrote market radar report: {md_path}")
     print(f"wrote structured report: {json_path}")
@@ -662,6 +663,38 @@ def _append_theme_daily_snapshot(path: Path, report) -> None:
     combined = (
         combined.sort_values(["trade_date", "rank", "theme"])
         .drop_duplicates(subset=["trade_date", "theme"], keep="last")
+        .reset_index(drop=True)
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    combined.to_csv(path, index=False)
+
+
+def _append_stock_role_snapshot(path: Path, report) -> None:
+    """Append one report's stock roles with idempotent trade_date/theme/stock upsert."""
+    if not report.stock_roles:
+        return
+    rows = [
+        {
+            "trade_date": role.trade_date,
+            "theme": role.theme,
+            "stock_code": role.stock_code,
+            "stock_name": role.stock_name,
+            "role": role.role,
+            "confidence": role.confidence,
+            "reason": " | ".join(role.reason or []),
+        }
+        for role in report.stock_roles
+    ]
+    current = pd.DataFrame(rows)
+    if path.exists():
+        existing = pd.read_csv(path)
+        combined = pd.concat([existing, current], ignore_index=True)
+    else:
+        combined = current
+    combined["trade_date"] = combined["trade_date"].astype(str).str.replace(r"\\.0$", "", regex=True)
+    combined = (
+        combined.sort_values(["trade_date", "theme", "stock_code"])
+        .drop_duplicates(subset=["trade_date", "theme", "stock_code"], keep="last")
         .reset_index(drop=True)
     )
     path.parent.mkdir(parents=True, exist_ok=True)
