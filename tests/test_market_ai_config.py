@@ -7,6 +7,7 @@ from pathlib import Path
 from market_ai.config import (
     DEFAULT_NEWS_SEMANTIC_WEIGHTS,
     DEFAULT_THEME_SCORE_WEIGHTS,
+    LLMConfig,
     NewsScoringConfig,
     ThemeScoreConfig,
     load_market_radar_config,
@@ -23,6 +24,8 @@ class MarketAiConfigTestCase(unittest.TestCase):
         self.assertEqual(config.news_scoring.default_authority_score, 50.0)
         self.assertEqual(config.news_scoring.semantic_weights, DEFAULT_NEWS_SEMANTIC_WEIGHTS)
         self.assertIn("财联社", config.news_scoring.authority_scores)
+        self.assertFalse(config.llm.enabled)
+        self.assertEqual(config.llm.provider, "none")
         self.assertEqual(config.top_theme_count, 5)
         self.assertEqual(config.theme_score.weights, DEFAULT_THEME_SCORE_WEIGHTS)
 
@@ -63,6 +66,7 @@ top_theme_count: 3
         self.assertEqual(config.providers.market, "fake")
         self.assertEqual(config.providers.news, ["local_csv", "announcements"])
         self.assertEqual(config.providers.llm, "fake_llm")
+        self.assertFalse(config.llm.enabled)
         self.assertEqual(config.news.lookback_hours, 24)
         self.assertEqual(config.news_scoring.default_authority_score, 45.0)
         self.assertEqual(config.news_scoring.authority_scores["财联社"], 80.0)
@@ -85,6 +89,22 @@ top_theme_count: 3
             NewsScoringConfig(authority_scores={"财联社": -1})
         with self.assertRaisesRegex(ValueError, "semantic_weights"):
             NewsScoringConfig(semantic_weights={"authority": 0})
+
+    def test_llm_config_accepts_ollama_openai(self) -> None:
+        config = LLMConfig(
+            enabled=True,
+            provider="ollama_openai",
+            base_url="http://192.168.85.248:11434/v1/",
+            model="qwen3:8b",
+        )
+
+        self.assertTrue(config.enabled)
+        self.assertEqual(config.base_url, "http://192.168.85.248:11434/v1")
+        self.assertEqual(config.model, "qwen3:8b")
+
+    def test_llm_config_rejects_unknown_enabled_provider(self) -> None:
+        with self.assertRaisesRegex(ValueError, "ollama_openai"):
+            LLMConfig(enabled=True, provider="unknown")
 
     def test_missing_config_file_raises_clear_error(self) -> None:
         with self.assertRaisesRegex(FileNotFoundError, "Market radar config file not found"):

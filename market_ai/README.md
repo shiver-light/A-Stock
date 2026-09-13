@@ -51,6 +51,42 @@ Tushare 涨停专题示例：
 
 `run-range` 会通过 A 股交易日历跳过周末和节假日，并在同一个输出目录维护 `theme_scores.csv`，用于后续生命周期判断。
 
+本地 LLM 新闻增强示例：
+
+先准备一个本地配置，例如 `config/market_radar_ollama.yaml`：
+
+```yaml
+providers:
+  market: tushare
+  news:
+    - local_csv
+  llm: ollama_openai
+
+llm:
+  enabled: true
+  provider: ollama_openai
+  base_url: http://192.168.85.248:11434/v1
+  model: qwen3:8b
+  timeout_seconds: 60
+  temperature: 0.0
+  max_tokens: 1200
+  prompt_version: news_event_v1
+```
+
+然后运行：
+
+```bash
+/Users/raymond/src/aquant/venv/bin/python -m market_ai run \
+  --config config/market_radar_ollama.yaml \
+  --trade-date 20260911 \
+  --market-provider tushare_limit \
+  --news-csv data/cache/market_ai/news/tushare_major_news_20260907_20260911.csv \
+  --stock-theme-labels data/cache/market_ai/stock_theme_labels/limit_up_cross_theme_labels_recent.csv \
+  --output-dir output/market_radar
+```
+
+LLM 只用于新闻事件结构化增强。若本地模型不可用、返回非法 JSON 或输出未命中已知题材，系统会回退到原有 taxonomy 规则归因。
+
 运行后会生成：
 
 - `output/market_radar_sample/20260912.json`

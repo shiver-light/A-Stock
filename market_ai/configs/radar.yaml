@@ -11,6 +11,16 @@ providers:
 news:
   lookback_hours: 36
 
+llm:
+  enabled: false
+  provider: none
+  base_url: http://192.168.85.248:11434/v1
+  model: qwen3:8b
+  timeout_seconds: 60
+  temperature: 0.0
+  max_tokens: 1200
+  prompt_version: news_event_v1
+
 news_scoring:
   default_authority_score: 50
   core_event_top_n: 10

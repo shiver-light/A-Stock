@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 from market_ai.analysis import identify_stock_roles
+from market_ai.ai import OpenAICompatibleLLMProvider, analyze_news_items_with_llm
 from market_ai.config import RadarConfig
 from market_ai.lifecycle import classify_theme_lifecycle
 from market_ai.lifecycle.rules import STAGE_NAMES as LIFECYCLE_STAGE_NAMES
@@ -69,7 +70,11 @@ def build_daily_radar_report(
         news_end = news_end_time or datetime.now()
         news_start = news_start_time or news_end - timedelta(hours=config.news.lookback_hours)
         news_items = news_provider.fetch_news(start_time=news_start, end_time=news_end)
-        news_events = normalize_news_items(news_items, taxonomy)
+        llm_provider = OpenAICompatibleLLMProvider(config.llm) if config.llm.enabled else None
+        if llm_provider is not None:
+            news_events = analyze_news_items_with_llm(news_items, taxonomy, provider=llm_provider)
+        else:
+            news_events = normalize_news_items(news_items, taxonomy)
 
     core_themes = calculate_theme_scores(
         trade_date=trade_date,
@@ -127,6 +132,10 @@ def build_daily_radar_report(
             "core_news_event_count": len(core_news_events),
             "theme_catalyst_count": len(theme_catalysts),
             "news_event_count": len(core_news_events),
+            "llm_enabled": config.llm.enabled,
+            "llm_provider": config.llm.provider if config.llm.enabled else "none",
+            "llm_model": config.llm.model if config.llm.enabled else "",
+            "llm_prompt_version": config.llm.prompt_version if config.llm.enabled else "",
         },
     )
 

@@ -96,6 +96,49 @@ class NewsScoringConfig:
 
 
 @dataclass(frozen=True)
+class LLMConfig:
+    """Optional OpenAI-compatible LLM config for semantic news analysis."""
+
+    enabled: bool = False
+    provider: str = "none"
+    base_url: str = "http://192.168.85.248:11434/v1"
+    model: str = "qwen3:8b"
+    api_key: str = ""
+    timeout_seconds: int = 60
+    temperature: float = 0.0
+    max_tokens: int = 1200
+    prompt_version: str = "news_event_v1"
+
+    def __post_init__(self) -> None:
+        provider = str(self.provider or "none").strip()
+        enabled = bool(self.enabled) and provider not in {"", "none"}
+        timeout = int(self.timeout_seconds)
+        max_tokens = int(self.max_tokens)
+        temperature = float(self.temperature)
+        if enabled and provider != "ollama_openai":
+            raise ValueError("llm.provider currently supports only ollama_openai or none.")
+        if enabled and not str(self.base_url).strip():
+            raise ValueError("llm.base_url is required when LLM is enabled.")
+        if enabled and not str(self.model).strip():
+            raise ValueError("llm.model is required when LLM is enabled.")
+        if timeout <= 0:
+            raise ValueError("llm.timeout_seconds must be positive.")
+        if max_tokens <= 0:
+            raise ValueError("llm.max_tokens must be positive.")
+        if temperature < 0.0:
+            raise ValueError("llm.temperature must be non-negative.")
+        object.__setattr__(self, "enabled", enabled)
+        object.__setattr__(self, "provider", provider or "none")
+        object.__setattr__(self, "base_url", str(self.base_url).strip().rstrip("/"))
+        object.__setattr__(self, "model", str(self.model).strip())
+        object.__setattr__(self, "api_key", str(self.api_key or "").strip())
+        object.__setattr__(self, "timeout_seconds", timeout)
+        object.__setattr__(self, "temperature", temperature)
+        object.__setattr__(self, "max_tokens", max_tokens)
+        object.__setattr__(self, "prompt_version", str(self.prompt_version or "news_event_v1").strip())
+
+
+@dataclass(frozen=True)
 class ThemeScoreConfig:
     """Configurable ThemeScore weights."""
 
@@ -132,6 +175,7 @@ class RadarConfig:
     providers: ProviderConfig = field(default_factory=ProviderConfig)
     news: NewsWindowConfig = field(default_factory=NewsWindowConfig)
     news_scoring: NewsScoringConfig = field(default_factory=NewsScoringConfig)
+    llm: LLMConfig = field(default_factory=LLMConfig)
     theme_score: ThemeScoreConfig = field(default_factory=ThemeScoreConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
     strong_stock_min_pct_chg: float = 7.0
@@ -167,6 +211,7 @@ def _build_radar_config(payload: dict[str, Any]) -> RadarConfig:
     providers = payload.get("providers", {}) or {}
     news = payload.get("news", {}) or {}
     news_scoring = payload.get("news_scoring", {}) or {}
+    llm = payload.get("llm", {}) or {}
     theme_score = payload.get("theme_score", {}) or {}
     output = payload.get("output", {}) or {}
     if not isinstance(providers, dict):
@@ -175,6 +220,8 @@ def _build_radar_config(payload: dict[str, Any]) -> RadarConfig:
         raise ValueError("news must be a mapping.")
     if not isinstance(news_scoring, dict):
         raise ValueError("news_scoring must be a mapping.")
+    if not isinstance(llm, dict):
+        raise ValueError("llm must be a mapping.")
     if not isinstance(theme_score, dict):
         raise ValueError("theme_score must be a mapping.")
     if not isinstance(output, dict):
@@ -194,6 +241,17 @@ def _build_radar_config(payload: dict[str, Any]) -> RadarConfig:
             min_core_event_score=float(news_scoring.get("min_core_event_score", 60.0)),
             require_core_theme_match=bool(news_scoring.get("require_core_theme_match", True)),
             semantic_weights=dict(news_scoring.get("semantic_weights", DEFAULT_NEWS_SEMANTIC_WEIGHTS) or DEFAULT_NEWS_SEMANTIC_WEIGHTS),
+        ),
+        llm=LLMConfig(
+            enabled=bool(llm.get("enabled", False)),
+            provider=str(llm.get("provider", providers.get("llm", "none"))),
+            base_url=str(llm.get("base_url", "http://192.168.85.248:11434/v1")),
+            model=str(llm.get("model", "qwen3:8b")),
+            api_key=str(llm.get("api_key", "")),
+            timeout_seconds=int(llm.get("timeout_seconds", 60)),
+            temperature=float(llm.get("temperature", 0.0)),
+            max_tokens=int(llm.get("max_tokens", 1200)),
+            prompt_version=str(llm.get("prompt_version", "news_event_v1")),
         ),
         theme_score=ThemeScoreConfig(
             weights=dict(theme_score.get("weights", DEFAULT_THEME_SCORE_WEIGHTS) or DEFAULT_THEME_SCORE_WEIGHTS)
