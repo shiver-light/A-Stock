@@ -12,6 +12,7 @@ from market_ai.__main__ import (
     _append_theme_score_history,
     _discover_stock_theme_label_files,
     _get_a_share_trade_dates,
+    build_theme_watchlist,
     main,
     summarize_theme_daily_snapshot,
 )
@@ -146,6 +147,72 @@ class MarketAiCliTestCase(unittest.TestCase):
             ).to_csv(path, index=False)
 
             code = main(["theme-summary", "--snapshot", str(path), "--output", "json"])
+
+        self.assertEqual(code, 0)
+
+    def test_build_theme_watchlist_filters_actionable_stages(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "theme_daily_snapshot.csv"
+            pd.DataFrame(
+                {
+                    "trade_date": ["20260911", "20260911", "20260911", "20260912"],
+                    "theme": ["AI算力", "CPO光通信", "量子科技新材料", "AI算力"],
+                    "rank": [1, 2, 3, 1],
+                    "score": [82.0, 45.0, 28.0, 10.0],
+                    "lifecycle_stage": [3, 2, 0, 7],
+                    "confirmed_event_count": [2, 0, 0, 0],
+                    "primary_event": ["算力订单", "", "", ""],
+                    "catalyst_conclusion": ["确认", "", "", ""],
+                }
+            ).to_csv(path, index=False)
+
+            watchlist = build_theme_watchlist(
+                path,
+                as_of_date="20260911",
+                lookback_days=1,
+                top_n=10,
+                min_score=30.0,
+            )
+
+        self.assertEqual(watchlist["theme"].to_list(), ["AI算力", "CPO光通信"])
+        self.assertEqual(watchlist.iloc[0]["stage_name"], "主升")
+        self.assertIn("当前确认消息 2 条", watchlist.iloc[0]["observation"])
+        self.assertIn("缺少消息确认", watchlist.iloc[1]["observation"])
+
+    def test_build_theme_watchlist_excludes_stale_themes_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "theme_daily_snapshot.csv"
+            pd.DataFrame(
+                {
+                    "trade_date": ["20260910", "20260911"],
+                    "theme": ["AI算力", "CPO光通信"],
+                    "rank": [1, 2],
+                    "score": [80.0, 45.0],
+                    "lifecycle_stage": [3, 2],
+                }
+            ).to_csv(path, index=False)
+
+            current = build_theme_watchlist(path, as_of_date="20260911")
+            with_stale = build_theme_watchlist(path, as_of_date="20260911", include_stale=True)
+
+        self.assertEqual(current["theme"].to_list(), ["CPO光通信"])
+        self.assertEqual(set(with_stale["theme"]), {"AI算力", "CPO光通信"})
+
+    def test_theme_watchlist_cli_prints_json(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "theme_daily_snapshot.csv"
+            pd.DataFrame(
+                {
+                    "trade_date": ["20260911"],
+                    "theme": ["AI算力"],
+                    "rank": [1],
+                    "score": [80.0],
+                    "lifecycle_stage": [3],
+                    "confirmed_event_count": [1],
+                }
+            ).to_csv(path, index=False)
+
+            code = main(["theme-watchlist", "--snapshot", str(path), "--output", "json"])
 
         self.assertEqual(code, 0)
 

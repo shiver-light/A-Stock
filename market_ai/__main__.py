@@ -144,6 +144,20 @@ def main(argv: list[str] | None = None) -> int:
     summary_parser.add_argument("--top-n", type=int, default=20, help="Number of summary rows to print.")
     summary_parser.add_argument("--output", choices=["table", "json"], default="table")
 
+    watchlist_parser = subparsers.add_parser("theme-watchlist", help="Build next-day theme observation watchlist.")
+    watchlist_parser.add_argument(
+        "--snapshot",
+        default="output/market_radar/theme_daily_snapshot.csv",
+        help="Path to theme_daily_snapshot.csv.",
+    )
+    watchlist_parser.add_argument("--as-of-date", default=None, help="Optional max trade date, for example 20260911.")
+    watchlist_parser.add_argument("--lookback-days", type=int, default=5, help="Number of latest trade dates to summarize.")
+    watchlist_parser.add_argument("--top-n", type=int, default=10, help="Number of watchlist rows to print.")
+    watchlist_parser.add_argument("--min-score", type=float, default=30.0, help="Minimum latest ThemeScore.")
+    watchlist_parser.add_argument("--stages", default="1,2,3,6", help="Lifecycle stages to include, comma separated.")
+    watchlist_parser.add_argument("--include-stale", action="store_true", help="Include themes not present on the latest snapshot date.")
+    watchlist_parser.add_argument("--output", choices=["table", "json"], default="table")
+
     args = parser.parse_args(argv)
     if args.command == "run":
         return _run(args)
@@ -157,6 +171,8 @@ def main(argv: list[str] | None = None) -> int:
         return _collect_news(args)
     if args.command == "theme-summary":
         return _theme_summary(args)
+    if args.command == "theme-watchlist":
+        return _theme_watchlist(args)
     raise ValueError(f"Unsupported command: {args.command}")
 
 
@@ -277,6 +293,37 @@ def _theme_summary(args: argparse.Namespace) -> int:
     return 0
 
 
+def _theme_watchlist(args: argparse.Namespace) -> int:
+    watchlist = build_theme_watchlist(
+        args.snapshot,
+        as_of_date=args.as_of_date,
+        lookback_days=args.lookback_days,
+        top_n=args.top_n,
+        min_score=args.min_score,
+        stages=_parse_stage_filter(args.stages),
+        include_stale=args.include_stale,
+    )
+    if args.output == "json":
+        print(json.dumps(watchlist.to_dict(orient="records"), ensure_ascii=False, indent=2))
+    else:
+        if watchlist.empty:
+            print("no watchlist themes found")
+        else:
+            columns = [
+                "theme",
+                "latest_trade_date",
+                "stage_name",
+                "latest_rank",
+                "latest_score",
+                "active_days",
+                "score_change",
+                "latest_confirmed_events",
+                "observation",
+            ]
+            print(watchlist[columns].to_string(index=False))
+    return 0
+
+
 def summarize_theme_daily_snapshot(
     snapshot_path: str | Path,
     *,
@@ -349,6 +396,44 @@ def summarize_theme_daily_snapshot(
     return summary.head(max(0, int(top_n)))
 
 
+def build_theme_watchlist(
+    snapshot_path: str | Path,
+    *,
+    as_of_date: str | None = None,
+    lookback_days: int = 5,
+    top_n: int = 10,
+    min_score: float = 30.0,
+    stages: set[int] | None = None,
+    include_stale: bool = False,
+) -> pd.DataFrame:
+    """Build next-day observation candidates from recent theme snapshots."""
+    selected_stages = stages if stages is not None else {1, 2, 3, 6}
+    summary = summarize_theme_daily_snapshot(
+        snapshot_path,
+        as_of_date=as_of_date,
+        lookback_days=lookback_days,
+        top_n=1000,
+    )
+    if summary.empty:
+        return pd.DataFrame(columns=_theme_watchlist_columns())
+    result = summary.copy()
+    if not include_stale:
+        latest_date = result["latest_trade_date"].max()
+        result = result.loc[result["latest_trade_date"].eq(latest_date)].copy()
+    result = result.loc[
+        result["latest_stage"].isin(selected_stages) & result["latest_score"].ge(float(min_score))
+    ].copy()
+    if result.empty:
+        return pd.DataFrame(columns=_theme_watchlist_columns())
+    result["stage_name"] = result["latest_stage"].map(_stage_name)
+    result["observation"] = result.apply(_watchlist_observation, axis=1)
+    result = result.sort_values(
+        ["latest_rank", "latest_confirmed_events", "active_days", "latest_score"],
+        ascending=[True, False, False, False],
+    ).reset_index(drop=True)
+    return result[_theme_watchlist_columns()].head(max(0, int(top_n)))
+
+
 def _discover_stock_theme_label_files(input_dir: Path) -> list[Path]:
     """Find existing generated stock theme label CSVs under an output directory."""
     if not input_dir.exists():
@@ -374,6 +459,67 @@ def _theme_summary_columns() -> list[str]:
         "latest_primary_event",
         "latest_catalyst_conclusion",
     ]
+
+
+def _theme_watchlist_columns() -> list[str]:
+    return [
+        "theme",
+        "latest_trade_date",
+        "latest_rank",
+        "latest_score",
+        "latest_stage",
+        "stage_name",
+        "active_days",
+        "mean_score",
+        "score_change",
+        "latest_confirmed_events",
+        "latest_primary_event",
+        "observation",
+    ]
+
+
+def _parse_stage_filter(value: str) -> set[int]:
+    stages = set()
+    for item in str(value or "").split(","):
+        text = item.strip()
+        if not text:
+            continue
+        stages.add(int(text))
+    return stages
+
+
+def _stage_name(stage: object) -> str:
+    names = {
+        0: "潜伏",
+        1: "启动",
+        2: "发酵",
+        3: "主升",
+        4: "高潮",
+        5: "分歧",
+        6: "回流",
+        7: "退潮",
+    }
+    if pd.isna(stage):
+        return "未判定"
+    return names.get(int(stage), f"未知({int(stage)})")
+
+
+def _watchlist_observation(row: pd.Series) -> str:
+    stage = int(row["latest_stage"])
+    theme = str(row["theme"])
+    if stage == 1:
+        base = f"{theme} 是否从首日启动扩散到更多涨停/强势股。"
+    elif stage == 2:
+        base = f"{theme} 是否继续发酵，并且排名和成交额强度不回落。"
+    elif stage == 3:
+        base = f"{theme} 龙头是否晋级，中军是否维持放量，避免高位分歧扩大。"
+    elif stage == 6:
+        base = f"{theme} 回流后是否二次走强，观察确认消息和前排承接。"
+    else:
+        base = f"{theme} 是否延续当前阶段。"
+    if int(row.get("latest_confirmed_events", 0)) <= 0:
+        return base + " 当前缺少消息确认，需重点核对公开催化。"
+    return base + f" 当前确认消息 {int(row['latest_confirmed_events'])} 条。"
 
 
 def _nullable_int(value: object) -> int | None:
