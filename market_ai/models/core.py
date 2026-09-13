@@ -47,6 +47,21 @@ def _text_list(values: list[str] | tuple[str, ...] | None) -> list[str]:
     return [str(value).strip() for value in values if str(value).strip()]
 
 
+def _clean_mapping(value: dict[str, Any]) -> dict[str, Any]:
+    result = {}
+    for key, item in value.items():
+        key_text = str(key).strip()
+        if not key_text:
+            continue
+        if isinstance(item, (int, float, bool)) or item is None:
+            result[key_text] = item
+        elif isinstance(item, (list, tuple)):
+            result[key_text] = [str(child).strip() for child in item if str(child).strip()]
+        else:
+            result[key_text] = str(item).strip()
+    return result
+
+
 @dataclass
 class JsonModel:
     """Mixin for deterministic JSON-compatible dict conversion."""
@@ -172,6 +187,7 @@ class NewsEventAnalysis(JsonModel):
     validation_state: str | None = None
     market_confirm_score: float | None = None
     validation_reason: list[str] = field(default_factory=list)
+    theme_evidence: list[dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         self.event = _require_text(self.event, "event")
@@ -189,6 +205,7 @@ class NewsEventAnalysis(JsonModel):
         if self.market_confirm_score is not None:
             self.market_confirm_score = _score(self.market_confirm_score, "market_confirm_score")
         self.validation_reason = _text_list(self.validation_reason)
+        self.theme_evidence = [_clean_mapping(item) for item in self.theme_evidence if isinstance(item, dict)]
 
 
 @dataclass

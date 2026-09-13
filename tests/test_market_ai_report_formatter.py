@@ -44,6 +44,14 @@ class MarketRadarReportFormatterTestCase(unittest.TestCase):
                     validation_state="confirmed_catalyst",
                     market_confirm_score=86.5,
                     validation_reason=["命中核心题材: AI算力", "最高 ThemeScore=86.50"],
+                    theme_evidence=[
+                        {
+                            "theme": "AI算力",
+                            "matched_keyword": "算力",
+                            "source": "taxonomy_rule",
+                            "confidence": 1.0,
+                        }
+                    ],
                 )
             ],
             theme_catalysts=[
@@ -87,6 +95,7 @@ class MarketRadarReportFormatterTestCase(unittest.TestCase):
         self.assertIn("## 核心题材催化", text)
         self.assertIn("| AI算力 | 算力基础设施政策发布 | 1/0 |", text)
         self.assertIn("算力基础设施政策发布", text)
+        self.assertIn("归因证据：AI算力:算力", text)
         self.assertIn("资金验证：confirmed_catalyst / 86.5", text)
         self.assertIn("验证原因：命中核心题材: AI算力; 最高 ThemeScore=86.50", text)
         self.assertIn("机器人具身智能", text)

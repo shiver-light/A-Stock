@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
 
 from market_ai.models import LimitStock, NewsEventAnalysis, NewsItem, StrongStock, ThemeNormalization
@@ -75,6 +76,7 @@ class RuleBasedThemeNormalizer:
             expected_duration="",
             confidence=min(0.8, _rule_confidence(matches)),
             source_news_ids=[news.news_id],
+            theme_evidence=_theme_evidence(matches),
         )
 
 
@@ -108,6 +110,32 @@ def _rule_confidence(matches: list[ThemeMatch]) -> float:
     if len(matches) >= 2:
         return 0.9
     return 0.8
+
+
+def _theme_evidence(matches: list[ThemeMatch]) -> list[dict[str, object]]:
+    evidence = []
+    seen = set()
+    for match in matches:
+        key = (match.theme, match.matched_alias)
+        if key in seen:
+            continue
+        seen.add(key)
+        evidence.append(
+            {
+                "theme": match.theme,
+                "matched_keyword": match.matched_alias,
+                "source": "taxonomy_rule",
+                "source_text": _evidence_excerpt(match.source_text),
+                "confidence": match.confidence,
+            }
+        )
+    return evidence
+
+
+def _evidence_excerpt(text: str, max_length: int = 160) -> str:
+    cleaned = re.sub(r"<[^>]+>", " ", str(text or ""))
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned[:max_length]
 
 
 def _join_text(values: Iterable[object]) -> str:

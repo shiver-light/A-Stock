@@ -82,6 +82,7 @@ def _render_news_events(events: list[NewsEventAnalysis]) -> list[str]:
             [
                 f"- 事件：{event.event}",
                 f"  - 对应题材：{themes}",
+                f"  - 归因证据：{_theme_evidence_text(event)}",
                 f"  - 类型/时间：{event.event_type} / {event.event_time}",
                 f"  - 重要性/新鲜度/置信度：{event.importance} / {event.novelty} / {event.confidence:.2f}",
                 f"  - 资金验证：{event.validation_state or 'N/A'} / {event.market_confirm_score if event.market_confirm_score is not None else 'N/A'}",
@@ -91,6 +92,18 @@ def _render_news_events(events: list[NewsEventAnalysis]) -> list[str]:
             ]
         )
     return lines
+
+
+def _theme_evidence_text(event: NewsEventAnalysis) -> str:
+    if not event.theme_evidence:
+        return "N/A"
+    parts = []
+    for item in event.theme_evidence[:5]:
+        theme = str(item.get("theme") or "").strip()
+        keyword = str(item.get("matched_keyword") or "").strip()
+        if theme and keyword:
+            parts.append(f"{theme}:{keyword}")
+    return "; ".join(parts) if parts else "N/A"
 
 
 def _render_theme_catalysts(catalysts: list[ThemeCatalystSummary]) -> list[str]:

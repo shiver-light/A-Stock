@@ -70,6 +70,8 @@ class ThemeNormalizerTestCase(unittest.TestCase):
         self.assertEqual(result.event_type, "news")
         self.assertEqual(result.themes, ["AI算力", "CPO光通信"])
         self.assertEqual(result.source_news_ids, ["n1"])
+        self.assertEqual(result.theme_evidence[0]["theme"], "AI算力")
+        self.assertEqual(result.theme_evidence[0]["matched_keyword"], "液冷服务器")
 
     def test_batch_helpers_drop_unmatched_rows(self) -> None:
         matched = LimitStock(
